@@ -1,0 +1,292 @@
+---
+title: "ApprovalResult"
+description: "Dataclasses representing the outcome of a gate evaluation and challenge verification"
+icon: "clipboard-check"
+---
+
+`ApprovalResult` is the full audit-ready record returned by every gate evaluation. It contains the final verdict, risk assessment, challenge result (if applicable), review timing, and audit metadata. `ChallengeResult` is a nested dataclass that captures the outcome of a specific verification challenge.
+
+## ApprovalResult
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import ApprovalResult
+```
+
+```typescript TypeScript
+import { ApprovalResult } from "@attesta/core";
+```
+</CodeGroup>
+
+### Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `verdict` | `Verdict` | *required* | The outcome of the review. See [Verdict enum](/api/enums#verdict). |
+| `risk_assessment` | `RiskAssessment` | *required* | The full risk assessment including score, level, and contributing factors. |
+| `challenge_result` | `ChallengeResult \| None` | `None` | The outcome of the verification challenge. `None` when the action was auto-approved (LOW risk). |
+| `approvers` | `list[str]` | `[]` | List of approver identifiers. Populated by multi-party challenges. |
+| `review_time_seconds` | `float` | `0.0` | Wall-clock time from interception to final verdict, in seconds. |
+| `audit_entry_id` | `str \| None` | `None` | Unique ID of the audit log entry. Set after the audit logger persists the record. |
+| `timestamp` | `datetime` | `datetime.now()` | When the result was produced. |
+| `modification` | `str \| None` | `None` | Description of how the action was modified. Populated only when verdict is `MODIFIED`. |
+
+### Usage
+
+<CodeGroup>
+```python Python
+from attesta import Attesta, ActionContext, Verdict
+
+attesta = Attesta.from_config("attesta.yaml")
+
+ctx = ActionContext(
+    function_name="deploy",
+    args=("api-gateway", "2.1.0"),
+    environment="production",
+)
+
+result = await attesta.evaluate(ctx)
+
+# Check the verdict
+if result.verdict == Verdict.APPROVED:
+    print("Action approved!")
+    print(f"Risk: {result.risk_assessment.level.value}")
+    print(f"Score: {result.risk_assessment.score:.2f}")
+    print(f"Review time: {result.review_time_seconds:.1f}s")
+    print(f"Audit ID: {result.audit_entry_id}")
+
+elif result.verdict == Verdict.DENIED:
+    print("Action denied.")
+    if result.challenge_result:
+        print(f"Challenge type: {result.challenge_result.challenge_type.value}")
+        print(f"Questions correct: {result.challenge_result.questions_correct}"
+              f"/{result.challenge_result.questions_asked}")
+
+elif result.verdict == Verdict.MODIFIED:
+    print(f"Action modified: {result.modification}")
+```
+
+```typescript TypeScript
+import { Attesta, ActionContext, Verdict } from "@attesta/core";
+
+const attesta = new Attesta();
+
+const ctx: ActionContext = {
+  functionName: "deploy",
+  args: ["api-gateway", "2.1.0"],
+  environment: "production",
+};
+
+const result = await attesta.evaluate(ctx);
+
+if (result.verdict === Verdict.APPROVED) {
+  console.log(`Risk: ${result.riskAssessment.level}`);
+  console.log(`Score: ${result.riskAssessment.score.toFixed(2)}`);
+  console.log(`Review time: ${result.reviewTimeSeconds.toFixed(1)}s`);
+  console.log(`Audit ID: ${result.auditEntryId}`);
+} else if (result.verdict === Verdict.DENIED) {
+  console.log("Action denied.");
+}
+```
+</CodeGroup>
+
+### Accessing via AttestaDenied
+
+When a gated function is denied, the `AttestaDenied` exception carries the full `ApprovalResult`:
+
+```python Python
+from attesta import gate, AttestaDenied
+
+@gate(risk="critical")
+def drop_table(name: str) -> str:
+    """Drop a database table."""
+    return f"Dropped {name}"
+
+try:
+    drop_table("users")
+except AttestaDenied as e:
+    result = e.result  # ApprovalResult | None
+    if result:
+        print(f"Verdict: {result.verdict.value}")
+        print(f"Risk score: {result.risk_assessment.score:.2f}")
+        print(f"Risk level: {result.risk_assessment.level.value}")
+        for factor in result.risk_assessment.factors:
+            print(f"  - {factor.name}: {factor.contribution:.3f}")
+```
+
+---
+
+## ChallengeResult
+
+Captures the outcome of a single verification challenge. This is `None` in the `ApprovalResult` when the action was auto-approved.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import ChallengeResult
+```
+
+```typescript TypeScript
+import { ChallengeResult } from "@attesta/core";
+```
+</CodeGroup>
+
+### Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `passed` | `bool` | *required* | Whether the challenge was successfully completed. |
+| `challenge_type` | `ChallengeType` | *required* | The type of challenge that was presented. See [ChallengeType enum](/api/enums#challengetype). |
+| `responder` | `str` | `"default"` | Identifier for who completed the challenge. Defaults to `"default"` for single-party challenges. |
+| `response_time_seconds` | `float` | `0.0` | Time taken to complete the challenge, in seconds. |
+| `questions_asked` | `int` | `0` | Number of questions presented (quiz and teach-back challenges). |
+| `questions_correct` | `int` | `0` | Number of questions answered correctly (quiz challenges). |
+| `details` | `dict[str, Any]` | `{}` | Additional challenge-specific metadata. |
+
+### Challenge-Specific Details
+
+The `details` dict contains different keys depending on the challenge type:
+
+**Confirm challenge:**
+```python
+{
+    "confirmed": True,
+    "review_seconds": 4.2,
+}
+```
+
+**Quiz challenge:**
+```python
+{
+    "questions": [
+        {"question": "What table will be dropped?", "expected": "users", "given": "users"},
+        {"question": "Is this reversible?", "expected": "no", "given": "no"},
+    ],
+    "pass_threshold": 0.8,
+    "actual_score": 1.0,
+}
+```
+
+**Teach-back challenge:**
+```python
+{
+    "explanation": "This will permanently delete the users table from the production database.",
+    "word_count": 12,
+    "key_terms_matched": ["delete", "users", "production"],
+    "key_terms_required": ["delete", "users", "production", "table"],
+}
+```
+
+**Multi-party challenge:**
+```python
+{
+    "approvers": [
+        {"id": "alice", "challenge": "teach_back", "passed": True},
+        {"id": "bob", "challenge": "quiz", "passed": True},
+        {"id": "carol", "challenge": "confirm", "passed": True},
+    ],
+    "required_approvers": 2,
+    "actual_approvers": 3,
+}
+```
+
+### Example: Inspecting a Challenge Result
+
+<CodeGroup>
+```python Python
+from attesta import Attesta, ActionContext, ChallengeType
+
+attesta = Attesta.from_config("attesta.yaml")
+
+ctx = ActionContext(
+    function_name="delete_user",
+    args=("usr_12345",),
+    function_doc="Permanently delete a user account and all associated data.",
+    environment="production",
+)
+
+result = await attesta.evaluate(ctx)
+
+if result.challenge_result:
+    cr = result.challenge_result
+    print(f"Challenge: {cr.challenge_type.value}")
+    print(f"Passed: {cr.passed}")
+    print(f"Response time: {cr.response_time_seconds:.1f}s")
+
+    if cr.challenge_type == ChallengeType.QUIZ:
+        print(f"Score: {cr.questions_correct}/{cr.questions_asked}")
+
+    if cr.challenge_type == ChallengeType.MULTI_PARTY:
+        for approver in cr.details.get("approvers", []):
+            print(f"  {approver['id']}: {approver['challenge']} -> {'passed' if approver['passed'] else 'failed'}")
+else:
+    print("Auto-approved (no challenge presented)")
+```
+
+```typescript TypeScript
+import { Attesta, ActionContext, ChallengeType } from "@attesta/core";
+
+const attesta = new Attesta();
+
+const ctx: ActionContext = {
+  functionName: "deleteUser",
+  args: ["usr_12345"],
+  functionDoc: "Permanently delete a user account.",
+  environment: "production",
+};
+
+const result = await attesta.evaluate(ctx);
+
+if (result.challengeResult) {
+  const cr = result.challengeResult;
+  console.log(`Challenge: ${cr.challengeType}`);
+  console.log(`Passed: ${cr.passed}`);
+  console.log(`Response time: ${cr.responseTimeSeconds.toFixed(1)}s`);
+
+  if (cr.challengeType === ChallengeType.QUIZ) {
+    console.log(`Score: ${cr.questionsCorrect}/${cr.questionsAsked}`);
+  }
+}
+```
+</CodeGroup>
+
+<Note>
+The `challenge_result` is `None` when the risk level is LOW and the default challenge map routes to `auto_approve`. In this case, `result.verdict` is `APPROVED` and no human interaction occurred.
+</Note>
+
+## AttestaDenied Exception
+
+Raised by the `@gate` decorator when a gated function call is denied, timed out, or escalated.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import AttestaDenied
+```
+
+```typescript TypeScript
+import { AttestaDenied } from "@attesta/core";
+```
+</CodeGroup>
+
+### Constructor
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `message` | `str` | `"Action denied by attesta"` | Human-readable error message. |
+| `result` | `ApprovalResult \| None` | `None` | The full approval result, if available. |
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `message` | `str` | The error message (inherited from `Exception`). |
+| `result` | `ApprovalResult \| None` | The full approval result with verdict, risk assessment, and challenge details. |
+
+<Warning>
+Always check `e.result is not None` before accessing result fields. The `result` may be `None` if the exception was raised before the evaluation completed (e.g., during context construction).
+</Warning>

@@ -1,0 +1,278 @@
+---
+title: "Dify Integration"
+description: "Add human-in-the-loop approval to Dify workflows with the Attesta plugin"
+icon: "plug"
+---
+
+The `dify-attesta` package provides an **Attesta** plugin for the [Dify](https://dify.ai) platform. It adds an **Attesta Approval** tool that evaluates AI agent actions for risk through the full Attesta pipeline, with provider-level credentials for configuring the risk threshold.
+
+<Note>
+**Package:** `dify-attesta` v0.0.1 | **Language:** Python | **Type:** Dify plugin | **Dependencies:** `attesta`, `dify_plugin`
+</Note>
+
+## Installation
+
+<Steps>
+  <Step title="Build the plugin archive">
+    From the `dify-attesta` directory, build the `.difypkg` file following the [Dify plugin packaging guide](https://docs.dify.ai/plugins):
+
+    ```bash
+    cd packages/dify-attesta
+    # Package the plugin into a .difypkg archive
+    ```
+
+    The plugin directory contains:
+    ```
+    dify-attesta/
+      manifest.yaml          # Plugin metadata (v0.0.1, memory: 256MB)
+      _assets/
+        icon.svg             # Plugin icon
+      provider/
+        attesta.yaml         # Provider identity and credentials schema
+        attesta.py           # AttestaProvider: credential validation
+      tools/
+        attesta_gate.yaml    # Tool identity, description, and parameters
+        attesta_gate.py      # AttestaGateTool: tool implementation
+    ```
+  </Step>
+  <Step title="Upload to Dify">
+    In the Dify dashboard, navigate to **Plugins** and upload the `.difypkg` file.
+  </Step>
+  <Step title="Configure the provider">
+    After installation, go to **Tools > Attesta > Authorize** and configure the optional **Risk Threshold** credential (see [Provider Credentials](#provider-credentials) below).
+  </Step>
+  <Step title="Add to a workflow">
+    In any Dify app (chatbot or workflow), add the **Attesta Approval** tool from the tool picker.
+  </Step>
+</Steps>
+
+---
+
+## Provider Credentials
+
+The Attesta provider (`AttestaProvider`) defines one optional credential that applies to all Attesta tools in the workspace:
+
+| Credential | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `risk_threshold` | Number | No | `0.5` | Default risk threshold (0--1). Actions scoring above this value are flagged for review. |
+
+The provider's `_validate_credentials()` method validates that `risk_threshold` is a number between 0 and 1. Values outside this range raise a `ToolProviderCredentialValidationError`.
+
+To configure:
+1. Go to **Tools > Attesta > Authorize**
+2. Set the **Risk Threshold** value (placeholder: `0.5`)
+3. Save
+
+<Tip>
+Lower the threshold (e.g., `0.3`) for stricter environments where you want more actions flagged for review. Raise it (e.g., `0.8`) for development environments where you only want to gate the most dangerous actions.
+</Tip>
+
+---
+
+## Tool Configuration
+
+The **Attesta Approval** tool (`AttestaGateTool`) has three parameters, defined in `tools/attesta_gate.yaml`:
+
+| Parameter | Type | Required | Form | Description |
+|---|---|---|---|---|
+| **function_name** | String | Yes | LLM | Name of the action being evaluated (e.g., `send_email`, `delete_record`). The LLM provides this value based on context. |
+| **risk_level** | Select | No | Form | Override the risk level. Options: Auto (Score-based), Low, Medium, High, Critical. Defaults to Auto. |
+| **action_args** | String | No | LLM | JSON string of arguments for the action being evaluated. The LLM provides this based on the action context. |
+
+<Note>
+Parameters with form type `LLM` are filled by the language model at runtime based on the conversation context. Parameters with form type `Form` are configured by the user in the tool settings. This means **function_name** and **action_args** are dynamically determined by the LLM, while **risk_level** is set once during configuration.
+</Note>
+
+The tool's LLM description (used by the model to decide when to invoke the tool) is:
+
+> A human-in-the-loop approval tool that evaluates AI agent actions for risk before execution. Use this tool to check whether a proposed action should be allowed.
+
+---
+
+## How It Works
+
+<Steps>
+  <Step title="LLM Invokes the Tool">
+    During a conversation or workflow execution, the LLM decides to call the **Attesta Approval** tool. It provides the `function_name` and `action_args` parameters based on the action it wants to evaluate.
+  </Step>
+  <Step title="Parse Arguments">
+    The tool parses `action_args`. If the value is a string, it attempts JSON parsing. Failed parses are wrapped as `{"raw_input": <value>}`. If the value is already a dict (from a workflow node), it is used directly.
+  </Step>
+  <Step title="Apply Credentials">
+    The `risk_threshold` from the provider credentials is read via `self.runtime.credentials.get("risk_threshold")` and added to the risk hints as `{"threshold": <value>}`.
+  </Step>
+  <Step title="Build ActionContext">
+    The tool creates an `ActionContext` with:
+    - `function_name`: from the LLM parameter
+    - `kwargs`: from the parsed action arguments
+    - `hints`: risk hints including the threshold from credentials
+    - `environment`: `"production"`
+    - `metadata`: `{"source": "dify"}`
+  </Step>
+  <Step title="Evaluate">
+    The `ActionContext` is passed to `attesta.evaluate()`. The tool handles both async and sync execution contexts (see [Async Execution](#async-execution) below).
+  </Step>
+  <Step title="Yield Result">
+    The tool yields a single `ToolInvokeMessage` (JSON) via `self.create_json_message()` with the verdict, risk score, and audit metadata.
+  </Step>
+</Steps>
+
+---
+
+## Output Format
+
+The tool yields a JSON message with the following fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `verdict` | string | `approved`, `denied`, `modified`, `timed_out`, or `escalated` |
+| `risk_score` | float | Numeric risk score between 0 and 1 |
+| `risk_level` | string | `low`, `medium`, `high`, or `critical` |
+| `denied` | bool | `true` if verdict is `denied`, `timed_out`, or `escalated` |
+| `audit_entry_id` | string | Unique audit log entry ID |
+| `function_name` | string | Echo of the evaluated function name |
+| `message` | string | Human-readable summary (e.g., `"Action 'send_email' was approved (risk: low, score: 0.20)"`) |
+
+<Tabs>
+  <Tab title="Approved">
+    ```json
+    {
+      "verdict": "approved",
+      "risk_score": 0.2,
+      "risk_level": "low",
+      "denied": false,
+      "audit_entry_id": "audit-abc123",
+      "function_name": "send_email",
+      "message": "Action 'send_email' was approved (risk: low, score: 0.20)"
+    }
+    ```
+  </Tab>
+  <Tab title="Denied">
+    ```json
+    {
+      "verdict": "denied",
+      "risk_score": 0.85,
+      "risk_level": "critical",
+      "denied": true,
+      "audit_entry_id": "audit-def456",
+      "function_name": "delete_all_users",
+      "message": "Action 'delete_all_users' was denied (risk: critical, score: 0.85)"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+The `message` field provides a human-readable summary that the LLM can relay to the user. The `denied` boolean provides a simple check for downstream branching in workflows.
+
+---
+
+## Usage Examples
+
+### Example: Chatbot with Gated Actions
+
+In a Dify chatbot app, add the **Attesta Approval** tool so the LLM can check approval before performing actions:
+
+1. Create a new **Chatbot** app in Dify.
+2. Under **Tools**, add the **Attesta Approval** tool.
+3. Set **Risk Level** to `Auto (Score-based)`.
+4. In the system prompt, instruct the LLM:
+   ```
+   Before performing any action that modifies data (sending emails, deleting
+   records, making API calls), you MUST first call the Attesta Approval tool
+   with the function name and arguments. Only proceed if the result shows
+   "denied": false.
+   ```
+5. The LLM will call the tool with the function name and arguments before executing any risky action.
+
+### Example: Workflow with Conditional Branching
+
+In a Dify workflow app, use the Attesta tool output to branch execution:
+
+```
+[Start] --> [LLM Node] --> [Attesta Approval] --> [IF denied] --> [End: Denied]
+                                                       |
+                                                       --> [Execute Action] --> [End: Success]
+```
+
+1. Create a **Workflow** app.
+2. Add an **LLM** node that determines the action to take.
+3. Add the **Attesta Approval** tool node.
+4. Add an **IF/ELSE** node that checks the `denied` field from the Attesta output.
+5. Route to the action node on approval, or to a denial response on denial.
+
+### Example: Multi-Tool Evaluation
+
+The LLM can call the Attesta tool multiple times in one conversation to evaluate different actions at different risk levels:
+
+```
+LLM decides to call:
+  1. attesta_gate(function_name="read_customer", action_args='{"id": "cust_123"}')
+     --> Approved (low risk, auto-approve)
+
+  2. attesta_gate(function_name="update_billing", action_args='{"amount": 500}')
+     --> Risk scored as HIGH --> quiz challenge presented
+
+  3. attesta_gate(function_name="delete_account", action_args='{"id": "cust_123"}')
+     --> Risk scored as CRITICAL --> multi-party approval required
+```
+
+---
+
+## Async Execution
+
+The Dify tool uses a synchronous `_invoke()` generator method (as required by the `dify_plugin.Tool` base class), but Attesta's `evaluate()` is async. The tool handles this automatically:
+
+- **No event loop running**: Uses `asyncio.run()` to execute the evaluation synchronously.
+- **Event loop already running** (common in Dify's async runtime): Creates a task on the existing loop and waits for the result via a `concurrent.futures.Future` with a 30-second timeout.
+
+<Warning>
+The 30-second timeout applies when running inside an existing event loop. If the Attesta evaluation (including any human challenge) takes longer than 30 seconds, the tool will raise a timeout error. For challenges that require extended review time, consider adjusting the timeout in a custom fork of the tool.
+</Warning>
+
+---
+
+## Manifest Details
+
+The plugin manifest (`manifest.yaml`) declares the plugin metadata and resource requirements:
+
+```yaml
+version: 0.0.1
+type: plugin
+author: attesta
+name: attesta
+label:
+  en_US: Attesta
+description:
+  en_US: Human-in-the-loop approval for AI agent actions
+icon: icon.svg
+resource:
+  memory: 268435456    # 256 MB
+  permission:
+    tool:
+      enabled: true
+    endpoint:
+      enabled: false
+```
+
+<Tip>
+The plugin requests 256 MB of memory and enables only the `tool` permission (no HTTP endpoints). This is sufficient for the Attesta risk scorer and challenge system. Adjust the `memory` field in `manifest.yaml` if you are using resource-intensive custom risk profiles.
+</Tip>
+
+---
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="n8n Integration" icon="diagram-project" href="/no-code/n8n">
+    Workflow node for n8n data pipelines
+  </Card>
+  <Card title="Flowise Integration" icon="robot" href="/no-code/flowise">
+    Tool component for Flowise chatflows
+  </Card>
+  <Card title="Langflow Integration" icon="wind" href="/no-code/langflow">
+    Python component for Langflow pipelines
+  </Card>
+  <Card title="No-Code Overview" icon="grid-2" href="/no-code/overview">
+    Compare all no-code platforms
+  </Card>
+</CardGroup>

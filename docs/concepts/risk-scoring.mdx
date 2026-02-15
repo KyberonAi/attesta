@@ -1,0 +1,275 @@
+---
+title: "Risk Scoring"
+description: "How DefaultRiskScorer analyzes AI agent actions across 5 weighted factors to produce a 0–1 risk score"
+icon: "gauge-high"
+---
+
+Every time a gated function is called, Attesta's `DefaultRiskScorer` evaluates the action across **5 independent factors** and produces a weighted composite score between `0.0` and `1.0`. This score determines which [challenge](/concepts/challenges) the human operator must complete before execution proceeds.
+
+## The 5 Scoring Factors
+
+| Factor | Weight | What It Analyzes |
+|---|---|---|
+| `function_name` | **0.30** | Verb classification — destructive, mutating, or read-only |
+| `arguments` | **0.25** | Sensitive patterns in argument values (credentials, SQL, shell commands) |
+| `docstring` | **0.20** | High-risk or caution keywords in the function's docstring |
+| `hints` | **0.15** | Caller-supplied risk hints (boolean flags, numeric values) |
+| `novelty` | **0.10** | How many times this function has been called before |
+
+The final score is the **weighted sum** of individual factor scores:
+
+```
+risk_score = (function_name × 0.30) + (arguments × 0.25) + (docstring × 0.20) + (hints × 0.15) + (novelty × 0.10)
+```
+
+<Note>
+All factor scores are clamped to the `[0.0, 1.0]` range before weighting. The final composite score is also clamped, ensuring it never exceeds `1.0`.
+</Note>
+
+---
+
+## Factor 1: Function Name (weight: 0.30)
+
+The scorer extracts the verb from the function name and classifies it into one of three tiers.
+
+### Destructive Verbs — score `0.95`
+
+These verbs indicate irreversible or highly impactful operations:
+
+```
+delete, remove, drop, destroy, purge, truncate, kill
+```
+
+### Mutating Verbs — score `0.55`
+
+These verbs modify state but are typically reversible:
+
+```
+write, update, modify, set, create, send, deploy, push, execute, run
+```
+
+### Read Verbs — score `0.10`
+
+These verbs indicate read-only operations with minimal risk:
+
+```
+read, get, list, fetch, search, find, check
+```
+
+If the verb does not match any category, a default mid-range score is assigned.
+
+<CodeGroup>
+```python Python
+from attesta import gate
+
+# Scores 0.95 — "delete" is a destructive verb
+@gate
+def delete_database(name: str) -> str:
+    """Delete an entire database."""
+    return f"Deleted {name}"
+
+# Scores 0.55 — "deploy" is a mutating verb
+@gate
+def deploy_service(service: str) -> str:
+    """Deploy to production."""
+    return f"Deployed {service}"
+
+# Scores 0.10 — "get" is a read verb
+@gate
+def get_status(service: str) -> dict:
+    """Check service health."""
+    return {"service": service, "status": "healthy"}
+```
+
+```typescript TypeScript
+import { gate } from "@attesta/core";
+
+// Scores 0.95 — "delete" is a destructive verb
+const deleteDatabase = gate(async (name: string) => {
+  return `Deleted ${name}`;
+});
+
+// Scores 0.55 — "deploy" is a mutating verb
+const deployService = gate(async (service: string) => {
+  return `Deployed ${service}`;
+});
+
+// Scores 0.10 — "get" is a read verb
+const getStatus = gate(async (service: string) => {
+  return { service, status: "healthy" };
+});
+```
+</CodeGroup>
+
+---
+
+## Factor 2: Arguments (weight: 0.25)
+
+The scorer scans all argument values (converted to strings) for patterns that indicate sensitive or dangerous content.
+
+### Sensitive Patterns
+
+| Category | Patterns |
+|---|---|
+| Credentials | `production`, `.env`, `secret`, `password`, `token`, `key`, `credential` |
+| Dangerous SQL | `DROP`, `DELETE`, `TRUNCATE`, `ALTER` |
+| Shell dangers | `rm -rf`, `sudo`, `chmod 777` |
+| Network | URLs, email addresses, IP addresses |
+
+Each detected pattern contributes to the argument score. Multiple matches compound the risk.
+
+<Warning>
+Arguments containing `production` or `.env` in any position will significantly elevate the risk score. This is by design — accidentally targeting production environments is one of the most common causes of AI agent incidents.
+</Warning>
+
+```python Python
+# High argument score — contains "production" and a URL
+deploy("api-gateway", env="production", url="https://api.example.com")
+
+# High argument score — dangerous SQL
+run_query("DROP TABLE users;")
+
+# High argument score — shell danger
+execute_command("sudo rm -rf /var/data")
+
+# Low argument score — no sensitive patterns
+get_user("usr_12345")
+```
+
+---
+
+## Factor 3: Docstring (weight: 0.20)
+
+The scorer inspects the function's docstring for keywords that signal risk.
+
+### High-Risk Keywords — score `0.85`
+
+```
+irreversible, permanent, destructive, dangerous, production, critical
+```
+
+### Caution Keywords — score `0.50`
+
+```
+careful, warning, caution
+```
+
+If multiple keywords match, the highest score wins.
+
+<CodeGroup>
+```python Python
+@gate
+def wipe_storage(bucket: str) -> str:
+    """Permanently and irreversibly delete all objects in a storage bucket.
+
+    This is a destructive operation that cannot be undone.
+    """
+    return f"Wiped {bucket}"
+# Docstring factor: 0.85 (matches "permanently", "irreversibly", "destructive")
+```
+
+```typescript TypeScript
+const wipeStorage = gate(
+  async (bucket: string) => `Wiped ${bucket}`,
+  {
+    description:
+      "Permanently and irreversibly delete all objects in a storage bucket. " +
+      "This is a destructive operation that cannot be undone.",
+  }
+);
+// Docstring factor: 0.85 (matches "permanently", "irreversibly", "destructive")
+```
+</CodeGroup>
+
+---
+
+## Factor 4: Hints (weight: 0.15)
+
+Callers can supply explicit risk hints to influence the score. Hints come in two forms:
+
+### Boolean Hints
+
+Each boolean hint set to `True` adds **0.30** to the hint score (cumulative, clamped to 1.0).
+
+```python
+@attesta.gate(risk_hints={"production": True, "affects_billing": True})
+def update_pricing(plan: str, price: float) -> str:
+    """Update subscription pricing."""
+    return f"Updated {plan} to ${price}"
+# Hint score: 0.60 (two True booleans × 0.30 each)
+```
+
+### Numeric Hints
+
+Numeric hints are scaled as `min(value / 10000, 1.0) * 0.8`:
+
+```python
+@attesta.gate(risk_hints={"affected_rows": 50000})
+def batch_update(query: str) -> int:
+    """Bulk update user records."""
+    return 50000
+# Hint score: 0.80 (min(50000/10000, 1.0) × 0.8 = 1.0 × 0.8)
+```
+
+<Tip>
+Use boolean hints for categorical flags like `production`, `affects_pii`, or `requires_backup`. Use numeric hints for quantities like `affected_rows`, `file_count`, or `dollar_amount`.
+</Tip>
+
+---
+
+## Factor 5: Novelty (weight: 0.10)
+
+The novelty factor captures how familiar a particular function call is. The first invocation of any gated function is treated as highest novelty; the score decreases linearly with subsequent calls.
+
+| Call Number | Novelty Score |
+|---|---|
+| 1st call | **0.90** |
+| 2nd call | 0.81 |
+| 3rd call | 0.72 |
+| 5th call | 0.54 |
+| 10th call | **0.10** |
+| 11th+ call | 0.10 (floor) |
+
+The formula is:
+
+```
+novelty = max(0.9 - (call_count - 1) * (0.8 / 9), 0.1)
+```
+
+This means the novelty score starts at `0.9` for the first call and linearly decreases to `0.1` by the 10th call, remaining at `0.1` thereafter.
+
+<Note>
+Novelty tracking is per-function, per-session. A new session resets all novelty counters.
+</Note>
+
+---
+
+## Worked Example
+
+Consider a function `delete_user("usr_123", env="production")` with docstring `"Permanently remove a user account."` called for the first time, with no hints:
+
+| Factor | Raw Score | Weight | Contribution |
+|---|---|---|---|
+| `function_name` — "delete" is destructive | 0.95 | 0.30 | 0.285 |
+| `arguments` — "production" detected | ~0.70 | 0.25 | 0.175 |
+| `docstring` — "permanently" detected | 0.85 | 0.20 | 0.170 |
+| `hints` — none provided | 0.00 | 0.15 | 0.000 |
+| `novelty` — first call | 0.90 | 0.10 | 0.090 |
+| **Total** | | | **0.720** |
+
+A score of `0.72` maps to [risk level **HIGH**](/concepts/risk-levels), which triggers a [quiz challenge](/concepts/challenge-quiz).
+
+---
+
+## Custom Scorers
+
+`DefaultRiskScorer` covers general-purpose use cases. For domain-specific scoring, you can use a [CompositeRiskScorer](/concepts/risk-scorers) to blend the default scorer with custom logic, or replace it entirely with your own implementation.
+
+<CardGroup cols={2}>
+  <Card title="Risk Levels" icon="signal" href="/concepts/risk-levels">
+    See how scores map to LOW, MEDIUM, HIGH, and CRITICAL
+  </Card>
+  <Card title="Risk Scorers" icon="sliders" href="/concepts/risk-scorers">
+    Combine or replace scorers with Composite, Max, and Fixed
+  </Card>
+</CardGroup>

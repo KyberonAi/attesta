@@ -1,0 +1,103 @@
+---
+title: "CLI Overview"
+description: "The attesta command-line interface for managing configuration, audit logs, trust profiles, and MCP proxying"
+icon: "terminal"
+---
+
+The `attesta` CLI is installed automatically with the Python package. It provides subcommands for project initialization, audit log inspection, trust management, and MCP server proxying.
+
+## Installation
+
+```bash
+pip install attesta
+```
+
+Verify the installation:
+
+```bash
+attesta version
+```
+
+```
+attesta 0.1.0
+```
+
+## Command Tree
+
+| Command | Description |
+|---------|-------------|
+| `attesta init` | Create `attesta.yaml` in current directory |
+| `attesta init --force` | Overwrite existing config |
+| **attesta audit** | |
+| `attesta audit verify` | Verify hash-chain integrity |
+| `attesta audit stats` | Print approval statistics |
+| `attesta audit rubber-stamps` | List suspiciously fast approvals |
+| **attesta trust** | |
+| `attesta trust show <agent_id>` | Show trust profile for an agent |
+| `attesta trust list` | List all agents and trust scores |
+| `attesta trust revoke <agent_id>` | Revoke trust for an agent |
+| **attesta mcp** | |
+| `attesta mcp wrap -- <command>` | Wrap MCP server with Attesta proxy |
+| `attesta version` | Print the attesta version |
+
+## Default Paths
+
+All data files are stored in a `.attesta/` directory within your project:
+
+| File | Default Path | Description |
+|------|-------------|-------------|
+| Audit log | `.attesta/audit.jsonl` | SHA-256 hash-chained JSONL audit trail |
+| Trust store | `.attesta/trust.json` | Per-agent trust profiles and history |
+| Config | `attesta.yaml` | Project-level configuration |
+
+<Tip>
+You can override any default path using the `--log`, `--store`, or `--config` flags on the respective subcommands.
+</Tip>
+
+## Global Help
+
+Every command and subcommand supports `--help`:
+
+```bash
+attesta --help
+attesta audit --help
+attesta trust show --help
+attesta mcp wrap --help
+```
+
+## Quick Examples
+
+<CodeGroup>
+```bash Initialize a project
+attesta init
+```
+
+```bash Check audit integrity
+attesta audit verify
+```
+
+```bash View trust scores
+attesta trust list
+```
+
+```bash Wrap an MCP server
+attesta mcp wrap -- npx @modelcontextprotocol/server-filesystem /tmp
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="attesta init" icon="wand-magic-sparkles" href="/cli/init">
+    Generate an attesta.yaml config file
+  </Card>
+  <Card title="attesta audit" icon="file-shield" href="/cli/audit">
+    Inspect and verify the audit trail
+  </Card>
+  <Card title="attesta trust" icon="brain" href="/cli/trust">
+    Manage agent trust profiles
+  </Card>
+  <Card title="attesta mcp wrap" icon="shield-halved" href="/cli/mcp-wrap">
+    Proxy MCP servers with approval
+  </Card>
+</CardGroup>

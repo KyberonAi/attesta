@@ -1,0 +1,224 @@
+---
+title: "attesta trust"
+description: "View, list, and revoke trust profiles for AI agents using the Bayesian trust engine"
+icon: "brain"
+---
+
+The `attesta trust` subcommands let you inspect and manage the per-agent trust profiles stored by Attesta's Bayesian trust engine. Trust scores influence risk assessment -- trusted agents experience reduced friction on non-critical actions, while agents with incidents face elevated scrutiny.
+
+## Shared Options
+
+All `attesta trust` subcommands accept:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--store PATH` | `.attesta/trust.json` | Path to the trust store JSON file |
+
+---
+
+## attesta trust show
+
+Display the full trust profile for a specific agent, including their overall score, incident count, domain-specific scores, and history size.
+
+### Usage
+
+```bash
+attesta trust show <agent_id> [--store PATH]
+```
+
+### Example Output
+
+```
+Trust Profile: gpt-4-agent
+
+  Overall score  : 0.723
+  Stored score   : 0.710
+  Incidents      : 0
+  Created        : 2025-01-10T08:30:00
+  Last action    : 2025-01-16T14:22:15
+
+  Domain Scores
+    finance             : 0.650
+    general             : 0.780
+    infrastructure      : 0.690
+
+  History entries : 142
+```
+
+### Understanding the Output
+
+| Field | Description |
+|-------|-------------|
+| **Overall score** | The computed trust score after applying decay and recency weighting (0.0 - 1.0) |
+| **Stored score** | The raw score stored in the trust file before decay adjustment |
+| **Incidents** | Number of security incidents recorded for this agent. Each incident applies a penalty multiplier |
+| **Domain Scores** | Per-domain trust scores. An agent trusted in `finance` may not be trusted in `infrastructure` |
+| **History entries** | Total number of recorded evaluations (approvals, denials, incidents) |
+
+Score coloring in the terminal:
+
+| Score Range | Color | Meaning |
+|-------------|-------|---------|
+| 0.70 - 1.00 | Green | High trust -- risk reduction applied |
+| 0.40 - 0.69 | Yellow | Moderate trust -- limited risk reduction |
+| 0.00 - 0.39 | Red | Low trust -- no risk reduction, possible amplification |
+
+### Error Case
+
+```bash
+$ attesta trust show nonexistent-agent
+error: Agent 'nonexistent-agent' not found in trust store.
+```
+
+---
+
+## attesta trust list
+
+Display a table of all known agents with their trust score, incident count, and last active timestamp.
+
+### Usage
+
+```bash
+attesta trust list [--store PATH]
+```
+
+### Example Output
+
+```
+Agents
+
+  Agent ID                       Score  Incidents Last Active
+  -------------------------------------------------------------------
+  claude-agent                   0.823          0 2025-01-16 14:30
+  gpt-4-agent                    0.723          0 2025-01-16 14:22
+  ops-bot                        0.412          2 2025-01-15 09:15
+  security-scanner               0.156          5 2025-01-10 11:00
+
+  4 agent(s) total
+```
+
+<Note>
+Agents with incidents have their incident count displayed in red. Trust decays over time -- an agent with no recent activity will see their score decrease by the configured `decay_rate` per day.
+</Note>
+
+### Empty Store
+
+```bash
+$ attesta trust list
+No agents found in trust store.
+```
+
+---
+
+## attesta trust revoke
+
+Immediately revoke all trust for a specific agent. This is a severe action that adds 3 incident penalties to the agent's profile, effectively reducing their trust score to near zero.
+
+### Usage
+
+```bash
+attesta trust revoke <agent_id> [-y] [--store PATH]
+```
+
+| Flag | Description |
+|------|-------------|
+| `-y`, `--yes` | Skip the confirmation prompt |
+
+### Interactive Confirmation
+
+```bash
+$ attesta trust revoke ops-bot
+Revoke all trust for agent 'ops-bot'? This cannot be undone. [y/N] y
+Revoked trust for agent 'ops-bot'.
+  New score: 0.000
+```
+
+### Non-Interactive (CI/Automation)
+
+```bash
+$ attesta trust revoke ops-bot -y
+Revoked trust for agent 'ops-bot'.
+  New score: 0.000
+```
+
+### Aborting
+
+```bash
+$ attesta trust revoke ops-bot
+Revoke all trust for agent 'ops-bot'? This cannot be undone. [y/N] n
+Aborted.
+```
+
+<Warning>
+Trust revocation cannot be undone through the CLI. The agent must rebuild trust through successful, approved actions over time. Use this command when you suspect an agent has been compromised or is behaving maliciously.
+</Warning>
+
+---
+
+## Practical Workflows
+
+### Investigating a Suspicious Agent
+
+<Steps>
+  <Step title="Check the agent's trust profile">
+    ```bash
+    attesta trust show suspicious-agent
+    ```
+  </Step>
+
+  <Step title="Review their rubber-stamp history">
+    ```bash
+    attesta audit rubber-stamps --min-risk medium
+    ```
+  </Step>
+
+  <Step title="Revoke trust if warranted">
+    ```bash
+    attesta trust revoke suspicious-agent -y
+    ```
+  </Step>
+
+  <Step title="Verify the revocation">
+    ```bash
+    attesta trust show suspicious-agent
+    ```
+    The overall score should now be at or near `0.000`.
+  </Step>
+</Steps>
+
+### Monitoring Trust Across Agents
+
+```bash
+# Quick overview of all agents
+attesta trust list
+
+# Detailed view of a specific agent
+attesta trust show my-agent-id
+
+# Check if any agents have incidents
+attesta trust list --store /path/to/trust.json
+```
+
+## How Trust Affects Risk
+
+The trust engine adjusts risk scores for agents with established profiles:
+
+- **High trust** (0.7+): Risk score reduced by up to `trust.influence` (default 0.3)
+- **Low trust** (below 0.4): No risk reduction applied
+- **CRITICAL actions**: Never downgraded regardless of trust -- this is a safety invariant
+
+```
+effective_risk = raw_risk - (trust_score * trust_influence)
+# But: if raw_risk >= 0.8 (CRITICAL), effective_risk = raw_risk
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Trust Engine Concepts" icon="brain" href="/concepts/trust-engine">
+    Learn how the Bayesian trust engine works
+  </Card>
+  <Card title="attesta audit" icon="file-shield" href="/cli/audit">
+    Inspect the audit trail for evidence
+  </Card>
+</CardGroup>

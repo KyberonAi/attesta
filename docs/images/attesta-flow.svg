@@ -1,0 +1,478 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 1100" fill="none">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="840" y2="1100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <!-- Node gradients -->
+    <linearGradient id="agentGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="riskGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="trustGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#eab308"/>
+    </linearGradient>
+    <linearGradient id="auditGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+
+    <!-- Risk level colors -->
+    <linearGradient id="lowGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="medGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#eab308"/>
+    </linearGradient>
+    <linearGradient id="highGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+    <linearGradient id="critGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#b91c1c"/>
+    </linearGradient>
+
+    <!-- Glow filters -->
+    <filter id="glowIndigo" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feFlood flood-color="#6366f1" flood-opacity="0.3" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowTeal" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feFlood flood-color="#14b8a6" flood-opacity="0.3" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowAmber" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feFlood flood-color="#f59e0b" flood-opacity="0.3" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowGreen" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feFlood flood-color="#22c55e" flood-opacity="0.25" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowYellow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feFlood flood-color="#eab308" flood-opacity="0.25" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowRed" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feFlood flood-color="#ef4444" flood-opacity="0.25" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowCritical" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feFlood flood-color="#dc2626" flood-opacity="0.35" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowPurple" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feFlood flood-color="#8b5cf6" flood-opacity="0.3" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Dot pattern -->
+    <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="0.6" fill="#334155" opacity="0.4"/>
+    </pattern>
+
+    <!-- Arrow marker -->
+    <marker id="arrowGray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <style>
+    text { font-family: 'Inter', 'SF Pro Display', system-ui, -apple-system, sans-serif; }
+    .step-label { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
+    .node-title { font-size: 15px; font-weight: 700; }
+    .node-sub { font-size: 10px; font-weight: 500; }
+    .factor-text { font-size: 9px; font-weight: 600; fill: #94a3b8; }
+    .branch-label { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; }
+    .challenge-title { font-size: 12px; font-weight: 700; }
+    .challenge-sub { font-size: 9px; font-weight: 500; }
+    .flow-dash {
+      stroke-dasharray: 5,4;
+      fill: none;
+      stroke-linecap: round;
+      animation: dash-flow 1.2s linear infinite;
+    }
+    .flow-solid { fill: none; stroke-linecap: round; }
+    @keyframes dash-flow {
+      to { stroke-dashoffset: -18; }
+    }
+  </style>
+
+  <!-- ══════════════ BACKGROUND ══════════════ -->
+  <rect width="840" height="1100" fill="url(#bgGrad)"/>
+  <rect width="840" height="1100" fill="url(#dots)"/>
+
+  <!-- Subtle center line -->
+  <line x1="400" y1="0" x2="400" y2="1100" stroke="#1e293b" stroke-width="0.5" opacity="0.4"/>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- ROW 1: AI AGENT                               -->
+  <!-- ══════════════════════════════════════════════ -->
+  <text x="295" y="30" class="step-label" fill="#6366f1">STEP 1</text>
+  <g filter="url(#glowIndigo)">
+    <rect x="295" y="36" width="210" height="56" rx="14" fill="url(#agentGrad)" opacity="0.12"/>
+    <rect x="295" y="36" width="210" height="56" rx="14" fill="none" stroke="#6366f1" stroke-width="1.5"/>
+    <!-- Robot icon -->
+    <rect x="318" y="50" width="20" height="16" rx="4" fill="none" stroke="#a5b4fc" stroke-width="1.4"/>
+    <circle cx="324" cy="58" r="2" fill="#a5b4fc"/>
+    <circle cx="332" cy="58" r="2" fill="#a5b4fc"/>
+    <line x1="328" y1="66" x2="328" y2="70" stroke="#a5b4fc" stroke-width="1.4"/>
+    <line x1="322" y1="70" x2="334" y2="70" stroke="#a5b4fc" stroke-width="1.4" stroke-linecap="round"/>
+    <line x1="328" y1="50" x2="328" y2="46" stroke="#a5b4fc" stroke-width="1.4"/>
+    <circle cx="328" cy="44" r="1.5" fill="#a5b4fc"/>
+    <text x="350" y="60" class="node-title" fill="#e0e7ff">AI Agent</text>
+    <text x="350" y="74" class="node-sub" fill="#818cf8">Requests action execution</text>
+  </g>
+
+  <!-- Arrow 1→2 -->
+  <line x1="400" y1="92" x2="400" y2="126" stroke="#6366f1" stroke-width="1.5" class="flow-dash" opacity="0.5"/>
+  <polygon points="395,122 400,132 405,122" fill="#6366f1" opacity="0.6"/>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- ROW 2: RISK SCORING                           -->
+  <!-- ══════════════════════════════════════════════ -->
+  <text x="275" y="130" class="step-label" fill="#14b8a6">STEP 2</text>
+  <g filter="url(#glowTeal)">
+    <rect x="275" y="136" width="250" height="76" rx="14" fill="url(#riskGrad)" opacity="0.1"/>
+    <rect x="275" y="136" width="250" height="76" rx="14" fill="none" stroke="#14b8a6" stroke-width="1.5"/>
+    <!-- Shield icon -->
+    <path d="M308,151 C308,151 298,155 298,163 C298,171 302,177 308,180 C314,177 318,171 318,163 C318,155 308,151 308,151Z" fill="none" stroke="#5eead4" stroke-width="1.4" stroke-linejoin="round"/>
+    <polyline points="303,163 307,167 314,160" fill="none" stroke="#5eead4" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="330" y="157" class="node-title" fill="#ccfbf1">Attesta Gate</text>
+    <text x="330" y="170" class="node-sub" fill="#2dd4bf">Risk Scoring Engine</text>
+    <!-- 5 factor pills -->
+    <rect x="290" y="184" width="42" height="16" rx="8" fill="#14b8a6" opacity="0.15"/>
+    <text x="311" y="195" text-anchor="middle" class="factor-text" fill="#5eead4">name</text>
+    <rect x="337" y="184" width="36" height="16" rx="8" fill="#14b8a6" opacity="0.15"/>
+    <text x="355" y="195" text-anchor="middle" class="factor-text" fill="#5eead4">args</text>
+    <rect x="378" y="184" width="36" height="16" rx="8" fill="#14b8a6" opacity="0.15"/>
+    <text x="396" y="195" text-anchor="middle" class="factor-text" fill="#5eead4">docs</text>
+    <rect x="419" y="184" width="38" height="16" rx="8" fill="#14b8a6" opacity="0.15"/>
+    <text x="438" y="195" text-anchor="middle" class="factor-text" fill="#5eead4">hints</text>
+    <rect x="462" y="184" width="50" height="16" rx="8" fill="#14b8a6" opacity="0.15"/>
+    <text x="487" y="195" text-anchor="middle" class="factor-text" fill="#5eead4">novelty</text>
+  </g>
+
+  <!-- Domain Profile side input -->
+  <g opacity="0.7">
+    <rect x="570" y="148" width="130" height="42" rx="10" fill="#8b5cf6" opacity="0.08"/>
+    <rect x="570" y="148" width="130" height="42" rx="10" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="635" y="166" text-anchor="middle" style="font-size:10px;font-weight:700;fill:#c4b5fd">Domain Profile</text>
+    <text x="635" y="179" text-anchor="middle" style="font-size:8px;fill:#a78bfa;font-weight:500">Custom Compliance Mappings</text>
+    <!-- Arrow into risk scoring -->
+    <line x1="570" y1="169" x2="528" y2="169" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+    <polygon points="530,166 524,169 530,172" fill="#8b5cf6" opacity="0.5"/>
+  </g>
+
+  <!-- Arrow 2→3 -->
+  <line x1="400" y1="212" x2="400" y2="248" stroke="#14b8a6" stroke-width="1.5" class="flow-dash" opacity="0.5"/>
+  <polygon points="395,244 400,254 405,244" fill="#14b8a6" opacity="0.6"/>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- ROW 3: TRUST ADJUSTMENT                       -->
+  <!-- ══════════════════════════════════════════════ -->
+  <text x="280" y="252" class="step-label" fill="#f59e0b">STEP 3</text>
+  <g filter="url(#glowAmber)">
+    <rect x="280" y="258" width="240" height="68" rx="14" fill="url(#trustGrad)" opacity="0.1"/>
+    <rect x="280" y="258" width="240" height="68" rx="14" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+    <!-- Brain icon -->
+    <circle cx="312" cy="286" r="11" fill="none" stroke="#fcd34d" stroke-width="1.4"/>
+    <path d="M306,282 C306,278 312,276 312,280 C312,276 318,278 318,282" fill="none" stroke="#fcd34d" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="M306,286 C306,290 312,292 312,288 C312,292 318,290 318,286" fill="none" stroke="#fcd34d" stroke-width="1.3" stroke-linecap="round"/>
+    <text x="335" y="280" class="node-title" fill="#fef3c7">Trust Engine</text>
+    <text x="335" y="294" class="node-sub" fill="#fbbf24">Adjusts risk by agent history</text>
+    <!-- Safety note -->
+    <rect x="335" y="302" width="160" height="14" rx="7" fill="#f59e0b" opacity="0.1"/>
+    <text x="415" y="312" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#fbbf24;letter-spacing:0.06em">CRITICAL NEVER DOWNGRADED</text>
+  </g>
+
+  <!-- Agent History side input -->
+  <g opacity="0.7">
+    <rect x="100" y="262" width="130" height="42" rx="10" fill="#f59e0b" opacity="0.08"/>
+    <rect x="100" y="262" width="130" height="42" rx="10" fill="none" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="165" y="280" text-anchor="middle" style="font-size:10px;font-weight:700;fill:#fde68a">Agent History</text>
+    <text x="165" y="293" text-anchor="middle" style="font-size:8px;fill:#fbbf24;font-weight:500">Bayesian trust score</text>
+    <!-- Arrow into trust engine -->
+    <line x1="230" y1="283" x2="277" y2="283" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+    <polygon points="275,280 281,283 275,286" fill="#f59e0b" opacity="0.5"/>
+  </g>
+
+  <!-- Arrow 3→4 (branching) -->
+  <line x1="400" y1="326" x2="400" y2="366" stroke="#f59e0b" stroke-width="1.5" class="flow-dash" opacity="0.5"/>
+  <polygon points="395,362 400,372 405,362" fill="#f59e0b" opacity="0.6"/>
+
+  <!-- Branching label -->
+  <text x="400" y="388" text-anchor="middle" style="font-size:10px;font-weight:700;fill:#64748b;letter-spacing:0.08em">EFFECTIVE RISK LEVEL</text>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- ROW 4: CHALLENGE BRANCHING                    -->
+  <!-- ══════════════════════════════════════════════ -->
+  <text x="68" y="396" class="step-label" fill="#22c55e">STEP 4</text>
+
+  <!-- Branch lines from center to 4 columns -->
+  <!-- LOW branch -->
+  <path d="M400,388 C400,400 115,400 115,418" stroke="#22c55e" stroke-width="1.5" class="flow-dash" opacity="0.4"/>
+  <polygon points="110,414 115,424 120,414" fill="#22c55e" opacity="0.5"/>
+  <!-- MEDIUM branch -->
+  <path d="M400,388 C400,400 290,400 290,418" stroke="#eab308" stroke-width="1.5" class="flow-dash" opacity="0.4"/>
+  <polygon points="285,414 290,424 295,414" fill="#eab308" opacity="0.5"/>
+  <!-- HIGH branch -->
+  <path d="M400,388 C400,400 510,400 510,418" stroke="#ef4444" stroke-width="1.5" class="flow-dash" opacity="0.4"/>
+  <polygon points="505,414 510,424 515,414" fill="#ef4444" opacity="0.5"/>
+  <!-- CRITICAL branch -->
+  <path d="M400,388 C400,400 685,400 685,418" stroke="#dc2626" stroke-width="2" class="flow-dash" opacity="0.5"/>
+  <polygon points="680,414 685,424 690,414" fill="#dc2626" opacity="0.6"/>
+
+
+  <!-- ── LOW (0.0-0.3) ── -->
+  <g filter="url(#glowGreen)">
+    <rect x="42" y="426" width="146" height="100" rx="12" fill="url(#lowGrad)" opacity="0.08"/>
+    <rect x="42" y="426" width="146" height="100" rx="12" fill="none" stroke="#22c55e" stroke-width="1.2"/>
+    <!-- Score badge -->
+    <rect x="54" y="434" width="62" height="18" rx="9" fill="#22c55e" opacity="0.2"/>
+    <text x="85" y="447" text-anchor="middle" style="font-size:9px;font-weight:800;fill:#4ade80;letter-spacing:0.06em">0.0 – 0.3</text>
+    <!-- Level -->
+    <text x="130" y="447" text-anchor="start" class="branch-label" fill="#86efac">LOW</text>
+    <!-- Divider -->
+    <line x1="54" y1="458" x2="176" y2="458" stroke="#22c55e" stroke-width="0.5" opacity="0.3"/>
+    <!-- Challenge -->
+    <text x="115" y="476" text-anchor="middle" class="challenge-title" fill="#bbf7d0">Auto-Approve</text>
+    <text x="115" y="490" text-anchor="middle" class="challenge-sub" fill="#4ade80">Silent pass-through</text>
+    <!-- Speed indicator -->
+    <text x="115" y="516" text-anchor="middle" style="font-size:18px;fill:#22c55e;opacity:0.6">&#x2192;&#x2192;&#x2192;</text>
+  </g>
+
+
+  <!-- ── MEDIUM (0.3-0.6) ── -->
+  <g filter="url(#glowYellow)">
+    <rect x="217" y="426" width="146" height="100" rx="12" fill="url(#medGrad)" opacity="0.08"/>
+    <rect x="217" y="426" width="146" height="100" rx="12" fill="none" stroke="#eab308" stroke-width="1.2"/>
+    <!-- Score badge -->
+    <rect x="229" y="434" width="62" height="18" rx="9" fill="#eab308" opacity="0.2"/>
+    <text x="260" y="447" text-anchor="middle" style="font-size:9px;font-weight:800;fill:#fde68a;letter-spacing:0.06em">0.3 – 0.6</text>
+    <!-- Level -->
+    <text x="298" y="447" text-anchor="start" class="branch-label" fill="#fde68a">MEDIUM</text>
+    <!-- Divider -->
+    <line x1="229" y1="458" x2="351" y2="458" stroke="#eab308" stroke-width="0.5" opacity="0.3"/>
+    <!-- Challenge -->
+    <text x="290" y="476" text-anchor="middle" class="challenge-title" fill="#fef9c3">Confirm (Y/N)</text>
+    <text x="290" y="490" text-anchor="middle" class="challenge-sub" fill="#fbbf24">Review &amp; approve</text>
+    <!-- Timer -->
+    <rect x="256" y="500" width="68" height="16" rx="8" fill="#eab308" opacity="0.12"/>
+    <text x="290" y="512" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#fcd34d">min 3s review</text>
+  </g>
+
+
+  <!-- ── HIGH (0.6-0.8) ── -->
+  <g filter="url(#glowRed)">
+    <rect x="437" y="426" width="146" height="100" rx="12" fill="url(#highGrad)" opacity="0.08"/>
+    <rect x="437" y="426" width="146" height="100" rx="12" fill="none" stroke="#ef4444" stroke-width="1.2"/>
+    <!-- Score badge -->
+    <rect x="449" y="434" width="62" height="18" rx="9" fill="#ef4444" opacity="0.2"/>
+    <text x="480" y="447" text-anchor="middle" style="font-size:9px;font-weight:800;fill:#fca5a5;letter-spacing:0.06em">0.6 – 0.8</text>
+    <!-- Level -->
+    <text x="518" y="447" text-anchor="start" class="branch-label" fill="#fca5a5">HIGH</text>
+    <!-- Divider -->
+    <line x1="449" y1="458" x2="571" y2="458" stroke="#ef4444" stroke-width="0.5" opacity="0.3"/>
+    <!-- Challenge -->
+    <text x="510" y="476" text-anchor="middle" class="challenge-title" fill="#fef2f2">Quiz</text>
+    <text x="510" y="490" text-anchor="middle" class="challenge-sub" fill="#f87171">Comprehension test</text>
+    <!-- Timer -->
+    <rect x="473" y="500" width="74" height="16" rx="8" fill="#ef4444" opacity="0.12"/>
+    <text x="510" y="512" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#fca5a5">min 10s review</text>
+  </g>
+
+
+  <!-- ── CRITICAL (0.8-1.0) ── -->
+  <g filter="url(#glowCritical)">
+    <rect x="612" y="426" width="146" height="100" rx="12" fill="url(#critGrad)" opacity="0.12"/>
+    <rect x="612" y="426" width="146" height="100" rx="12" fill="none" stroke="#dc2626" stroke-width="1.8"/>
+    <!-- Score badge -->
+    <rect x="624" y="434" width="62" height="18" rx="9" fill="#dc2626" opacity="0.3"/>
+    <text x="655" y="447" text-anchor="middle" style="font-size:9px;font-weight:800;fill:#fca5a5;letter-spacing:0.06em">0.8 – 1.0</text>
+    <!-- Level -->
+    <text x="693" y="447" text-anchor="start" class="branch-label" fill="#fca5a5">CRITICAL</text>
+    <!-- Divider -->
+    <line x1="624" y1="458" x2="746" y2="458" stroke="#dc2626" stroke-width="0.5" opacity="0.3"/>
+    <!-- Challenge -->
+    <text x="685" y="476" text-anchor="middle" class="challenge-title" fill="#fef2f2">Multi-Party</text>
+    <text x="685" y="490" text-anchor="middle" class="challenge-sub" fill="#f87171">2+ independent approvers</text>
+    <!-- Sub-challenges -->
+    <rect x="626" y="500" width="50" height="14" rx="7" fill="#dc2626" opacity="0.15"/>
+    <text x="651" y="510" text-anchor="middle" style="font-size:7px;font-weight:600;fill:#fca5a5">teach-back</text>
+    <rect x="680" y="500" width="34" height="14" rx="7" fill="#dc2626" opacity="0.15"/>
+    <text x="697" y="510" text-anchor="middle" style="font-size:7px;font-weight:600;fill:#fca5a5">quiz</text>
+    <rect x="718" y="500" width="36" height="14" rx="7" fill="#dc2626" opacity="0.15"/>
+    <text x="736" y="510" text-anchor="middle" style="font-size:7px;font-weight:600;fill:#fca5a5">confirm</text>
+    <!-- Timer -->
+    <rect x="648" y="518" width="74" height="14" rx="7" fill="#dc2626" opacity="0.15"/>
+    <text x="685" y="528" text-anchor="middle" style="font-size:7px;font-weight:700;fill:#fca5a5">min 30s+ review</text>
+  </g>
+
+  <!-- Multi-party approver icons -->
+  <g opacity="0.5">
+    <!-- Person 1 -->
+    <circle cx="650" y="456" r="0" fill="none"/>
+    <!-- Person icons near the critical card -->
+  </g>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- ROW 5: CONVERGENCE → DECISION                 -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <!-- Merge lines from all 4 paths -->
+  <path d="M115,526 C115,560 380,560 400,575" stroke="#22c55e" stroke-width="1" class="flow-solid" opacity="0.3"/>
+  <path d="M290,526 C290,556 390,556 400,575" stroke="#eab308" stroke-width="1" class="flow-solid" opacity="0.3"/>
+  <path d="M510,526 C510,556 410,556 400,575" stroke="#ef4444" stroke-width="1" class="flow-solid" opacity="0.3"/>
+  <path d="M685,540 C685,564 420,564 400,575" stroke="#dc2626" stroke-width="1.5" class="flow-solid" opacity="0.3"/>
+
+  <text x="330" y="566" class="step-label" fill="#94a3b8">STEP 5</text>
+
+  <!-- Decision diamond -->
+  <g filter="url(#glowAmber)">
+    <polygon points="400,575 440,605 400,635 360,605" fill="#f59e0b" opacity="0.1"/>
+    <polygon points="400,575 440,605 400,635 360,605" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="400" y="609" text-anchor="middle" style="font-size:12px;font-weight:800;fill:#fde68a">Pass?</text>
+  </g>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- ROW 6: OUTCOMES                               -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <!-- YES branch -->
+  <path d="M375,625 C350,650 250,650 240,670" stroke="#22c55e" stroke-width="1.5" class="flow-dash" opacity="0.5"/>
+  <polygon points="235,666 240,676 245,666" fill="#22c55e" opacity="0.6"/>
+  <rect x="294" y="640" width="36" height="16" rx="8" fill="#22c55e" opacity="0.15"/>
+  <text x="312" y="652" text-anchor="middle" style="font-size:9px;font-weight:700;fill:#4ade80">YES</text>
+
+  <!-- NO branch -->
+  <path d="M425,625 C450,650 550,650 560,670" stroke="#ef4444" stroke-width="1.5" class="flow-dash" opacity="0.5"/>
+  <polygon points="555,666 560,676 565,666" fill="#ef4444" opacity="0.6"/>
+  <rect x="470" y="640" width="30" height="16" rx="8" fill="#ef4444" opacity="0.15"/>
+  <text x="485" y="652" text-anchor="middle" style="font-size:9px;font-weight:700;fill:#f87171">NO</text>
+
+  <!-- APPROVED -->
+  <g filter="url(#glowGreen)">
+    <rect x="145" y="680" width="190" height="50" rx="25" fill="#22c55e" opacity="0.12"/>
+    <rect x="145" y="680" width="190" height="50" rx="25" fill="none" stroke="#22c55e" stroke-width="1.5"/>
+    <!-- Checkmark -->
+    <circle cx="180" cy="705" r="10" fill="#22c55e" opacity="0.2"/>
+    <polyline points="175,705 179,709 186,700" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="250" y="700" text-anchor="middle" style="font-size:13px;font-weight:800;fill:#bbf7d0;letter-spacing:0.05em">Execute Action</text>
+    <text x="250" y="716" text-anchor="middle" style="font-size:9px;fill:#4ade80;font-weight:500">APPROVED</text>
+  </g>
+
+  <!-- DENIED -->
+  <g filter="url(#glowRed)">
+    <rect x="465" y="680" width="190" height="50" rx="25" fill="#ef4444" opacity="0.12"/>
+    <rect x="465" y="680" width="190" height="50" rx="25" fill="none" stroke="#ef4444" stroke-width="1.5"/>
+    <!-- X icon -->
+    <circle cx="500" cy="705" r="10" fill="#ef4444" opacity="0.2"/>
+    <line x1="495" y1="700" x2="505" y2="710" stroke="#fca5a5" stroke-width="2" stroke-linecap="round"/>
+    <line x1="505" y1="700" x2="495" y2="710" stroke="#fca5a5" stroke-width="2" stroke-linecap="round"/>
+    <text x="570" y="700" text-anchor="middle" style="font-size:13px;font-weight:800;fill:#fecaca;letter-spacing:0.05em">AttestaDenied</text>
+    <text x="570" y="716" text-anchor="middle" style="font-size:9px;fill:#f87171;font-weight:500">DENIED</text>
+  </g>
+
+  <!-- Both converge to audit -->
+  <path d="M240,730 C240,755 380,755 400,770" stroke="#22c55e" stroke-width="1" class="flow-solid" opacity="0.3"/>
+  <path d="M560,730 C560,755 420,755 400,770" stroke="#ef4444" stroke-width="1" class="flow-solid" opacity="0.3"/>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- ROW 7: AUDIT TRAIL                            -->
+  <!-- ══════════════════════════════════════════════ -->
+  <text x="310" y="776" class="step-label" fill="#8b5cf6">STEP 6</text>
+  <g filter="url(#glowPurple)">
+    <rect x="130" y="782" width="540" height="58" rx="14" fill="url(#auditGrad)" opacity="0.08"/>
+    <rect x="130" y="782" width="540" height="58" rx="14" fill="none" stroke="#8b5cf6" stroke-width="1.5"/>
+    <!-- Lock/chain icon -->
+    <rect x="162" y="798" width="16" height="12" rx="3" fill="none" stroke="#c4b5fd" stroke-width="1.3"/>
+    <path d="M166,798 L166,794 C166,790 174,790 174,794 L174,798" fill="none" stroke="#c4b5fd" stroke-width="1.3"/>
+    <!-- Chain links -->
+    <circle cx="196" cy="805" r="5" fill="none" stroke="#a78bfa" stroke-width="1"/>
+    <circle cx="206" cy="805" r="5" fill="none" stroke="#a78bfa" stroke-width="1"/>
+    <text x="224" y="802" style="font-size:14px;font-weight:700;fill:#e0e7ff">SHA-256 Hash-Chained Audit Trail</text>
+    <text x="224" y="818" style="font-size:9px;fill:#a78bfa;font-weight:500">Every decision logged</text>
+    <text x="340" y="818" style="font-size:9px;fill:#64748b;font-weight:500">|</text>
+    <text x="352" y="818" style="font-size:9px;fill:#a78bfa;font-weight:500">Tamper-evident</text>
+    <text x="430" y="818" style="font-size:9px;fill:#64748b;font-weight:500">|</text>
+    <text x="442" y="818" style="font-size:9px;fill:#a78bfa;font-weight:500">attesta audit verify</text>
+    <!-- Verify badge -->
+    <rect x="568" y="796" width="86" height="22" rx="11" fill="#8b5cf6" opacity="0.15"/>
+    <text x="611" y="810" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#c4b5fd;letter-spacing:0.05em">IMMUTABLE</text>
+  </g>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- ROW 8: TRUST FEEDBACK LOOP                    -->
+  <!-- ══════════════════════════════════════════════ -->
+  <text x="310" y="860" class="step-label" fill="#f59e0b">FEEDBACK</text>
+
+  <!-- Feedback info box -->
+  <rect x="220" y="868" width="360" height="62" rx="12" fill="#f59e0b" opacity="0.05"/>
+  <rect x="220" y="868" width="360" height="62" rx="12" fill="none" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- Three feedback items -->
+  <circle cx="250" cy="890" r="5" fill="#22c55e" opacity="0.3"/>
+  <text x="260" y="893" style="font-size:9px;font-weight:600;fill:#4ade80">Approved</text>
+  <text x="310" y="893" style="font-size:9px;fill:#94a3b8">&#x2192; trust increases</text>
+
+  <circle cx="250" cy="908" r="5" fill="#ef4444" opacity="0.3"/>
+  <text x="260" y="911" style="font-size:9px;font-weight:600;fill:#f87171">Denied</text>
+  <text x="300" y="911" style="font-size:9px;fill:#94a3b8">&#x2192; recorded, no trust gain</text>
+
+  <circle cx="250" cy="923" r="5" fill="#dc2626" opacity="0.3"/>
+  <text x="260" y="926" style="font-size:9px;font-weight:600;fill:#fca5a5">Incident</text>
+  <text x="308" y="926" style="font-size:9px;fill:#94a3b8">&#x2192; trust penalized (0.7&#x00D7;)</text>
+
+  <!-- Arrow icon -->
+  <text x="510" y="900" style="font-size:10px;font-weight:700;fill:#fbbf24;letter-spacing:0.05em">LOOPS BACK</text>
+  <text x="510" y="914" style="font-size:10px;font-weight:700;fill:#fbbf24;letter-spacing:0.05em">TO TRUST</text>
+  <text x="510" y="928" style="font-size:10px;font-weight:700;fill:#fbbf24;letter-spacing:0.05em">ENGINE</text>
+
+  <!-- Curved feedback arrow: from audit back to trust engine -->
+  <path d="M670,811 C770,811 790,600 790,400 C790,300 660,285 525,285"
+        stroke="#f59e0b" stroke-width="1.5" fill="none" stroke-dasharray="6,4" opacity="0.4" class="flow-dash"/>
+  <polygon points="527,282 521,285 527,288" fill="#f59e0b" opacity="0.5"/>
+
+  <!-- Loop label on the arrow -->
+  <rect x="768" y="540" width="50" height="38" rx="8" fill="#0f172a" opacity="0.8"/>
+  <text x="793" y="556" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#fbbf24;letter-spacing:0.06em">TRUST</text>
+  <text x="793" y="568" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#fbbf24;letter-spacing:0.06em">LOOP</text>
+
+</svg>

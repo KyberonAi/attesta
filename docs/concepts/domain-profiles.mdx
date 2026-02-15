@@ -1,0 +1,187 @@
+---
+title: "Domain Profiles"
+description: "Industry-specific risk configurations using Attesta's domain profile framework"
+icon: "building"
+---
+
+Domain profiles allow you to apply **industry-specific risk policies** to Attesta. Each profile configures risk patterns, sensitive terminology, compliance frameworks, escalation rules, and minimum review overrides tailored to a specific regulatory or operational context.
+
+Attesta provides the domain profile framework (types, registry, scorer); you create profiles for your industry.
+
+## How It Works
+
+A domain profile layers on top of Attesta's base 5-factor risk scorer to add industry-specific signals:
+
+1. **Risk Patterns** -- regex patterns that boost the risk score when matched against function names, arguments, or docstrings
+2. **Sensitive Terms** -- individual words with associated risk weights
+3. **Critical / Safe Actions** -- function name patterns that always score as CRITICAL or LOW
+4. **Escalation Rules** -- conditions that trigger additional approvers or notifications
+5. **Challenge Templates** -- domain-specific verification questions
+6. **Risk Floor & Production Multiplier** -- minimum scores and environment amplification
+
+---
+
+## DomainProfile Dataclass
+
+Each profile is a `DomainProfile` dataclass:
+
+| Field | Type | Description |
+|---|---|---|
+| `risk_patterns` | `list[RiskPattern]` | Regex patterns with risk contributions |
+| `sensitive_terms` | `dict[str, float]` | Terms mapped to risk weights (0.0-1.0) |
+| `critical_actions` | `list[str]` | Action names that are always CRITICAL |
+| `safe_actions` | `list[str]` | Action names that are always LOW |
+| `compliance_frameworks` | `list[str]` | Applicable compliance standards |
+| `escalation_rules` | `list[EscalationRule]` | Conditions for extra approvers |
+| `challenge_templates` | `list[DomainChallengeTemplate]` | Custom challenge questions |
+| `min_review_overrides` | `dict[str, float]` | Per-risk-level review time overrides (seconds) |
+| `base_risk_floor` | `float` | Minimum risk score for all actions in this domain |
+| `production_multiplier` | `float` | Score multiplier when environment is production |
+| `required_vocabulary` | `list[str]` | Terms that must appear in teach-back explanations |
+
+---
+
+## Creating a Domain Profile
+
+```python
+from attesta.domains import (
+    DomainProfile, DomainRiskScorer,
+    RiskPattern, EscalationRule,
+)
+
+profile = DomainProfile(
+    name="my-industry",
+    display_name="My Industry",
+    description="Compliance profile for my domain",
+    risk_patterns=[
+        RiskPattern(
+            pattern=r"confidential|secret|restricted",
+            target="any",
+            risk_contribution=0.8,
+            name="confidential_data",
+            description="Detects confidential data access",
+            compliance_refs=["SOC 2 CC6.1"],
+        ),
+    ],
+    sensitive_terms={"secret": 0.9, "internal": 0.6},
+    critical_actions=["delete_records", "export_all_data"],
+    safe_actions=["check_status", "list_items"],
+    compliance_frameworks=["SOC 2", "ISO 27001"],
+    escalation_rules=[
+        EscalationRule(
+            condition="risk_score > 0.9",
+            action="require_multi_party",
+            required_approvers=2,
+            description="High-risk actions need dual approval",
+        ),
+    ],
+    base_risk_floor=0.15,
+    production_multiplier=1.5,
+)
+
+# Use with a DomainRiskScorer
+scorer = DomainRiskScorer(profile)
+```
+
+---
+
+## Using Domain Profiles
+
+```python
+from attesta import Attesta
+from attesta.domains import DomainProfile, DomainRiskScorer
+
+# Create your profile
+profile = DomainProfile(
+    name="my-industry",
+    display_name="My Industry",
+    description="Custom compliance profile.",
+)
+scorer = DomainRiskScorer(profile)
+
+# Pass the scorer to Attesta
+attesta = Attesta(risk_scorer=scorer)
+
+@attesta.gate()
+def sensitive_action(data: str) -> str:
+    return f"Processed {data}"
+```
+
+Or register as a preset for YAML-based activation:
+
+```python
+from attesta.domains.presets import register_preset
+
+register_preset(profile, aliases=["my-alias"])
+
+# Now attesta.yaml can use: domain: my-industry
+```
+
+---
+
+## DomainRegistry
+
+The `DomainRegistry` manages profile registration, retrieval, and merging:
+
+```python
+from attesta.domains import DomainRegistry, registry
+
+# Register a profile
+registry.register(my_profile)
+
+# Retrieve by name
+profile = registry.get("my-industry")
+
+# List all registered domains
+names = registry.list_domains()
+
+# Merge multiple profiles
+merged = registry.merge(profile_a, profile_b)
+```
+
+### Merge Behavior
+
+When merging multiple profiles, the registry follows these rules:
+
+| Field | Merge Strategy |
+|---|---|
+| `risk_patterns` | Union of all patterns |
+| `sensitive_terms` | Union; duplicate terms take the higher weight |
+| `critical_actions` | Union (deduplicated) |
+| `safe_actions` | Union (deduplicated) |
+| `compliance_frameworks` | Union (deduplicated) |
+| `escalation_rules` | Union of all rules |
+| `base_risk_floor` | Maximum across all profiles |
+| `production_multiplier` | Maximum across all profiles |
+| `required_vocabulary` | Union (deduplicated) |
+
+<Tip>
+Merging profiles is useful for organizations that span multiple regulated domains -- for example, a company that has created custom profiles for two different compliance contexts can merge them for comprehensive coverage.
+</Tip>
+
+---
+
+## Configuration via YAML
+
+```yaml attesta.yaml
+# Activate a registered domain preset
+domain: my-industry
+
+# Or activate multiple (merged)
+# domain:
+#   - my-industry
+#   - another-domain
+```
+
+<Note>
+Domain names in `attesta.yaml` must match presets registered via `register_preset()` before loading the config. See [Custom Domains](/domains/custom-domains) for setup instructions.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Custom Domains" icon="puzzle-piece" href="/domains/custom-domains">
+    Build your own domain profile
+  </Card>
+  <Card title="Domain Overview" icon="grid-2" href="/domains/overview">
+    Architecture and merge strategy
+  </Card>
+</CardGroup>

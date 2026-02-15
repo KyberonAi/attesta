@@ -1,0 +1,412 @@
+---
+title: "Python vs TypeScript API"
+description: "Side-by-side comparison of naming conventions, async patterns, and feature parity between the Python and TypeScript SDKs"
+icon: "arrows-left-right"
+---
+
+Attesta provides full implementations in both Python and TypeScript. The two SDKs share the same approval pipeline, risk scoring logic, and audit format, but differ in naming conventions and language-specific patterns. This page documents every significant difference.
+
+## Naming Conventions
+
+Python uses `snake_case` for all identifiers. TypeScript uses `camelCase` for properties and methods, and `PascalCase` for types and classes.
+
+| Python | TypeScript | Context |
+|--------|------------|---------|
+| `risk_scorer` | `riskScorer` | Constructor / gate option |
+| `audit_logger` | `auditLogger` | Constructor / gate option |
+| `risk_hints` | `riskHints` | Gate option |
+| `min_review_seconds` | `minReviewSeconds` | Gate option / policy key |
+| `agent_id` | `agentId` | Gate option / context field |
+| `session_id` | `sessionId` | Gate option / context field |
+| `challenge_map` | `challengeMap` | Policy key |
+| `function_name` | `functionName` | ActionContext field |
+| `function_doc` | `functionDoc` | ActionContext field |
+| `risk_assessment` | `riskAssessment` | ApprovalResult field |
+| `challenge_result` | `challengeResult` | ApprovalResult field |
+| `review_time_seconds` | `reviewTimeSeconds` | ApprovalResult field |
+| `from_config` | Constructor (`new Attesta()`) | No TS equivalent; use constructor |
+| `render_approval` | `renderApproval` | Renderer method |
+| `render_challenge` | `renderChallenge` | Renderer method |
+| `render_info` | `renderInfo` | Renderer method |
+| `render_auto_approved` | `renderAutoApproved` | Renderer method |
+| `challenge_type` | `challengeType` | ChallengeProtocol property |
+
+---
+
+## Gate Syntax
+
+The `@gate` decorator in Python has no direct equivalent in TypeScript. Instead, TypeScript uses `gate()` as a higher-order function.
+
+<Tabs>
+  <Tab title="Python">
+    Python supports three calling styles:
+
+    ```python
+    from attesta import gate
+
+    # Style 1: Bare decorator
+    @gate
+    def read_file(path: str) -> str:
+        return open(path).read()
+
+    # Style 2: Empty parentheses
+    @gate()
+    def list_users() -> list[str]:
+        return ["alice", "bob"]
+
+    # Style 3: With options
+    @gate(risk="high", risk_hints={"production": True})
+    def deploy(service: str, version: str) -> str:
+        return f"Deployed {service} v{version}"
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    TypeScript uses function wrapping:
+
+    ```typescript
+    import { gate } from "@attesta/core";
+
+    // Style 1: Wrap directly
+    const readFile = gate(async (path: string) => {
+      return fs.readFileSync(path, "utf-8");
+    });
+
+    // Style 2: With options
+    const deploy = gate(
+      { risk: "high", riskHints: { production: true } },
+      async (service: string, version: string) => {
+        return `Deployed ${service} v${version}`;
+      }
+    );
+
+    // Style 3: Curried factory
+    const withHighRisk = gate({ risk: "high" });
+    const restartService = withHighRisk(async (name: string) => {
+      return `Restarted ${name}`;
+    });
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Async Patterns
+
+Python's `asyncio` and TypeScript's `Promise` model have significant differences that affect how Attesta works in each language.
+
+<Tabs>
+  <Tab title="Python">
+    The Python SDK supports both sync and async functions. When a sync function is decorated with `@gate`, Attesta internally bridges to async using `asyncio.run()` or schedules a task if a loop is already running (e.g., Jupyter).
+
+    ```python
+    from attesta import gate
+
+    # Sync function -- Attesta handles the event loop
+    @gate
+    def sync_deploy(service: str) -> str:
+        return f"Deployed {service}"
+
+    result = sync_deploy("api")  # No await needed
+
+    # Async function -- caller must await
+    @gate
+    async def async_deploy(service: str) -> str:
+        return f"Deployed {service}"
+
+    result = await async_deploy("api")
+    ```
+
+    The `sync_timeout` parameter (default 300s) controls how long Attesta waits when bridging from sync to async.
+  </Tab>
+  <Tab title="TypeScript">
+    The TypeScript SDK requires all gated functions to be `async`. The `gate()` wrapper always returns a `Promise`, so callers must always use `await`.
+
+    ```typescript
+    import { gate } from "@attesta/core";
+
+    const deploy = gate(async (service: string) => {
+      return `Deployed ${service}`;
+    });
+
+    // Always await
+    const result = await deploy("api");
+    ```
+
+    There is no `syncTimeout` equivalent because TypeScript does not have the sync/async bridging issue that Python has.
+  </Tab>
+</Tabs>
+
+<Note>
+In TypeScript, if you wrap a synchronous function with `gate()`, it is automatically treated as an async function. The return type becomes `Promise<T>` regardless of the original function's return type.
+</Note>
+
+---
+
+## Configuration Loading
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from attesta import Attesta
+    from pathlib import Path
+
+    # From string path
+    attesta = Attesta.from_config("attesta.yaml")
+
+    # From Path object
+    attesta = Attesta.from_config(Path("/etc/attesta/config.yaml"))
+
+    # Programmatic
+    attesta = Attesta(
+        policy={"min_review_seconds": 3.0},
+        risk_scorer=my_scorer,
+    )
+    ```
+
+    `from_config()` is synchronous and returns an `Attesta` instance directly.
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    import { Attesta } from "@attesta/core";
+
+    // TypeScript uses the constructor directly (no fromConfig)
+    const attesta = new Attesta();
+
+    // With options
+    const attesta = new Attesta({
+      minReviewSeconds: 3.0,
+      riskScorer: myScorer,
+    });
+    ```
+
+    TypeScript uses the constructor directly. There is no `fromConfig()` method.
+  </Tab>
+</Tabs>
+
+---
+
+## Evaluate API
+
+The `evaluate()` method is available on both SDKs and runs the full approval pipeline without raising `AttestaDenied`. The caller is responsible for checking the verdict.
+
+<CodeGroup>
+```python Python
+from attesta import Attesta, ActionContext, Verdict
+
+attesta = Attesta.from_config("attesta.yaml")
+
+ctx = ActionContext(
+    function_name="deploy",
+    args=("api-gateway", "2.1.0"),
+    function_doc="Deploy a service to production.",
+    environment="production",
+    agent_id="deploy-bot",
+)
+
+result = await attesta.evaluate(ctx)
+
+if result.verdict == Verdict.APPROVED:
+    deploy("api-gateway", "2.1.0")
+elif result.verdict == Verdict.DENIED:
+    print(f"Risk score: {result.risk_assessment.score}")
+```
+
+```typescript TypeScript
+import { Attesta, ActionContext, Verdict } from "@attesta/core";
+
+const attesta = new Attesta();
+
+const ctx: ActionContext = {
+  functionName: "deploy",
+  args: ["api-gateway", "2.1.0"],
+  functionDoc: "Deploy a service to production.",
+  environment: "production",
+  agentId: "deploy-bot",
+};
+
+const result = await attesta.evaluate(ctx);
+
+if (result.verdict === Verdict.APPROVED) {
+  await deploy("api-gateway", "2.1.0");
+} else if (result.verdict === Verdict.DENIED) {
+  console.log(`Risk score: ${result.riskAssessment.score}`);
+}
+```
+</CodeGroup>
+
+Key differences:
+- Python `ActionContext` uses keyword arguments to the constructor; TypeScript uses an object literal matching the interface shape.
+- Python uses `==` for enum comparison; TypeScript uses `===`.
+- Python accesses `result.risk_assessment`; TypeScript accesses `result.riskAssessment`.
+
+---
+
+## Custom Implementations
+
+Both SDKs use structural typing for pluggable components (scorers, renderers, loggers), but the mechanism differs.
+
+<Tabs>
+  <Tab title="Python">
+    Python uses `Protocol` classes with `@runtime_checkable`. Any object with the right methods satisfies the protocol -- no inheritance needed.
+
+    ```python
+    from attesta import RiskScorer, ActionContext
+
+    class MyScorer:
+        @property
+        def name(self) -> str:
+            return "my-scorer"
+
+        def score(self, ctx: ActionContext) -> float:
+            return 0.5
+
+    # Duck typing -- no inheritance required
+    assert isinstance(MyScorer(), RiskScorer)
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    TypeScript uses `interface` definitions. Use `implements` for explicit compliance, or rely on structural typing.
+
+    ```typescript
+    import { RiskScorer, ActionContext } from "@attesta/core";
+
+    // Explicit implementation
+    class MyScorer implements RiskScorer {
+      readonly name = "my-scorer";
+
+      score(ctx: ActionContext): number {
+        return 0.5;
+      }
+    }
+
+    // Structural typing also works (no implements keyword)
+    const inlineScorer: RiskScorer = {
+      name: "inline",
+      score: (ctx) => 0.5,
+    };
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Error Handling
+
+<CodeGroup>
+```python Python
+from attesta import gate, AttestaDenied
+
+@gate(risk="critical")
+def dangerous_action() -> str:
+    return "done"
+
+try:
+    dangerous_action()
+except AttestaDenied as e:
+    print(e.message)           # Human-readable denial message
+    print(e.result)            # ApprovalResult or None
+    print(e.result.verdict)    # Verdict enum
+```
+
+```typescript TypeScript
+import { gate, AttestaDenied } from "@attesta/core";
+
+const dangerousAction = gate(
+  { risk: "critical" },
+  async () => "done"
+);
+
+try {
+  await dangerousAction();
+} catch (error) {
+  if (error instanceof AttestaDenied) {
+    console.log(error.message);           // Human-readable denial message
+    console.log(error.result);            // ApprovalResult or undefined
+    console.log(error.result?.verdict);   // Verdict enum
+  }
+}
+```
+</CodeGroup>
+
+| Aspect | Python | TypeScript |
+|--------|--------|------------|
+| Exception class | `AttestaDenied` | `AttestaDenied` (extends `Error`) |
+| Null result check | `if e.result:` | `error.result?.verdict` (optional chaining) |
+| Catch syntax | `except AttestaDenied as e` | `catch (error)` + `instanceof` check |
+
+---
+
+## Feature Parity
+
+Most features are available in both SDKs. The table below documents known differences as of v0.1.x.
+
+| Feature | Python | TypeScript | Notes |
+|---------|--------|------------|-------|
+| `gate()` / `@gate` | Yes | Yes | Decorator vs. wrapper function |
+| `Attesta` class | Yes | Yes | |
+| `Attesta.fromConfig()` | Yes (sync) | No (use constructor) | TypeScript uses `new Attesta()` |
+| `evaluate()` | Yes | Yes | |
+| `DefaultRiskScorer` | Yes | Yes | |
+| `CompositeRiskScorer` | Yes | Yes | |
+| `MaxRiskScorer` | Yes | Yes | |
+| Domain profiles | Yes | No | Python-only; use `attesta.yaml` domain config with the CLI |
+| Multi-party challenge | Yes | No | Python-only |
+| Trust engine | Yes | Yes | |
+| Audit logger (JSONL) | Yes | Yes | |
+| Hash-chain verification | Yes | No | Use `attesta audit verify` CLI instead |
+| `TerminalRenderer` (rich UI) | Yes | Basic | TypeScript uses a basic console renderer |
+| LangChain integration | Yes | Yes | |
+| OpenAI Agents SDK | Yes | No | Python-only |
+| Anthropic Claude | Yes | No | Python-only |
+| CrewAI | Yes | No | Python-only |
+| MCP decorator | Yes | No | Python-only |
+| MCP proxy (`MCPProxy`) | Yes | No | Use `attesta mcp wrap` CLI from TypeScript projects |
+| Vercel AI SDK integration | No | Yes | TypeScript-only |
+| `sync_timeout` bridging | Yes | N/A | TypeScript is always async |
+| CLI (`attesta`) | Yes | N/A | CLI is Python-only; usable from any project |
+
+<Tip>
+Even if you are building a TypeScript project, you can install the Python package (`pip install attesta`) to use the `attesta` CLI for audit verification, trust management, and MCP wrapping. The CLI operates on the shared `.attesta/` data directory and `attesta.yaml` config file.
+</Tip>
+
+---
+
+## Audit Log Compatibility
+
+Both SDKs write to the same `.attesta/audit.jsonl` format. Entries produced by the Python SDK and the TypeScript SDK are fully interoperable -- you can mix and match within the same project, and the `attesta audit verify` command validates the entire chain regardless of which SDK produced each entry.
+
+```json
+{
+  "id": "a4f8b2c1e3d5...",
+  "timestamp": "2025-06-15T14:32:18Z",
+  "function_name": "deploy",
+  "verdict": "approved",
+  "risk_level": "high",
+  "risk_score": 0.78,
+  "agent_id": "deploy-bot",
+  "prev_hash": "e3d5a4f8b2c1..."
+}
+```
+
+<Warning>
+Field names in the audit log JSONL file use `snake_case` regardless of which SDK produced the entry. This is a serialization format decision, not an API convention. The TypeScript SDK maps `camelCase` properties to `snake_case` on write and reverses the mapping on read.
+</Warning>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="TypeScript Getting Started" icon="js" href="/typescript/getting-started">
+    Install and configure the TypeScript SDK
+  </Card>
+  <Card title="Attesta Class" icon="cube" href="/api/attesta-class">
+    Full API reference for the Attesta class
+  </Card>
+  <Card title="Protocols" icon="plug" href="/api/protocols">
+    Implement custom scorers, renderers, and loggers
+  </Card>
+  <Card title="Vercel AI SDK" icon="triangle" href="/integrations/vercel-ai">
+    TypeScript-native Vercel AI integration
+  </Card>
+</CardGroup>

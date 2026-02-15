@@ -1,0 +1,286 @@
+---
+title: "RiskAssessment"
+description: "Dataclasses representing risk scores, levels, and contributing factors"
+icon: "gauge-high"
+---
+
+`RiskAssessment` captures the result of evaluating the risk of an action, including a continuous score, a discrete risk level, and an itemized list of contributing factors. `RiskFactor` describes a single contributing factor to the overall score.
+
+## RiskAssessment
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import RiskAssessment
+```
+
+```typescript TypeScript
+import { RiskAssessment } from "@attesta/core";
+```
+</CodeGroup>
+
+### Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `score` | `float` | *required* | Continuous risk score in the range `[0.0, 1.0]`. Validated on construction. |
+| `level` | `RiskLevel` | *required* | Discrete risk classification derived from the score. See [RiskLevel enum](/api/enums#risklevel). |
+| `factors` | `list[RiskFactor]` | `[]` | Itemized list of factors that contributed to the score. |
+| `scorer_name` | `str` | `"default"` | Identifier of the scorer that produced this assessment. |
+
+### Validation
+
+The `score` field is validated in `__post_init__` to ensure it falls within `[0.0, 1.0]`. Attempting to construct a `RiskAssessment` with an out-of-range score raises a `ValueError`.
+
+```python Python
+from attesta import RiskAssessment, RiskLevel
+
+# Valid
+assessment = RiskAssessment(score=0.75, level=RiskLevel.HIGH)
+
+# Raises ValueError: Risk score must be in [0, 1], got 1.5
+assessment = RiskAssessment(score=1.5, level=RiskLevel.CRITICAL)
+```
+
+### Score-to-Level Mapping
+
+The `RiskLevel.from_score()` classmethod maps continuous scores to discrete levels:
+
+| Score Range | Risk Level | Default Challenge |
+|-------------|-----------|-------------------|
+| `0.0 - 0.3` | `LOW` | `auto_approve` |
+| `0.3 - 0.6` | `MEDIUM` | `confirm` |
+| `0.6 - 0.8` | `HIGH` | `quiz` |
+| `0.8 - 1.0` | `CRITICAL` | `multi_party` |
+
+<Note>
+The boundary values are exclusive on the lower end: a score of exactly `0.3` maps to `MEDIUM`, not `LOW`. A score of exactly `0.6` maps to `HIGH`, and `0.8` maps to `CRITICAL`.
+</Note>
+
+### Constructing Manually
+
+You can build a `RiskAssessment` manually for testing or custom integration scenarios.
+
+<CodeGroup>
+```python Python
+from attesta import RiskAssessment, RiskLevel, RiskFactor
+
+assessment = RiskAssessment(
+    score=0.72,
+    level=RiskLevel.HIGH,
+    factors=[
+        RiskFactor(
+            name="function_name",
+            contribution=0.285,
+            description="Risk inferred from the function name verbs.",
+            evidence="destructive verbs: delete",
+        ),
+        RiskFactor(
+            name="arguments",
+            contribution=0.225,
+            description="Risk inferred from argument values.",
+            evidence="sensitive pattern 'production'",
+        ),
+        RiskFactor(
+            name="docstring",
+            contribution=0.17,
+            description="Risk inferred from the function docstring.",
+            evidence="high-risk keyword 'irreversible'",
+        ),
+    ],
+    scorer_name="default",
+)
+
+print(f"Score: {assessment.score}")        # 0.72
+print(f"Level: {assessment.level.value}")  # "high"
+print(f"Scorer: {assessment.scorer_name}") # "default"
+print(f"Factors: {len(assessment.factors)}")  # 3
+```
+
+```typescript TypeScript
+import { RiskAssessment, RiskLevel } from "@attesta/core";
+
+const assessment: RiskAssessment = {
+  score: 0.72,
+  level: RiskLevel.HIGH,
+  factors: [
+    {
+      name: "function_name",
+      contribution: 0.285,
+      description: "Risk inferred from the function name verbs.",
+      evidence: "destructive verbs: delete",
+    },
+    {
+      name: "arguments",
+      contribution: 0.225,
+      description: "Risk inferred from argument values.",
+      evidence: "sensitive pattern 'production'",
+    },
+  ],
+  scorerName: "default",
+};
+```
+</CodeGroup>
+
+### Trust-Adjusted Assessments
+
+When a trust engine is configured, the `CoreAttesta` pipeline may produce a `RiskAssessment` with an additional `trust_adjustment` factor that shows how the score was modified.
+
+```python Python
+# After trust adjustment, the factors list includes:
+RiskFactor(
+    name="trust_adjustment",
+    contribution=-0.08,  # negative = risk was reduced
+    description="Trust engine adjusted risk from 0.72 to 0.64",
+)
+```
+
+<Warning>
+Trust adjustment never downgrades CRITICAL-level actions. If the original assessment is CRITICAL (score >= 0.8), the trust engine is bypassed entirely and the original score is preserved. This is a safety invariant.
+</Warning>
+
+### Override Assessments
+
+When `risk=` is set on the `@gate` decorator, the scorer is bypassed and a fixed score is used:
+
+| Risk Level | Fixed Score |
+|-----------|-------------|
+| `LOW` | `0.15` |
+| `MEDIUM` | `0.45` |
+| `HIGH` | `0.70` |
+| `CRITICAL` | `0.90` |
+
+The resulting `RiskAssessment` has `scorer_name="override"` and a single `manual_override` factor.
+
+---
+
+## RiskFactor
+
+Describes a single contributing factor to the overall risk score.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import RiskFactor
+```
+
+```typescript TypeScript
+import { RiskFactor } from "@attesta/core";
+```
+</CodeGroup>
+
+### Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `str` | *required* | Short identifier for the factor (e.g., `"function_name"`, `"arguments"`, `"docstring"`, `"hints"`, `"novelty"`). |
+| `contribution` | `float` | *required* | The weighted contribution of this factor to the overall score. This is the raw factor score multiplied by the factor's weight. |
+| `description` | `str` | *required* | Human-readable explanation of what this factor measures. |
+| `evidence` | `str \| None` | `None` | Specific evidence that triggered this factor (e.g., `"destructive verbs: delete, drop"`). |
+
+### DefaultRiskScorer Factors
+
+The built-in `DefaultRiskScorer` produces exactly five factors for every assessment:
+
+| Factor Name | Weight | Score Range | Evidence Examples |
+|-------------|--------|-------------|-------------------|
+| `function_name` | 0.30 | 0.0 - 1.0 | `"destructive verbs: delete"`, `"mutating verbs: deploy"`, `"read verbs: get"` |
+| `arguments` | 0.25 | 0.0 - 1.0 | `"sensitive pattern 'production'"`, `"SQL keyword 'DROP'"`, `"shell command 'rm -rf'"` |
+| `docstring` | 0.20 | 0.0 - 1.0 | `"high-risk keyword 'irreversible'"`, `"caution keyword 'warning'"`, `"no docstring available"` |
+| `hints` | 0.15 | 0.0 - 1.0 | `"production=True (+0.30); pii=True (+0.30)"`, `"no hints provided"` |
+| `novelty` | 0.10 | 0.0 - 1.0 | `"seen 0 time(s) before"` (novel), `"seen 15 time(s) before"` (well-known) |
+
+### Example: Iterating Over Factors
+
+<CodeGroup>
+```python Python
+from attesta import Attesta, ActionContext
+
+attesta = Attesta.from_config("attesta.yaml")
+
+ctx = ActionContext(
+    function_name="delete_user",
+    args=("usr_12345",),
+    function_doc="Permanently delete a user account. This is irreversible.",
+    hints={"production": True, "pii": True},
+    environment="production",
+)
+
+result = await attesta.evaluate(ctx)
+
+print(f"Overall: {result.risk_assessment.score:.3f} ({result.risk_assessment.level.value})")
+print(f"Scorer: {result.risk_assessment.scorer_name}")
+print()
+
+for factor in result.risk_assessment.factors:
+    print(f"  {factor.name}:")
+    print(f"    Contribution: {factor.contribution:.4f}")
+    print(f"    Description:  {factor.description}")
+    if factor.evidence:
+        print(f"    Evidence:     {factor.evidence}")
+    print()
+```
+
+```typescript TypeScript
+import { Attesta, ActionContext } from "@attesta/core";
+
+const attesta = new Attesta();
+
+const ctx: ActionContext = {
+  functionName: "deleteUser",
+  args: ["usr_12345"],
+  functionDoc: "Permanently delete a user account. This is irreversible.",
+  hints: { production: true, pii: true },
+  environment: "production",
+};
+
+const result = await attesta.evaluate(ctx);
+
+console.log(`Overall: ${result.riskAssessment.score.toFixed(3)} (${result.riskAssessment.level})`);
+
+for (const factor of result.riskAssessment.factors) {
+  console.log(`  ${factor.name}: ${factor.contribution.toFixed(4)}`);
+  if (factor.evidence) {
+    console.log(`    Evidence: ${factor.evidence}`);
+  }
+}
+```
+</CodeGroup>
+
+Sample output for a destructive action in production:
+
+```
+Overall: 0.808 (critical)
+Scorer: default
+
+  function_name:
+    Contribution: 0.2850
+    Description:  Risk inferred from the function name verbs.
+    Evidence:     destructive verbs: delete
+
+  arguments:
+    Contribution: 0.0125
+    Description:  Risk inferred from argument values.
+    Evidence:     arguments appear benign
+
+  docstring:
+    Contribution: 0.1700
+    Description:  Risk inferred from the function docstring.
+    Evidence:     high-risk keyword 'irreversible'; high-risk keyword 'Permanently'
+
+  hints:
+    Contribution: 0.0900
+    Description:  Risk inferred from caller-supplied hints.
+    Evidence:     production=True (+0.30); pii=True (+0.30)
+
+  novelty:
+    Contribution: 0.0900
+    Description:  Risk due to function call novelty.
+    Evidence:     seen 0 time(s) before
+```
+
+<Note>
+The `contribution` values are **weighted** -- they represent `raw_factor_score * factor_weight`. The sum of all contributions equals the overall `score` (before clamping to [0, 1]). This makes it easy to see exactly how much each factor contributed to the final result.
+</Note>

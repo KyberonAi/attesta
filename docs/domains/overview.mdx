@@ -1,0 +1,206 @@
+---
+title: "Domain Profiles Overview"
+description: "Architecture and structure of Attesta's domain profile framework for industry-specific risk scoring"
+icon: "grid-2"
+---
+
+Domain profiles are Attesta's mechanism for encoding industry-specific compliance knowledge into the risk scoring and approval pipeline. Each profile contains risk patterns, sensitive terms, critical actions, escalation rules, and challenge templates tailored to a specific regulatory domain.
+
+## Architecture
+
+A domain profile is defined by the `DomainProfile` dataclass, which contains all the domain-specific configuration that layers on top of Attesta's base scoring engine.
+
+```python
+from attesta.domains import DomainProfile
+
+profile = DomainProfile(
+    name="my-industry",
+    display_name="My Industry",
+    description="Custom compliance profile for my domain",
+    risk_patterns=[...],           # Regex patterns that elevate risk
+    sensitive_terms={...},         # Terms with risk weights
+    critical_actions=[...],        # Actions that are always CRITICAL
+    safe_actions=[...],            # Actions that are always LOW
+    compliance_frameworks=[...],   # Applicable regulations
+    escalation_rules=[...],        # When to require extra approvers
+    challenge_templates=[...],     # Domain-specific challenge questions
+    min_review_overrides={...},    # Per-level review time overrides
+    base_risk_floor=0.15,          # Minimum risk for any action
+    production_multiplier=1.8,     # Risk multiplier in production
+    required_vocabulary=[...],     # Terms operators must know
+)
+```
+
+## DomainProfile Structure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `str` | Unique identifier (e.g., `"my-industry"`) |
+| `display_name` | `str` | Human-readable label |
+| `description` | `str` | Summary of the profile's purpose |
+| `risk_patterns` | `list[RiskPattern]` | Regex patterns that contribute to risk scoring |
+| `sensitive_terms` | `dict[str, float]` | Terms mapped to risk weights (0.0-1.0) |
+| `critical_actions` | `list[str]` | Function names that are always CRITICAL |
+| `safe_actions` | `list[str]` | Function names that are always LOW |
+| `compliance_frameworks` | `list[str]` | Applicable regulatory frameworks |
+| `escalation_rules` | `list[EscalationRule]` | Conditions that trigger extra approvers |
+| `challenge_templates` | `list[DomainChallengeTemplate]` | Domain-specific challenge questions |
+| `min_review_overrides` | `dict` | Per-risk-level review time overrides |
+| `base_risk_floor` | `float` | Minimum risk score for any action in this domain |
+| `production_multiplier` | `float` | Risk multiplier when running in production |
+| `required_vocabulary` | `list[str]` | Terms operators must understand |
+
+### RiskPattern
+
+Each risk pattern defines a regex that matches against a specific part of the action context:
+
+```python
+from attesta.domains import RiskPattern
+
+pattern = RiskPattern(
+    pattern=r"confidential|secret|internal_only",
+    target="args",              # "function_name", "args", "kwargs", "docstring", "any"
+    risk_contribution=0.8,      # How much this pattern adds to the risk score
+    name="confidential_data",
+    description="Detects confidential data references in arguments",
+    compliance_refs=["SOC 2 CC6.1"],
+)
+```
+
+| Target | What It Matches Against |
+|--------|------------------------|
+| `function_name` | The gated function's name |
+| `args` | Positional argument values (stringified) |
+| `kwargs` | Keyword argument values (stringified) |
+| `docstring` | The function's docstring |
+| `any` | All of the above (matches if any target contains the pattern) |
+
+### EscalationRule
+
+Escalation rules define conditions that require additional approvers or notifications beyond the standard challenge:
+
+```python
+from attesta.domains import EscalationRule
+
+rule = EscalationRule(
+    condition="risk_score > 0.9",
+    action="require_multi_party",
+    required_approvers=3,
+    notify_roles=["compliance_officer"],
+    description="High-risk actions require 3-party approval",
+)
+```
+
+Supported condition forms:
+
+| Condition | Example | Description |
+|-----------|---------|-------------|
+| Risk score comparison | `"risk_score > 0.9"` | Numeric comparison on risk score |
+| Pattern match | `"matches_pattern:phi_access"` | Fires when a named pattern matched |
+| Environment check | `"environment:production"` | Fires when environment matches |
+| Risk level check | `"risk_level:critical"` | Fires when risk level matches |
+
+### DomainChallengeTemplate
+
+Challenge templates provide domain-specific questions for comprehension challenges:
+
+```python
+from attesta.domains import DomainChallengeTemplate
+
+template = DomainChallengeTemplate(
+    question_template="What compliance requirement governs {action}?",
+    answer_hints=["access control", "audit trail"],
+    context_vars=["action"],
+    challenge_type="teach_back",
+    min_risk_level="high",
+)
+```
+
+## Domain Registry
+
+The `DomainRegistry` manages all registered domain profiles:
+
+```python
+from attesta.domains import DomainRegistry, registry
+
+# List all registered domains
+domains = registry.list_domains()
+
+# Get a profile by name
+profile = registry.get("my-industry")
+
+# Register a custom domain
+registry.register(my_custom_profile)
+
+# Replace an existing domain
+registry.replace(my_modified_profile)
+
+# Merge multiple profiles (conservative strategy)
+merged = registry.merge(profile_a, profile_b)
+```
+
+### Merge Strategy
+
+When merging multiple domains via `DomainRegistry.merge()`, the strategy is **conservative** -- it always picks the stricter option:
+
+- **Lists** (risk_patterns, critical_actions, etc.): Union of all entries
+- **Dicts** (sensitive_terms, min_review_overrides): Union with max value for conflicts
+- **Scalars** (base_risk_floor, production_multiplier): Take the higher value
+
+This guarantees that combining domains never weakens the overall policy.
+
+## Registering Presets
+
+You can register profiles as loadable presets for use in `attesta.yaml`:
+
+```python
+from attesta.domains.presets import register_preset
+
+register_preset(my_profile, aliases=["my-alias", "alt-name"])
+
+# Now attesta.yaml can reference:
+# domain: my-industry
+# or: domain: my-alias
+```
+
+## Activation
+
+Activate domain profiles via `attesta.yaml` or programmatically:
+
+<CodeGroup>
+```yaml attesta.yaml
+# Single domain (must be registered as a preset first)
+domain: my-industry
+
+# Multiple domains (merged)
+# domain:
+#   - my-industry
+#   - another-domain
+```
+
+```python Python
+from attesta.domains import DomainProfile, DomainRiskScorer
+from attesta import Attesta
+
+# Programmatic activation
+profile = DomainProfile(
+    name="my-industry",
+    display_name="My Industry",
+    description="Custom profile.",
+)
+scorer = DomainRiskScorer(profile)
+
+attesta = Attesta(risk_scorer=scorer)
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Custom Domains" icon="puzzle-piece" href="/domains/custom-domains">
+    Build and deploy custom domain profiles
+  </Card>
+  <Card title="Custom Risk Scorer" icon="gauge-high" href="/guides/custom-risk-scorer">
+    Build risk scorers from scratch
+  </Card>
+</CardGroup>

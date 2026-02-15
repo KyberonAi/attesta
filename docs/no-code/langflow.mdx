@@ -1,0 +1,303 @@
+---
+title: "Langflow Integration"
+description: "Add human-in-the-loop approval to Langflow pipelines with the Attesta Approval component"
+icon: "wind"
+---
+
+The `langflow-attesta` package provides the **Attesta Approval** component for [Langflow](https://langflow.org). It is a Python component that evaluates AI agent actions for risk and returns a structured `Data` object with the verdict, risk score, and audit information.
+
+<Note>
+**Package:** `langflow-attesta` | **Language:** Python | **Dependencies:** `attesta >=0.1.0` | **Runtime:** Langflow component system (`lfx.custom.custom_component.component.Component`)
+</Note>
+
+## Installation
+
+The Attesta Approval component can be installed in two ways: as a contribution to the Langflow source tree, or as a custom component loaded at runtime.
+
+<Tabs>
+  <Tab title="Langflow Source Contribution">
+    Follow the [Langflow contributing components guide](https://docs.langflow.org/contributing-components):
+
+    <Steps>
+      <Step title="Copy the component file">
+        ```bash
+        cp attesta_gate.py /path/to/langflow/src/lfx/src/lfx/components/tools/attesta_gate.py
+        ```
+      </Step>
+      <Step title="Register in __init__.py">
+        Add the import to the Tools category init file:
+
+        ```python
+        # In src/lfx/src/lfx/components/tools/__init__.py
+        from .attesta_gate import AttestaGate
+        ```
+      </Step>
+      <Step title="Add the dependency">
+        Add `attesta` to the Langflow `pyproject.toml`:
+
+        ```toml
+        [project.optional-dependencies]
+        attesta = ["attesta>=0.1.0"]
+        ```
+      </Step>
+      <Step title="Restart Langflow">
+        Restart Langflow. The **Attesta Approval** component appears in the **Tools** category on the canvas.
+
+        ```bash
+        langflow run
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Custom Component (LANGFLOW_COMPONENTS_PATH)">
+    If you do not want to modify the Langflow source, load the component at runtime:
+
+    <Steps>
+      <Step title="Set the components path">
+        ```bash
+        export LANGFLOW_COMPONENTS_PATH=/path/to/langflow-attesta
+        ```
+      </Step>
+      <Step title="Install the attesta dependency">
+        ```bash
+        pip install attesta
+        ```
+      </Step>
+      <Step title="Start Langflow">
+        ```bash
+        langflow run
+        ```
+
+        The **Attesta Approval** component appears in the component panel with the `shield-check` icon.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+---
+
+## Component Configuration
+
+The component exposes four inputs in the Langflow canvas:
+
+| Input | Type | Default | Required | Advanced | Description |
+|---|---|---|---|---|---|
+| **Function Name** | `MessageTextInput` | -- | Yes | No | Name of the action being gated (e.g., `send_email`, `delete_record`). |
+| **Risk Level** | `DropdownInput` | `auto` | No | No | Risk level override: `auto`, `low`, `medium`, `high`, `critical`. |
+| **Action Arguments** | `MessageTextInput` | `{}` | No | No | JSON string of arguments to evaluate (e.g., `{"to": "user@example.com"}`). |
+| **Risk Hints** | `MessageTextInput` | `{}` | No | Yes | JSON string of risk hints (e.g., `{"destructive": true, "pii": true}`). |
+
+The component has one output:
+
+| Output | Display Name | Method | Description |
+|---|---|---|---|
+| `result` | Approval Result | `evaluate_gate` | Structured `Data` object with verdict, risk score, and audit metadata. |
+
+<Tip>
+The **Risk Hints** input is marked as `advanced=True`, meaning it is hidden by default in the Langflow UI. Click "Show Advanced" on the component to reveal it. For most use cases, the automatic risk scorer combined with the Function Name provides sufficient accuracy.
+</Tip>
+
+---
+
+## How It Works
+
+<Steps>
+  <Step title="Parse Inputs">
+    The component parses **Action Arguments** and **Risk Hints** from JSON strings into Python dictionaries using the `_parse_json()` helper. Invalid JSON is silently replaced with an empty dict, and a warning is logged via `self.log()`.
+  </Step>
+  <Step title="Configure Risk Override">
+    If **Risk Level** is set to anything other than `auto`, the component creates a `RiskLevel` enum value (e.g., `RiskLevel.HIGH`) and passes it as `risk_override` to the Attesta instance. When set to `auto`, `risk_override` is `None` and the built-in scorer determines the level.
+  </Step>
+  <Step title="Build ActionContext">
+    The component creates an `ActionContext`:
+
+    ```python
+    ActionContext(
+        function_name="send_email",
+        kwargs={"to": "user@example.com"},
+        hints={"pii": True},
+        environment="production",
+        metadata={"source": "langflow"},
+    )
+    ```
+  </Step>
+  <Step title="Evaluate">
+    The `ActionContext` is passed to `attesta.evaluate()` (async). The Attesta pipeline runs risk scoring, challenge selection, and verification.
+  </Step>
+  <Step title="Return Data">
+    The component returns a Langflow `Data` object containing the full evaluation result, including `review_time_seconds` and the echoed `function_name`.
+  </Step>
+</Steps>
+
+---
+
+## Output Format
+
+The **Approval Result** output is a Langflow `Data` object with the following fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `verdict` | string | `approved`, `denied`, `modified`, `timed_out`, or `escalated` |
+| `risk_score` | float | Numeric risk score between 0 and 1 |
+| `risk_level` | string | `low`, `medium`, `high`, or `critical` |
+| `denied` | bool | `true` if verdict is `denied`, `timed_out`, or `escalated` |
+| `audit_entry_id` | string | Unique audit log entry ID |
+| `review_time_seconds` | float | Time spent in human review |
+| `function_name` | string | Echo of the configured function name |
+
+<Tabs>
+  <Tab title="Approved">
+    ```json
+    {
+      "verdict": "approved",
+      "risk_score": 0.2,
+      "risk_level": "low",
+      "denied": false,
+      "audit_entry_id": "audit-abc123",
+      "review_time_seconds": 0.5,
+      "function_name": "send_email"
+    }
+    ```
+  </Tab>
+  <Tab title="Denied">
+    ```json
+    {
+      "verdict": "denied",
+      "risk_score": 0.85,
+      "risk_level": "critical",
+      "denied": true,
+      "audit_entry_id": "audit-def456",
+      "review_time_seconds": 1.0,
+      "function_name": "delete_all_users"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+The `denied` field is a convenience boolean that is `True` when the verdict is `denied`, `timed_out`, or `escalated`. Use this for simple conditional routing in your pipeline.
+</Note>
+
+---
+
+## Pipeline Examples
+
+### Example: Gate a Deployment Action
+
+1. Open a pipeline in Langflow.
+2. Drag the **Attesta Approval** component onto the canvas.
+3. Configure:
+   - **Function Name**: `deploy_service`
+   - **Risk Level**: `high`
+   - **Action Arguments**: `{"service": "api-gateway", "version": "2.1.0"}`
+   - **Risk Hints**: `{"production": true}`
+4. Connect the **Approval Result** output to a conditional component or downstream tool.
+
+### Example: Dynamic Arguments from Upstream
+
+Connect the output of an upstream component (e.g., a Text Input or LLM) to the **Action Arguments** field:
+
+```
+[User Input] --> [LLM] --> [Parse Output] --> [Attesta Approval] --> [Execute Tool]
+                                               function_name: "send_email"
+                                               action_args: {{parse_output.text}}
+```
+
+The parsed LLM output (e.g., `{"to": "ceo@company.com", "body": "..."}`) is passed as the action arguments for risk evaluation.
+
+---
+
+## Pipeline Patterns
+
+### Pattern: Conditional Execution
+
+Use the output `Data` object's `denied` field in a conditional component:
+
+```
+[Attesta Approval] --> [Conditional: data.denied == false] --> [Execute Action]
+                                        |
+                                        --> [Notify User: "Action denied"]
+```
+
+### Pattern: Chained Evaluation
+
+Evaluate multiple actions in sequence, each with appropriate risk levels:
+
+```
+[Data Fetch]     --> [Attesta: read_data, low]     --> [Process Data]
+[Process Data]   --> [Attesta: transform, medium]  --> [Write Results]
+[Write Results]  --> [Attesta: deploy, critical]   --> [Deploy]
+```
+
+### Pattern: High-Risk Action with Hints
+
+For actions that are inherently dangerous, set explicit risk hints:
+
+1. Set **Function Name** to `drop_database_table`.
+2. Set **Risk Level** to `critical`.
+3. Set **Risk Hints** to:
+   ```json
+   {"destructive": true, "irreversible": true, "production": true}
+   ```
+4. The risk scorer will combine the destructive verb, the critical override, and the hints to produce a very high risk score, triggering multi-party approval.
+
+---
+
+## JSON Parsing Behavior
+
+Both **Action Arguments** and **Risk Hints** accept JSON strings. The `_parse_json()` helper handles edge cases gracefully:
+
+| Input | Parsed Result | Behavior |
+|---|---|---|
+| `{"key": "value"}` | `{"key": "value"}` | Normal parsing |
+| `""` or empty | `{}` | Empty dict |
+| `"not valid json{{"` | `{}` | Warning logged via `self.log()`, empty dict used |
+| `[1, 2, 3]` (array) | `{}` | Non-dict JSON is treated as empty |
+| `null` or `None` | `{}` | Empty dict |
+
+<Warning>
+Invalid JSON does not stop the pipeline. The component logs a warning (`"Warning: invalid JSON in {field_name}, using empty dict"`) but does not fail. This means risk scoring may be less accurate if arguments are malformed. Check Langflow's logs if you suspect a parsing issue.
+</Warning>
+
+---
+
+## Source Code Reference
+
+The component extends Langflow's `Component` base class:
+
+```python
+from lfx.custom.custom_component.component import Component
+from lfx.io import DropdownInput, MessageTextInput, Output
+from lfx.schema import Data
+from attesta.core.gate import Attesta
+from attesta.core.types import ActionContext, RiskLevel, Verdict
+
+
+class AttestaGate(Component):
+    display_name = "Attesta Approval"
+    description = "Human-in-the-loop approval that evaluates AI agent actions for risk before execution"
+    documentation = "https://attesta.dev"
+    icon = "shield-check"
+    name = "attesta_gate"
+```
+
+The `evaluate_gate` method is async and handles the full Attesta pipeline. The `_parse_json` private method provides safe JSON parsing with logging.
+
+---
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="n8n Integration" icon="diagram-project" href="/no-code/n8n">
+    Workflow node for n8n data pipelines
+  </Card>
+  <Card title="Flowise Integration" icon="robot" href="/no-code/flowise">
+    Tool component for Flowise chatflows
+  </Card>
+  <Card title="Dify Integration" icon="plug" href="/no-code/dify">
+    Plugin tool for the Dify platform
+  </Card>
+  <Card title="No-Code Overview" icon="grid-2" href="/no-code/overview">
+    Compare all no-code platforms
+  </Card>
+</CardGroup>

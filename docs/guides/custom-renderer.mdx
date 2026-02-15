@@ -1,0 +1,607 @@
+---
+title: "Building a Custom Renderer"
+description: "Implement the Renderer protocol to present approval prompts and challenges via Slack, web UIs, email, or any custom channel"
+icon: "display"
+---
+
+A renderer is the UI/UX layer that sits between Attesta's decision engine and the human operator. It controls how approval prompts, challenges, and status messages are presented. Attesta ships with a `TerminalRenderer` (rich terminal UI) and a `_DefaultRenderer` (silent auto-approve for CI), but you can build custom renderers for any delivery channel -- Slack, web dashboards, email, mobile push notifications, or even voice interfaces.
+
+## The Renderer Protocol
+
+Every renderer must implement four async methods:
+
+| Method | Signature | When Called |
+|--------|-----------|------------|
+| `render_approval` | `async (ctx, risk) -> Verdict` | MEDIUM-risk actions needing simple approve/deny |
+| `render_challenge` | `async (ctx, risk, challenge_type) -> ChallengeResult` | HIGH/CRITICAL-risk actions needing verification |
+| `render_info` | `async (message) -> None` | Informational messages (no decision required) |
+| `render_auto_approved` | `async (ctx, risk) -> None` | LOW-risk actions that were auto-approved |
+
+<Note>
+All renderer methods are `async`. Even if your implementation is synchronous under the hood (e.g., blocking HTTP call), you must declare the methods as `async def`. Use `await asyncio.to_thread(...)` to wrap blocking I/O.
+</Note>
+
+---
+
+## Step-by-Step: Slack Renderer
+
+A Slack renderer sends approval requests as interactive messages with buttons and collects responses via a callback URL or polling.
+
+<Steps>
+  <Step title="Set Up Dependencies">
+    Install the Slack SDK alongside Attesta:
+
+    ```bash
+    pip install attesta slack-sdk aiohttp
+    ```
+  </Step>
+
+  <Step title="Implement the Renderer">
+    ```python
+    import asyncio
+    import json
+    import aiohttp
+    from attesta import (
+        ActionContext,
+        RiskAssessment,
+        ChallengeType,
+        ChallengeResult,
+        Verdict,
+    )
+
+    class SlackRenderer:
+        """Sends approval requests to Slack and waits for button responses."""
+
+        def __init__(
+            self,
+            webhook_url: str,
+            channel: str,
+            callback_url: str,
+            timeout_seconds: float = 300.0,
+        ):
+            self.webhook_url = webhook_url
+            self.channel = channel
+            self.callback_url = callback_url
+            self.timeout = timeout_seconds
+
+        async def render_approval(
+            self, ctx: ActionContext, risk: RiskAssessment
+        ) -> Verdict:
+            """Post an interactive message and wait for a button click."""
+            blocks = self._build_approval_blocks(ctx, risk)
+            request_id = await self._post_message(blocks)
+            response = await self._wait_for_response(request_id)
+
+            if response == "approve":
+                return Verdict.APPROVED
+            return Verdict.DENIED
+
+        async def render_challenge(
+            self,
+            ctx: ActionContext,
+            risk: RiskAssessment,
+            challenge_type: ChallengeType,
+        ) -> ChallengeResult:
+            """Post a challenge prompt and collect the response."""
+            blocks = self._build_challenge_blocks(ctx, risk, challenge_type)
+            request_id = await self._post_message(blocks)
+            response = await self._wait_for_response(request_id)
+
+            return ChallengeResult(
+                passed=(response == "approve"),
+                challenge_type=challenge_type,
+                responder=self.channel,
+            )
+
+        async def render_info(self, message: str) -> None:
+            """Post an informational message to the channel."""
+            blocks = [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f":information_source: *Attesta* {message}",
+                    },
+                }
+            ]
+            await self._post_message(blocks)
+
+        async def render_auto_approved(
+            self, ctx: ActionContext, risk: RiskAssessment
+        ) -> None:
+            """Optionally notify on auto-approvals. Often a no-op."""
+            pass  # Silent for low-risk actions
+
+        # -- internal helpers ------------------------------------------
+
+        def _build_approval_blocks(
+            self, ctx: ActionContext, risk: RiskAssessment
+        ) -> list[dict]:
+            risk_emoji = {
+                "low": ":large_green_circle:",
+                "medium": ":large_yellow_circle:",
+                "high": ":red_circle:",
+                "critical": ":no_entry:",
+            }
+            emoji = risk_emoji.get(risk.level.value, ":grey_question:")
+
+            return [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Attesta Approval Request",
+                    },
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Action:*\n`{ctx.function_name}`",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": (
+                                f"*Risk:* {emoji} "
+                                f"{risk.level.value.upper()} "
+                                f"({risk.score:.2f})"
+                            ),
+                        },
+                    ],
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Call:*\n```{ctx.description}```",
+                    },
+                },
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "Approve"},
+                            "style": "primary",
+                            "value": "approve",
+                        },
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "Deny"},
+                            "style": "danger",
+                            "value": "deny",
+                        },
+                    ],
+                },
+            ]
+
+        def _build_challenge_blocks(
+            self,
+            ctx: ActionContext,
+            risk: RiskAssessment,
+            challenge_type: ChallengeType,
+        ) -> list[dict]:
+            blocks = self._build_approval_blocks(ctx, risk)
+            # Insert a challenge question before the action buttons
+            challenge_block = {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f":warning: *{challenge_type.value.upper()} Challenge*\n"
+                        f"Please review the action details carefully "
+                        f"before responding."
+                    ),
+                },
+            }
+            blocks.insert(-1, challenge_block)
+            return blocks
+
+        async def _post_message(self, blocks: list[dict]) -> str:
+            """Post a block-kit message and return a request ID."""
+            import uuid
+            request_id = uuid.uuid4().hex
+
+            async with aiohttp.ClientSession() as session:
+                payload = {
+                    "channel": self.channel,
+                    "blocks": blocks,
+                    "metadata": {
+                        "event_type": "attesta_approval",
+                        "event_payload": {"request_id": request_id},
+                    },
+                }
+                await session.post(self.webhook_url, json=payload)
+
+            return request_id
+
+        async def _wait_for_response(self, request_id: str) -> str:
+            """Poll for a response (replace with webhook in production)."""
+            # In production, use a webhook callback or WebSocket
+            # This is a simplified polling example
+            async with aiohttp.ClientSession() as session:
+                deadline = asyncio.get_event_loop().time() + self.timeout
+                while asyncio.get_event_loop().time() < deadline:
+                    resp = await session.get(
+                        f"{self.callback_url}/responses/{request_id}"
+                    )
+                    data = await resp.json()
+                    if data.get("status") == "responded":
+                        return data["value"]
+                    await asyncio.sleep(2.0)
+            return "deny"  # Timeout defaults to deny
+    ```
+  </Step>
+
+  <Step title="Register with Attesta">
+    <CodeGroup>
+    ```python Per-Gate
+    from attesta import gate
+
+    slack = SlackRenderer(
+        webhook_url="https://hooks.slack.com/services/T.../B.../xxx",
+        channel="#ai-approvals",
+        callback_url="https://your-api.example.com/attesta",
+    )
+
+    @gate(renderer=slack)
+    def deploy_to_production(service: str) -> str:
+        return f"Deployed {service}"
+    ```
+
+    ```python Instance-Wide
+    from attesta import Attesta
+
+    attesta = Attesta(
+        renderer=SlackRenderer(
+            webhook_url="https://hooks.slack.com/services/T.../B.../xxx",
+            channel="#ai-approvals",
+            callback_url="https://your-api.example.com/attesta",
+        )
+    )
+
+    @attesta.gate
+    def deploy_to_production(service: str) -> str:
+        return f"Deployed {service}"
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+---
+
+## Step-by-Step: Web UI Renderer
+
+A web-based renderer sends approval requests to a dashboard and receives responses via WebSocket or server-sent events.
+
+<Steps>
+  <Step title="Define the Renderer">
+    ```python
+    import asyncio
+    import json
+    import uuid
+    import aiohttp
+    from attesta import (
+        ActionContext,
+        RiskAssessment,
+        ChallengeType,
+        ChallengeResult,
+        Verdict,
+    )
+
+    class WebUIRenderer:
+        """Sends approval requests to a web dashboard via REST API."""
+
+        def __init__(
+            self,
+            api_base_url: str,
+            api_key: str,
+            timeout_seconds: float = 600.0,
+        ):
+            self.api_base = api_base_url.rstrip("/")
+            self.api_key = api_key
+            self.timeout = timeout_seconds
+
+        async def render_approval(
+            self, ctx: ActionContext, risk: RiskAssessment
+        ) -> Verdict:
+            request_id = await self._create_request(ctx, risk, "approval")
+            response = await self._poll_response(request_id)
+            return Verdict.APPROVED if response == "approved" else Verdict.DENIED
+
+        async def render_challenge(
+            self,
+            ctx: ActionContext,
+            risk: RiskAssessment,
+            challenge_type: ChallengeType,
+        ) -> ChallengeResult:
+            request_id = await self._create_request(
+                ctx, risk, "challenge", challenge_type
+            )
+            response = await self._poll_response(request_id)
+            return ChallengeResult(
+                passed=(response == "approved"),
+                challenge_type=challenge_type,
+                responder="web-dashboard",
+            )
+
+        async def render_info(self, message: str) -> None:
+            async with aiohttp.ClientSession() as session:
+                await session.post(
+                    f"{self.api_base}/notifications",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json={"type": "info", "message": message},
+                )
+
+        async def render_auto_approved(
+            self, ctx: ActionContext, risk: RiskAssessment
+        ) -> None:
+            # Log to dashboard activity feed
+            async with aiohttp.ClientSession() as session:
+                await session.post(
+                    f"{self.api_base}/activity",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json={
+                        "type": "auto_approved",
+                        "action": ctx.function_name,
+                        "risk_score": risk.score,
+                    },
+                )
+
+        async def _create_request(
+            self,
+            ctx: ActionContext,
+            risk: RiskAssessment,
+            request_type: str,
+            challenge_type: ChallengeType | None = None,
+        ) -> str:
+            request_id = uuid.uuid4().hex
+            payload = {
+                "request_id": request_id,
+                "type": request_type,
+                "action": ctx.function_name,
+                "description": ctx.description,
+                "risk_score": risk.score,
+                "risk_level": risk.level.value,
+                "environment": ctx.environment,
+                "agent_id": ctx.agent_id,
+            }
+            if challenge_type:
+                payload["challenge_type"] = challenge_type.value
+
+            async with aiohttp.ClientSession() as session:
+                await session.post(
+                    f"{self.api_base}/requests",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json=payload,
+                )
+            return request_id
+
+        async def _poll_response(self, request_id: str) -> str:
+            async with aiohttp.ClientSession() as session:
+                deadline = asyncio.get_event_loop().time() + self.timeout
+                while asyncio.get_event_loop().time() < deadline:
+                    resp = await session.get(
+                        f"{self.api_base}/requests/{request_id}",
+                        headers={"Authorization": f"Bearer {self.api_key}"},
+                    )
+                    data = await resp.json()
+                    if data.get("status") in ("approved", "denied"):
+                        return data["status"]
+                    await asyncio.sleep(1.0)
+            return "denied"  # Timeout = deny
+    ```
+  </Step>
+
+  <Step title="Verify Protocol Compliance">
+    ```python
+    from attesta import Renderer
+
+    renderer = WebUIRenderer(
+        api_base_url="https://dashboard.example.com/api/v1",
+        api_key="your-api-key",
+    )
+    assert isinstance(renderer, Renderer)
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Example: Multi-Channel Renderer
+
+A renderer that fans out approval requests to multiple channels simultaneously and accepts the first response.
+
+```python
+import asyncio
+from attesta import (
+    ActionContext,
+    RiskAssessment,
+    ChallengeType,
+    ChallengeResult,
+    Verdict,
+)
+
+class MultiChannelRenderer:
+    """Sends to multiple renderers; first response wins."""
+
+    def __init__(self, renderers: list):
+        self.renderers = renderers
+
+    async def render_approval(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> Verdict:
+        tasks = [
+            asyncio.create_task(r.render_approval(ctx, risk))
+            for r in self.renderers
+        ]
+        done, pending = await asyncio.wait(
+            tasks, return_when=asyncio.FIRST_COMPLETED
+        )
+        # Cancel remaining tasks
+        for task in pending:
+            task.cancel()
+        return done.pop().result()
+
+    async def render_challenge(
+        self,
+        ctx: ActionContext,
+        risk: RiskAssessment,
+        challenge_type: ChallengeType,
+    ) -> ChallengeResult:
+        tasks = [
+            asyncio.create_task(
+                r.render_challenge(ctx, risk, challenge_type)
+            )
+            for r in self.renderers
+        ]
+        done, pending = await asyncio.wait(
+            tasks, return_when=asyncio.FIRST_COMPLETED
+        )
+        for task in pending:
+            task.cancel()
+        return done.pop().result()
+
+    async def render_info(self, message: str) -> None:
+        await asyncio.gather(
+            *(r.render_info(message) for r in self.renderers)
+        )
+
+    async def render_auto_approved(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> None:
+        await asyncio.gather(
+            *(r.render_auto_approved(ctx, risk) for r in self.renderers)
+        )
+```
+
+Usage:
+
+```python
+from attesta import Attesta
+
+attesta = Attesta(
+    renderer=MultiChannelRenderer([
+        SlackRenderer(webhook_url="...", channel="#approvals", callback_url="..."),
+        WebUIRenderer(api_base_url="https://...", api_key="..."),
+    ])
+)
+```
+
+---
+
+## Inheriting from BaseRenderer
+
+If you prefer an abstract-base-class approach over the structural protocol, you can extend `BaseRenderer`:
+
+```python
+from attesta.renderers.base import BaseRenderer
+from attesta import (
+    ActionContext, RiskAssessment,
+    ChallengeType, ChallengeResult, Verdict,
+)
+
+class EmailRenderer(BaseRenderer):
+    """Sends approval requests via email with magic-link responses."""
+
+    def __init__(self, smtp_host: str, from_addr: str, to_addr: str):
+        self.smtp_host = smtp_host
+        self.from_addr = from_addr
+        self.to_addr = to_addr
+
+    async def render_approval(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> Verdict:
+        # Send email with approve/deny links
+        # Wait for callback
+        ...
+
+    async def render_challenge(
+        self,
+        ctx: ActionContext,
+        risk: RiskAssessment,
+        challenge_type: ChallengeType,
+    ) -> ChallengeResult:
+        # Send challenge email, collect response
+        ...
+
+    async def render_auto_approved(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> None:
+        pass  # No notification for auto-approvals
+
+    async def render_info(self, message: str) -> None:
+        # Send informational email
+        ...
+```
+
+<Tip>
+`BaseRenderer` is an abstract class that will raise `TypeError` at instantiation if you forget to implement any required method. The `Renderer` protocol, by contrast, only catches missing methods at runtime `isinstance()` checks or through static type checkers.
+</Tip>
+
+---
+
+## Renderer Selection at Runtime
+
+Attesta auto-detects the best renderer when none is explicitly provided:
+
+```
+1. If renderer= is passed to @gate or Attesta() → use that
+2. If stdin is a TTY and `rich` is installed → TerminalRenderer
+3. Otherwise → _DefaultRenderer (auto-approve, for CI/headless)
+```
+
+To force a specific renderer in all environments:
+
+```python
+from attesta import Attesta
+
+# Always use your custom renderer, never auto-detect
+attesta = Attesta(renderer=SlackRenderer(...))
+```
+
+<Warning>
+The `_DefaultRenderer` auto-approves everything. In production, always specify an explicit renderer to ensure human oversight is not accidentally bypassed in non-TTY environments (containers, cron jobs, systemd services).
+</Warning>
+
+---
+
+## Testing Custom Renderers
+
+```python
+import pytest
+from attesta import (
+    ActionContext, RiskAssessment, RiskLevel,
+    ChallengeType, Verdict, Renderer,
+)
+
+@pytest.mark.asyncio
+async def test_slack_renderer_satisfies_protocol():
+    renderer = SlackRenderer(
+        webhook_url="https://example.com",
+        channel="#test",
+        callback_url="https://example.com",
+    )
+    assert isinstance(renderer, Renderer)
+
+@pytest.mark.asyncio
+async def test_render_info_does_not_raise():
+    renderer = SlackRenderer(
+        webhook_url="https://example.com",
+        channel="#test",
+        callback_url="https://example.com",
+    )
+    # Should not raise even if the webhook is unreachable in tests
+    # (wrap in try/except or mock the HTTP call)
+    ...
+```
+
+<CardGroup cols={2}>
+  <Card title="Protocols" icon="plug" href="/api/protocols">
+    Full Renderer protocol specification
+  </Card>
+  <Card title="Renderers Concept" icon="display" href="/concepts/renderers">
+    How Attesta selects and uses renderers
+  </Card>
+</CardGroup>

@@ -1,0 +1,196 @@
+---
+title: "Risk Section"
+description: "Configure risk level overrides and regex-based score amplifiers to customize risk scoring per action"
+icon: "gauge-high"
+---
+
+The `risk` section of `attesta.yaml` lets you override the calculated risk level for specific actions and amplify scores based on pattern matching. These settings layer on top of the [DefaultRiskScorer](/concepts/risk-scoring) and any active [domain profiles](/domains/overview).
+
+## Configuration
+
+```yaml attesta.yaml
+risk:
+  overrides:
+    deploy_production: critical
+    read_config: low
+    restart_service: high
+
+  amplifiers:
+    - pattern: ".*production.*"
+      boost: 0.3
+    - pattern: ".*delete.*"
+      boost: 0.2
+    - pattern: ".*pii.*"
+      boost: 0.25
+```
+
+## Risk Overrides
+
+Overrides force a specific action to a fixed risk level, bypassing the scorer entirely. The key is the function name and the value is one of: `low`, `medium`, `high`, or `critical`.
+
+```yaml
+risk:
+  overrides:
+    deploy_production: critical    # Always CRITICAL, no matter what the scorer says
+    run_backup: low                # Always LOW, skip scoring
+    update_dns: high               # Always HIGH
+    read_logs: low                 # Always LOW
+```
+
+<Note>
+Overrides take absolute precedence over the risk scorer. If a function matches an override, the scorer is still invoked (for audit purposes) but its output is replaced by the override level.
+</Note>
+
+### When to Use Overrides
+
+Overrides are best for actions where you know the risk level with certainty:
+
+| Use Case | Override | Rationale |
+|----------|----------|-----------|
+| Production deployments | `critical` | Always require full multi-party approval |
+| Database migrations | `high` | Schema changes need comprehension quiz |
+| Read-only health checks | `low` | No risk, auto-approve silently |
+| Known safe utilities | `low` | Skip unnecessary friction |
+| Compliance-mandated | `critical` | Regulatory requirement |
+
+### Programmatic Overrides
+
+You can also set overrides via the `Policy` dataclass:
+
+```python
+from attesta.config.loader import Policy
+
+policy = Policy(
+    risk_overrides={
+        "deploy_production": "critical",
+        "read_config": "low",
+        "modify_schema": "high",
+    }
+)
+```
+
+## Risk Amplifiers
+
+Amplifiers apply a regex pattern to the action name. When the pattern matches, the risk score is **boosted** by the specified amount (additive). Multiple amplifiers can stack.
+
+```yaml
+risk:
+  amplifiers:
+    - pattern: ".*production.*"
+      boost: 0.3
+    - pattern: ".*delete.*"
+      boost: 0.2
+    - pattern: ".*sensitive.*"
+      boost: 0.15
+```
+
+### How Amplifiers Work
+
+1. The `DefaultRiskScorer` produces a base score (e.g., `0.45`)
+2. Each amplifier whose `pattern` matches the function name adds its `boost`
+3. The final score is clamped to `[0.0, 1.0]`
+
+**Example**: A function named `delete_production_data` with a base score of `0.45`:
+
+| Amplifier | Pattern | Matches? | Boost |
+|-----------|---------|----------|-------|
+| Production | `.*production.*` | Yes | +0.30 |
+| Delete | `.*delete.*` | Yes | +0.20 |
+| **Final score** | | | **0.95** |
+
+The base score of `0.45` (MEDIUM) is amplified to `0.95` (CRITICAL).
+
+<Warning>
+Amplifiers are additive and can stack. A function matching 3 amplifiers with `boost: 0.2` each gets a total boost of `0.6`. Design your patterns and boost values carefully to avoid unintentionally pushing all actions to CRITICAL.
+</Warning>
+
+### Pattern Syntax
+
+Amplifier patterns use Python's `re` module (or JavaScript's `RegExp` in the TypeScript SDK). The pattern is matched against the full function name.
+
+```yaml
+risk:
+  amplifiers:
+    # Match any function containing "production"
+    - pattern: ".*production.*"
+      boost: 0.3
+
+    # Match functions starting with "delete_" or "drop_"
+    - pattern: "^(delete|drop)_.*"
+      boost: 0.25
+
+    # Match functions ending with "_pii" or "_phi"
+    - pattern: ".*_(pii|phi)$"
+      boost: 0.3
+
+    # Match functions containing SQL-related terms
+    - pattern: ".*(query|sql|migrate).*"
+      boost: 0.15
+```
+
+<Tip>
+Amplifiers are especially useful when you want to increase risk for a *class* of actions rather than listing individual overrides. Use overrides for specific known functions; use amplifiers for broad patterns.
+</Tip>
+
+## Combining Overrides and Amplifiers
+
+Overrides and amplifiers serve different purposes and can be used together:
+
+| Feature | Overrides | Amplifiers |
+|---------|-----------|------------|
+| Granularity | Per function name (exact match) | Regex pattern (broad match) |
+| Effect | Replaces scorer output entirely | Adds to scorer output |
+| Stacking | Last match wins | All matches stack |
+| Best for | Known critical/safe actions | Environmental risk factors |
+
+```yaml
+risk:
+  # Exact overrides for known actions
+  overrides:
+    deploy_production: critical
+    read_health: low
+
+  # Broad patterns for risk classes
+  amplifiers:
+    - pattern: ".*production.*"
+      boost: 0.3
+    - pattern: ".*delete.*"
+      boost: 0.2
+```
+
+In this configuration, `deploy_production` is always CRITICAL (override wins). But `restart_production_service` -- which has no override -- gets its score boosted by 0.3 from the amplifier.
+
+## Interaction with Domain Profiles
+
+When a [domain profile](/domains/overview) is active, domain-specific risk patterns are applied **before** the config-level amplifiers. The evaluation order is:
+
+1. `DefaultRiskScorer` produces a base score
+2. Domain profile risk patterns adjust the score
+3. Config-level amplifiers add their boosts
+4. Config-level overrides replace the final level (if matched)
+5. The score is clamped to `[0.0, 1.0]`
+
+```python
+# The Policy.build_risk_scorer() method assembles all layers
+from attesta.config.loader import Policy
+
+policy = Policy(
+    domain="my-domain",  # a custom domain profile you registered
+    risk_overrides={"export_data": "critical"},
+    risk_amplifiers=[{"pattern": ".*confidential.*", "boost": 0.2}],
+)
+
+scorer = policy.build_risk_scorer()
+# Returns a CompositeRiskScorer with domain patterns, amplifiers, and overrides
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Risk Scoring" icon="gauge-high" href="/concepts/risk-scoring">
+    How the 5-factor DefaultRiskScorer works
+  </Card>
+  <Card title="Trust Section" icon="brain" href="/configuration/trust-section">
+    Configure trust-based risk reduction
+  </Card>
+</CardGroup>

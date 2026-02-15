@@ -1,0 +1,262 @@
+---
+title: "Flowise Integration"
+description: "Add human-in-the-loop approval to Flowise chatflows with the Attesta Approval tool component"
+icon: "robot"
+---
+
+The `flowise-attesta` package provides the **Attesta Approval** tool component for [Flowise](https://flowiseai.com). It registers as a LangChain `DynamicTool` that an agent can invoke during a chatflow to evaluate actions for risk before execution.
+
+<Note>
+**Package:** `flowise-attesta` v0.1.0 | **Language:** TypeScript | **Dependencies:** `@attesta/core ^0.1.0` | **Peers:** `flowise-components >=1.0.0`, `@langchain/core >=0.1.0`
+</Note>
+
+## Installation
+
+<Steps>
+  <Step title="Install the component">
+    Copy the package into your Flowise custom components directory:
+
+    ```bash
+    cp -r flowise-attesta /path/to/flowise/packages/components/nodes/AttestaGate
+    ```
+
+    Or install as a dependency in your custom Flowise components project:
+
+    ```bash
+    npm install flowise-attesta
+    ```
+  </Step>
+  <Step title="Build the component">
+    If you copied the source, build it:
+
+    ```bash
+    cd /path/to/flowise/packages/components/nodes/AttestaGate
+    npm install
+    npm run build
+    ```
+  </Step>
+  <Step title="Restart Flowise">
+    Restart your Flowise instance to load the new component:
+
+    ```bash
+    npx flowise start
+    ```
+  </Step>
+  <Step title="Find the component">
+    In the Flowise canvas, open the node picker and search for **"Attesta Approval"**. It appears under the **Tools** category with the `attesta.svg` icon.
+  </Step>
+</Steps>
+
+---
+
+## Component Configuration
+
+The Attesta Approval component exposes four inputs in the Flowise canvas:
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| **Function Name** | String | `gated_action` | Name of the action being gated (e.g., `send_email`, `delete_record`). This becomes the `DynamicTool` name. |
+| **Risk Level** | Options | Auto (Score-based) | Override the risk level. Options: Auto, Low, Medium, High, Critical. |
+| **Risk Hints** | JSON (advanced) | `{}` | JSON object of risk hints (e.g., `{"destructive": true, "pii": true}`). Invalid JSON is silently ignored. |
+| **Tool Description** | String | `A gated action that requires approval before execution` | Description shown to the LLM. The agent uses this to decide when to call the tool. |
+
+<Tip>
+Write a clear **Tool Description** so the LLM knows when to invoke the gate. For example: `"Check approval before sending an email to an external recipient"`. The agent will call this tool when it determines the action matches the description.
+</Tip>
+
+---
+
+## How It Works
+
+The Flowise integration works differently from the [n8n node](/no-code/n8n). Instead of processing items in a data pipeline, it creates a **LangChain `DynamicTool`** that an agent can call during conversation:
+
+<Steps>
+  <Step title="Component Initialization">
+    When the chatflow loads, Flowise calls the component's `init()` method. This creates a `DynamicTool` with the configured function name and description, and registers it with the agent. The component exports `{ nodeClass: AttestaGate }` following Flowise convention.
+  </Step>
+  <Step title="Agent Invocation">
+    During a conversation, the LLM decides to call the tool. The tool receives a single string input from the agent.
+  </Step>
+  <Step title="Input Parsing">
+    The tool attempts to parse the input as JSON. If parsing succeeds, the result is used as `kwargs`. If it fails, the raw string is wrapped as `{ input: <raw string> }`.
+  </Step>
+  <Step title="Risk Evaluation">
+    The tool builds an `ActionContext` with `environment: "production"` and `metadata: { source: "flowise" }`, then passes it to `attesta.evaluate()`.
+  </Step>
+  <Step title="Result">
+    The tool returns a JSON string that the agent can parse. Approved results include the verdict, risk score, audit entry ID, and the parsed input. Denied results include the verdict, risk score, and a human-readable denial message.
+  </Step>
+</Steps>
+
+<Note>
+Because the component is a `DynamicTool`, it is the **agent** (LLM) that decides whether to invoke it. The tool does not intercept other tools automatically. You should instruct the agent in its system prompt to call the Attesta Approval tool before performing risky actions.
+</Note>
+
+---
+
+## Output Format
+
+The tool returns a JSON string to the agent. The agent can parse this to decide how to proceed.
+
+<Tabs>
+  <Tab title="Approved">
+    ```json
+    {
+      "status": "approved",
+      "verdict": "approved",
+      "riskScore": 0.1,
+      "riskLevel": "low",
+      "auditEntryId": "audit-abc123",
+      "input": { "to": "user@example.com" }
+    }
+    ```
+  </Tab>
+  <Tab title="Denied">
+    ```json
+    {
+      "status": "denied",
+      "verdict": "denied",
+      "riskScore": 0.9,
+      "riskLevel": "critical",
+      "message": "Action \"send_email\" was denied by Attesta (risk: critical)"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+The `status` field provides a simple check: `"approved"` or `"denied"`. The `verdict` field contains the full Attesta verdict (`approved`, `denied`, `modified`, `timed_out`, or `escalated`). Note that approved responses include the parsed `input` and `auditEntryId`, while denied responses include a human-readable `message` instead.
+
+---
+
+## Chatflow Examples
+
+### Example: Agent with Gated Email
+
+Build a chatflow where an AI agent can send emails, but only after Attesta approves the action:
+
+```
+[Chat Trigger] --> [ChatOpenAI] --> [Agent]
+                                      |
+                              [Attesta Approval]     [Send Email Tool]
+                               functionName: "send_email"
+                               toolDescription: "Check approval before sending email"
+```
+
+1. Add a **ChatOpenAI** (or any Chat Model) node and connect it to an **Agent** node.
+2. Add the **Attesta Approval** component as a Tool input to the Agent.
+3. Set **Function Name** to `send_email` and **Tool Description** to `"Check approval before sending an email. Call this tool with the recipient and subject as JSON."`.
+4. Add your actual **Send Email** tool as another Tool input.
+5. In the Agent's system prompt, instruct it to call the Attesta tool before using the send email tool.
+
+### Example: Gated Database Operations
+
+```
+[Chat Trigger] --> [Agent]
+                      |
+              [Attesta Approval]         [SQL Tool]
+               functionName: "execute_sql"
+               riskLevel: "high"
+               riskHints: {"destructive": true}
+               toolDescription: "Evaluate SQL operation risk before execution"
+```
+
+Set the **Risk Level** to `High` to force a comprehension quiz challenge, and add `{"destructive": true}` as **Risk Hints** to boost the risk score for any SQL mutations.
+
+---
+
+## Chatflow Patterns
+
+### Pattern: Approval Before External API
+
+```
+User --> [Agent] --> [Attesta Approval Tool] --> evaluates risk
+                                              --> agent receives verdict
+                                              --> [HTTP Request Tool] (if approved)
+```
+
+The agent calls the Attesta Approval tool first, checks the verdict, and only proceeds to call the HTTP Request tool if approved.
+
+### Pattern: Multiple Gated Tools
+
+You can add multiple Attesta Approval components with different function names and risk levels:
+
+```
+Agent Tools:
+  -- Attesta Approval (send_email, auto)
+  -- Attesta Approval (delete_record, critical)
+  -- Attesta Approval (read_data, low)
+  -- Calculator Tool (ungated)
+```
+
+Each tool is independently evaluated. The agent decides which tool to call based on the user's request.
+
+<Tip>
+For read-only operations, set the risk level to **Low** so the Attesta gate auto-approves without human intervention. This keeps the chatflow responsive for safe operations while still maintaining an audit trail.
+</Tip>
+
+---
+
+## Input Parsing
+
+The tool receives a single string from the agent. It handles two formats:
+
+1. **Valid JSON string**: Parsed into a key-value object and passed as `kwargs` to the `ActionContext`.
+   ```
+   Agent sends: '{"to": "user@example.com", "subject": "Hello"}'
+   Parsed as:   { to: "user@example.com", subject: "Hello" }
+   ```
+
+2. **Non-JSON string**: Wrapped in an `{ input: <raw string> }` object.
+   ```
+   Agent sends: 'send email to user@example.com'
+   Parsed as:   { input: "send email to user@example.com" }
+   ```
+
+<Tip>
+For more accurate risk scoring, instruct the agent to pass structured JSON to the tool. The risk scorer can analyze individual argument values (e.g., detecting PII in email addresses or dangerous SQL patterns).
+</Tip>
+
+---
+
+## Error Handling
+
+Unlike the [n8n integration](/no-code/n8n), the Flowise component does not throw errors or stop the chatflow on denial. Instead, it always returns a JSON string:
+
+- The agent receives the denial message and can respond to the user accordingly (e.g., "I was unable to perform that action because it was flagged as high risk").
+- Invalid **Risk Hints** JSON is silently ignored (defaults to `{}`), so the chatflow continues without interruption.
+
+---
+
+## Peer Dependencies
+
+The component requires the following peer dependencies:
+
+| Package | Version |
+|---|---|
+| `flowise-components` | `>=1.0.0` |
+| `@langchain/core` | `>=0.1.0` |
+
+These are typically already available in a Flowise installation. The `@attesta/core` package is bundled as a direct dependency of `flowise-attesta`.
+
+<Warning>
+The Flowise component creates a new `Attesta` instance for each `init()` call. Trust scores and session state do not persist across conversations. For persistent trust tracking, configure an external audit logger via the Attesta configuration.
+</Warning>
+
+---
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="n8n Integration" icon="diagram-project" href="/no-code/n8n">
+    Workflow node for n8n data pipelines
+  </Card>
+  <Card title="Langflow Integration" icon="wind" href="/no-code/langflow">
+    Python component for Langflow pipelines
+  </Card>
+  <Card title="Dify Integration" icon="plug" href="/no-code/dify">
+    Plugin tool for the Dify platform
+  </Card>
+  <Card title="No-Code Overview" icon="grid-2" href="/no-code/overview">
+    Compare all no-code platforms
+  </Card>
+</CardGroup>

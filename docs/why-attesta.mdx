@@ -1,0 +1,143 @@
+---
+title: "Why Attesta"
+description: "Beyond basic HITL — a cognitive approval layer that thinks before it gates"
+icon: "lightbulb"
+---
+
+## Every Framework Has "Confirm Y/N." That's Not Enough.
+
+LangChain has `HumanApprovalCallbackHandler`. CrewAI has `human_input=True`. OpenAI Agents SDK has handoffs. They all do the same thing: pause execution and ask a human to click **Yes** or **No**.
+
+The problem? A human who sees 200 approval prompts a day **stops reading them**. Approval fatigue turns your safety layer into a rubber stamp.
+
+<Tabs>
+  <Tab title="Basic HITL">
+    | Action | What Happens |
+    |--------|-------------|
+    | `get_user()` | "Confirm? [Y/N]" → Y → execute |
+    | `deploy_to_prod()` | "Confirm? [Y/N]" → Y → execute |
+    | `drop_database()` | "Confirm? [Y/N]" → Y → execute |
+
+    Every action gets the **same prompt**. No risk awareness. No comprehension check. The human clicks Y 200 times a day and stops reading.
+  </Tab>
+  <Tab title="Attesta">
+    | Action | Risk | Challenge | What the Approver Does |
+    |--------|------|-----------|----------------------|
+    | `get_user()` | 0.08 LOW | Auto-approve | Nothing — silent pass-through |
+    | `deploy_to_prod()` | 0.82 CRITICAL | Multi-party | Approver 1 writes a teach-back explanation. Approver 2 answers a quiz. 45s minimum review enforced. |
+    | `drop_database()` | 0.95 CRITICAL | Multi-party | Same — but with even stricter domain rules |
+
+    Risk-proportional. Low-risk auto-approves silently. Critical requires **proven comprehension** from multiple approvers.
+  </Tab>
+</Tabs>
+
+## What Makes Attesta Different
+
+<CardGroup cols={2}>
+  <Card title="Risk Is Computed, Not Assumed" icon="gauge-high" color="#16A34A">
+    A 5-factor scoring engine analyzes the function name, arguments, docstring, caller hints, and call novelty. `get_user()` scores 0.1. `drop_database()` scores 0.95. The challenge scales accordingly — no configuration needed.
+  </Card>
+  <Card title="Challenges Test Comprehension" icon="brain" color="#15803D">
+    High-risk actions require the approver to **prove they understand** what's about to happen. Quiz challenges auto-generate questions from the action's parameters. Teach-back challenges require a written explanation. You can't just click through.
+  </Card>
+  <Card title="Trust Is Earned, Not Given" icon="shield-check" color="#22C55E">
+    A Bayesian trust engine tracks each agent's history with exponential decay. Trusted agents see reduced friction over time. A single incident instantly revokes trust. CRITICAL actions are immune to trust discounts — always fully gated.
+  </Card>
+  <Card title="Domains Know Their Regulations" icon="building-columns" color="#16A34A">
+    Custom domain profiles flag sensitive operations with compliance citations. Define industry-specific risk patterns, escalation rules, and challenge templates. Register and activate your own profiles via `register_preset()`.
+  </Card>
+</CardGroup>
+
+## The Cognitive Approval Stack
+
+Attesta implements five layers that basic HITL frameworks don't have:
+
+### 1. Multi-Factor Risk Scoring
+
+Every function call is decomposed into five weighted signals:
+
+| Factor | Weight | What It Detects |
+|--------|--------|-----------------|
+| **Function name** | 30% | Destructive verbs (`delete`, `drop`, `purge`) vs. read verbs (`get`, `list`, `fetch`) |
+| **Arguments** | 25% | Sensitive values — production URLs, SQL keywords, shell commands, credentials |
+| **Docstring** | 20% | Danger language — "irreversible", "permanent", "destructive", "production" |
+| **Caller hints** | 15% | Risk metadata from the calling agent or framework |
+| **Novelty** | 10% | First call to a function scores 0.9; decays to 0.1 after 10+ successful calls |
+
+The composite score maps to a risk level that determines the challenge type — no manual risk tagging required.
+
+### 2. Escalating Cognitive Challenges
+
+| Risk Level | Challenge | What the Approver Must Do |
+|------------|-----------|---------------------------|
+| LOW (0.0–0.3) | Auto-approve | Nothing — silent pass-through |
+| MEDIUM (0.3–0.6) | Confirm | Read the action summary, wait minimum review time, press Y |
+| HIGH (0.6–0.8) | Quiz | Answer auto-generated comprehension questions about the action's parameters |
+| CRITICAL (0.8–1.0) | Multi-party | Multiple approvers, each with a different challenge type (teach-back → quiz → confirm), all must pass |
+
+Quiz questions are **generated programmatically** from the action context — file paths become "which directory?", SQL tables become "which table?", numeric args become "what value?" — with plausible distractors.
+
+### 3. Minimum Review Time Enforcement
+
+Every challenge has a wall-clock minimum before the prompt accepts input. This isn't a UI delay — it's a cognitive forcing function:
+
+- **Confirm**: 3 seconds
+- **Quiz**: 10 seconds
+- **Teach-back**: 30 seconds
+- **Multi-party**: 30+ seconds per approver
+
+Domain profiles can override these defaults. For example, a custom compliance-focused profile might set CRITICAL = 60s to allow time for thorough review. The audit trail records whether minimums were met.
+
+### 4. Bayesian Trust Adaptation
+
+```python
+trust = success_rate(exponential_decay) × recency_factor × incident_penalty
+```
+
+- **Exponential decay**: Recent actions weighted more than old ones (`e^(-0.1 × days_ago)`)
+- **Recency**: Trust halves every ~70 days of inactivity
+- **Incidents**: Each incident multiplies trust down by 0.7×. `revoke()` adds 3 incidents instantly
+- **Safety invariant**: CRITICAL risk is **never** reduced by trust — always fully gated
+- **Per-domain tracking**: An agent trusted for `read` operations isn't auto-trusted for `infrastructure`
+
+### 5. Tamper-Proof Audit Trail
+
+Every decision is a SHA-256 hash-chained JSONL entry:
+
+```json
+{
+  "entry_id": "a1b2c3...",
+  "chain_hash": "sha256(previous_hash + canonical_json(entry))",
+  "action_name": "deploy_service",
+  "risk_score": 0.82,
+  "risk_level": "CRITICAL",
+  "challenge_type": "multi_party",
+  "approver_ids": ["ops-lead", "platform-eng"],
+  "review_duration_seconds": 67.3,
+  "min_review_met": true,
+  "verdict": "APPROVED"
+}
+```
+
+Modify any field and every subsequent hash breaks. `attesta audit verify` checks the entire chain. `attesta audit rubber-stamps` flags suspiciously fast approvals on high-risk actions.
+
+## Attesta vs. Existing Approaches
+
+| Capability | Basic HITL | Manual Review Process | Attesta |
+|------------|-----------|----------------------|---------|
+| Risk scoring | None — all actions equal | Human judgment | 5-factor heuristic + pluggable scorers |
+| Challenge type | Y/N for everything | Varies by reviewer | Auto-selected by risk level |
+| Comprehension check | No | Informal | Quiz + teach-back with validation |
+| Approval fatigue | High — every action prompts | Low volume, high cost | Low — only risky actions surface |
+| Trust learning | None | Reputation-based | Bayesian with decay + incidents |
+| Audit integrity | Logs (mutable) | Documents (mutable) | SHA-256 hash chain (tamper-evident) |
+| Regulatory mapping | None | Manual | Pluggable (custom compliance mappings) |
+| Time to integrate | 1 line | Weeks | 1 decorator / 1 function wrapper |
+| Multi-party approval | No | Email chains | Orchestrated with challenge rotation |
+
+## Who Is Attesta For
+
+- **AI engineers** building agents that touch production systems, databases, or infrastructure
+- **Platform teams** enforcing company-wide approval policies across MCP tools and agent frameworks
+- **Compliance teams** in regulated industries who need auditable, tamper-evident approval records with regulatory citations
+- **Security teams** who need to detect rubber-stamping, track trust degradation, and respond to incidents with instant revocation

@@ -1,0 +1,55 @@
+identity:
+  name: attesta_gate
+  author: attesta
+  label:
+    en_US: Attesta Approval
+    zh_Hans: Attesta Approval
+description:
+  human:
+    en_US: Evaluate an AI agent action for risk and enforce approval policies before execution
+    zh_Hans: Evaluate an AI agent action for risk before execution
+  llm: A human-in-the-loop approval tool that evaluates AI agent actions for risk before execution. Use this tool to check whether a proposed action should be allowed.
+parameters:
+  - name: function_name
+    type: string
+    required: true
+    label:
+      en_US: Function Name
+    human_description:
+      en_US: Name of the action being evaluated (e.g. send_email, delete_record)
+    llm_description: The name of the function or action to evaluate for risk
+    form: llm
+  - name: risk_level
+    type: select
+    required: false
+    label:
+      en_US: Risk Level
+    human_description:
+      en_US: Override the risk level assessment
+    options:
+      - value: auto
+        label:
+          en_US: Auto (Score-based)
+      - value: low
+        label:
+          en_US: Low
+      - value: medium
+        label:
+          en_US: Medium
+      - value: high
+        label:
+          en_US: High
+      - value: critical
+        label:
+          en_US: Critical
+    default: auto
+    form: form
+  - name: action_args
+    type: string
+    required: false
+    label:
+      en_US: Action Arguments
+    human_description:
+      en_US: JSON string of arguments for the action being evaluated
+    llm_description: A JSON string containing the arguments for the action being evaluated
+    form: llm

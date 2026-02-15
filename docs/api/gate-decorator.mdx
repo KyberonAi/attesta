@@ -1,0 +1,293 @@
+---
+title: "@gate Decorator"
+description: "Protect any function with human-in-the-loop approval using the @gate decorator"
+icon: "shield-halved"
+---
+
+The `@gate` decorator is the primary user-facing API for protecting function calls with Attesta approval. It intercepts every invocation, scores the risk, presents the appropriate challenge, and either allows or blocks execution.
+
+## Calling Styles
+
+The decorator supports three equivalent calling styles:
+
+<CodeGroup>
+```python Python
+from attesta import gate
+
+# Style 1: Bare decorator (no parentheses)
+@gate
+def deploy(service: str, version: str) -> str:
+    """Deploy a service to production."""
+    return f"Deployed {service} v{version}"
+
+# Style 2: Empty parentheses
+@gate()
+def restart_service(name: str) -> str:
+    """Restart a running service."""
+    return f"Restarted {name}"
+
+# Style 3: With options
+@gate(risk="high", risk_hints={"production": True})
+def delete_database(db_name: str) -> str:
+    """Permanently delete a database."""
+    return f"Deleted {db_name}"
+```
+
+```typescript TypeScript
+import { gate } from "@attesta/core";
+
+// Style 1: Wrap a function directly
+const deploy = gate(async (service: string, version: string) => {
+  return `Deployed ${service} v${version}`;
+});
+
+// Style 2: With options, then function
+const deleteDatabase = gate(
+  { risk: "high", riskHints: { production: true } },
+  async (dbName: string) => {
+    return `Deleted ${dbName}`;
+  }
+);
+
+// Style 3: Options factory (curried)
+const withHighRisk = gate({ risk: "high" });
+const restartService = withHighRisk(async (name: string) => {
+  return `Restarted ${name}`;
+});
+```
+</CodeGroup>
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `risk` | `RiskLevel \| str \| None` | `None` | Explicit risk level override. Bypasses the risk scorer entirely. Accepts enum values or strings like `"high"`, `"critical"`. |
+| `risk_hints` | `dict[str, Any] \| None` | `None` | Hints forwarded to the risk scorer. Common keys: `production`, `destructive`, `pii`. |
+| `risk_scorer` | `RiskScorer \| None` | `None` | Override the default risk scorer for this gate. |
+| `renderer` | `Renderer \| None` | `None` | Override the default renderer for this gate. |
+| `audit_logger` | `AuditLogger \| None` | `None` | Override the default audit logger for this gate. |
+| `challenge_map` | `dict[RiskLevel, ChallengeType] \| None` | `None` | Override the default risk-level-to-challenge mapping. |
+| `min_review_seconds` | `float` | `0.0` | Minimum wall-clock time the review must take. Prevents rubber-stamping. |
+| `agent_id` | `str \| None` | `None` | Identifier for the AI agent making the call. Used by the trust engine. |
+| `session_id` | `str \| None` | `None` | Session identifier for grouping related actions in audit logs. |
+| `environment` | `str` | `"development"` | Environment tag. Production environments receive higher base risk scores. |
+| `metadata` | `dict[str, Any] \| None` | `None` | Arbitrary metadata attached to every `ActionContext` created by this gate. |
+| `trust_engine` | `Any \| None` | `None` | Trust engine for adaptive risk adjustment. Requires `agent_id` to be set. |
+| `sync_timeout` | `float` | `300.0` | Maximum seconds to wait when bridging async evaluation from a synchronous context (e.g., Jupyter). Set to `0` for no timeout. |
+
+## Sync and Async Behavior
+
+The `@gate` decorator automatically detects whether the wrapped function is synchronous or asynchronous and handles each case correctly.
+
+<CodeGroup>
+```python Python (async)
+import asyncio
+from attesta import gate
+
+@gate(risk="medium")
+async def send_email(to: str, subject: str) -> str:
+    """Send an email to a user."""
+    # ... async email logic ...
+    return f"Sent to {to}"
+
+# In an async context, just await the call
+async def main():
+    result = await send_email("user@example.com", "Hello")
+
+asyncio.run(main())
+```
+
+```python Python (sync)
+from attesta import gate
+
+@gate(risk="medium")
+def send_email(to: str, subject: str) -> str:
+    """Send an email to a user."""
+    # ... email logic ...
+    return f"Sent to {to}"
+
+# In a sync context, call normally -- Attesta handles the event loop
+result = send_email("user@example.com", "Hello")
+```
+</CodeGroup>
+
+<Note>
+When a sync function decorated with `@gate` is called inside an already-running event loop (e.g., Jupyter notebooks), Attesta schedules the evaluation as an asyncio task and waits up to `sync_timeout` seconds. Adjust this value if your approval flow involves long review times.
+</Note>
+
+## Denial Behavior
+
+When the operator denies the action, fails a challenge, or the review times out, the decorator raises an `AttestaDenied` exception. The protected function is **never executed**.
+
+<CodeGroup>
+```python Python
+from attesta import gate, AttestaDenied
+
+@gate(risk="critical")
+def drop_table(table_name: str) -> str:
+    """Drop a database table. This is irreversible."""
+    return f"Dropped {table_name}"
+
+try:
+    drop_table("users")
+except AttestaDenied as e:
+    print(f"Blocked: {e}")
+    # Access the full ApprovalResult for details
+    if e.result:
+        print(f"Verdict: {e.result.verdict}")
+        print(f"Risk score: {e.result.risk_assessment.score}")
+```
+
+```typescript TypeScript
+import { gate, AttestaDenied } from "@attesta/core";
+
+const dropTable = gate(
+  { risk: "critical" },
+  async (tableName: string) => {
+    return `Dropped ${tableName}`;
+  }
+);
+
+try {
+  await dropTable("users");
+} catch (e) {
+  if (e instanceof AttestaDenied) {
+    console.log(`Blocked: ${e.message}`);
+    console.log(`Verdict: ${e.result?.verdict}`);
+  }
+}
+```
+</CodeGroup>
+
+The three verdicts that trigger `AttestaDenied` are:
+
+| Verdict | Meaning |
+|---------|---------|
+| `DENIED` | The operator explicitly rejected the action |
+| `TIMED_OUT` | The review period expired without a response |
+| `ESCALATED` | The action was escalated but not yet resolved |
+
+## Introspection
+
+Every gated function has a `__gate__` attribute attached to it, which holds a reference to the internal `CoreAttesta` orchestrator instance. This is useful for testing and debugging.
+
+<CodeGroup>
+```python Python
+from attesta import gate
+
+@gate(risk="high", min_review_seconds=5.0)
+def deploy(service: str) -> str:
+    """Deploy to production."""
+    return f"Deployed {service}"
+
+# Inspect the gate configuration
+core = deploy.__gate__
+print(core._min_review_seconds)  # 5.0
+print(core._risk_override)       # RiskLevel.HIGH
+```
+
+```typescript TypeScript
+import { gate } from "@attesta/core";
+
+const deploy = gate({ risk: "high" }, async (service: string) => {
+  return `Deployed ${service}`;
+});
+
+// Access the gate metadata
+console.log(deploy.__gate__);
+```
+</CodeGroup>
+
+## Risk Hints
+
+Risk hints are key-value pairs that influence the risk scorer without hardcoding a risk level. They are more flexible than `risk=` because the scorer combines them with other factors.
+
+<CodeGroup>
+```python Python
+from attesta import gate
+
+@gate(risk_hints={"production": True, "pii": True, "record_count": 50000})
+def export_users(format: str) -> str:
+    """Export all user data including PII."""
+    return f"Exported in {format}"
+
+# Boolean hints add +0.30 each when True
+# Numeric hints scale as min(value / 10000, 1.0) * 0.8
+# Combined: the DefaultRiskScorer will produce a high risk score
+```
+
+```typescript TypeScript
+import { gate } from "@attesta/core";
+
+const exportUsers = gate(
+  {
+    riskHints: { production: true, pii: true, recordCount: 50000 },
+  },
+  async (format: string) => {
+    return `Exported in ${format}`;
+  }
+);
+```
+</CodeGroup>
+
+<Warning>
+Using `risk="critical"` bypasses the risk scorer entirely and always assigns CRITICAL risk. Use `risk_hints` instead when you want to *influence* the score while still allowing the scorer to consider other factors like function name, arguments, and novelty.
+</Warning>
+
+## With the Attesta Instance
+
+When using an `Attesta` instance (recommended for production), the instance-level `gate()` method inherits defaults from the instance's policy, risk scorer, renderer, and audit logger. Per-gate overrides take precedence.
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+
+attesta = Attesta.from_config("attesta.yaml")
+
+# Inherits all instance defaults
+@attesta.gate
+def read_config(key: str) -> str:
+    return f"Value for {key}"
+
+# Override environment for this specific gate
+@attesta.gate(environment="production", risk_hints={"destructive": True})
+def delete_user(user_id: str) -> str:
+    """Permanently delete a user account."""
+    return f"Deleted {user_id}"
+```
+
+```typescript TypeScript
+import { Attesta, gate } from "@attesta/core";
+
+const attesta = new Attesta({
+  minReviewSeconds: 3.0,
+});
+
+const readConfig = gate(async (key: string) => {
+  return `Value for ${key}`;
+}, { attesta });
+
+const deleteUser = gate(
+  async (userId: string) => {
+    return `Deleted ${userId}`;
+  },
+  { attesta, riskHints: { destructive: true } }
+);
+```
+</CodeGroup>
+
+## Type Signatures
+
+The decorator preserves the original function's type signature using `functools.wraps` (Python) or generics (TypeScript). Type checkers see the correct parameter and return types through the wrapper.
+
+```python Python
+from attesta import gate
+
+@gate
+def add(a: int, b: int) -> int:
+    return a + b
+
+# Type checkers infer: add(a: int, b: int) -> int
+result: int = add(1, 2)  # OK
+result: str = add(1, 2)  # Type error
+```

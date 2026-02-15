@@ -1,0 +1,196 @@
+---
+title: "QuizChallenge"
+description: "Auto-generated comprehension questions that force operators to read and understand actions before approving"
+icon: "circle-question"
+---
+
+The `QuizChallenge` generates **1 to 3 multiple-choice questions** from the action context and requires the operator to answer correctly before the action proceeds. Unlike a simple Y/N confirmation, the quiz forces the operator to demonstrate understanding of what they are approving.
+
+## When It Is Used
+
+By default, `QuizChallenge` is assigned to **HIGH** risk actions (score `0.6`–`0.8`). These are actions like deployments, executing commands, or running operations that have significant impact but fall short of the critical threshold.
+
+| Parameter | Default | Description |
+|---|---|---|
+| `max_questions` | **3** | Maximum number of questions generated (1–3) |
+| `min_correct` | **1** | Minimum correct answers required to pass |
+| `min_review_seconds` | **10.0** | Minimum seconds before submission is accepted without rubber-stamp flagging |
+
+---
+
+## Question Generation Strategies
+
+The quiz engine automatically extracts question material from the action context. It uses multiple strategies in priority order, falling back to simpler questions when richer context is unavailable.
+
+### Strategy 1: File Paths
+
+When arguments contain file paths, the quiz asks about the target path:
+
+```
+Q: Which file path will be affected by this operation?
+  A) /var/log/app.log
+  B) /etc/nginx/nginx.conf        ← correct (from arguments)
+  C) /home/user/.bashrc
+  D) /tmp/scratch.txt
+```
+
+### Strategy 2: Numeric Values
+
+When arguments contain numbers (counts, IDs, ports), the quiz asks about the specific value:
+
+```
+Q: How many records will be affected by this batch operation?
+  A) 500
+  B) 5,000                        ← correct (from arguments)
+  C) 50,000
+  D) 500,000
+```
+
+### Strategy 3: SQL Tables
+
+When arguments contain SQL statements, the quiz extracts table names:
+
+```
+Q: Which database table will this query target?
+  A) orders
+  B) users                         ← correct (parsed from SQL)
+  C) sessions
+  D) payments
+```
+
+### Strategy 4: Function Name Fallback
+
+When no rich context is available, the quiz asks about the function name itself:
+
+```
+Q: What action is about to be performed?
+  A) deploy_service                ← correct
+  B) restart_service
+  C) stop_service
+  D) delete_service
+```
+
+<Note>
+Questions are generated dynamically on every invocation. The wrong answers (distractors) are plausible alternatives generated to avoid trivially obvious correct answers.
+</Note>
+
+---
+
+## Usage
+
+<CodeGroup>
+```python Python
+from attesta.challenges import QuizChallenge
+
+# Default: up to 3 questions, 1 must be correct
+quiz = QuizChallenge()
+
+# Stricter: 3 questions, at least 2 must be correct
+quiz = QuizChallenge(
+    max_questions=3,
+    min_correct=2,
+    min_review_seconds=15.0,
+)
+
+# Lighter: 1 question, must be correct
+quiz = QuizChallenge(
+    max_questions=1,
+    min_correct=1,
+    min_review_seconds=5.0,
+)
+```
+
+```typescript TypeScript
+import { QuizChallenge } from "@attesta/core";
+
+// Default: up to 3 questions, 1 must be correct
+const quiz = new QuizChallenge();
+
+// Stricter: 3 questions, at least 2 must be correct
+const quiz = new QuizChallenge({
+  maxQuestions: 3,
+  minCorrect: 2,
+  minReviewSeconds: 15.0,
+});
+
+// Lighter: 1 question, must be correct
+const quiz = new QuizChallenge({
+  maxQuestions: 1,
+  minCorrect: 1,
+  minReviewSeconds: 5.0,
+});
+```
+</CodeGroup>
+
+---
+
+## Terminal Experience
+
+When using the [TerminalRenderer](/concepts/renderers), the quiz is presented as an interactive panel:
+
+> **HIGH RISK -- Comprehension Quiz Required**
+>
+> **Action:** `deploy_service` | **Arguments:** `service="api-gateway"`, `env="staging"` | **Risk:** 0.68 (HIGH)
+>
+> Answer the following to approve:
+>
+> **Q1:** Which service will be deployed?
+> a) auth-service, b) api-gateway, c) web-frontend, d) data-pipeline
+
+---
+
+## Pass/Fail Logic
+
+The quiz follows these rules:
+
+1. Generate up to `max_questions` questions from available context
+2. Present each question sequentially
+3. Track correct answers
+4. **Pass** if `correct_count >= min_correct`
+5. **Fail** if the operator cannot reach `min_correct` even with remaining questions
+
+<Tip>
+The default settings (`max_questions=3`, `min_correct=1`) are deliberately lenient — the goal is to ensure the operator reads the context, not to create an exam. For higher-assurance environments, increase `min_correct` to `2` or `3`.
+</Tip>
+
+### Scoring Examples
+
+| max_questions | min_correct | Answers | Result |
+|---|---|---|---|
+| 3 | 1 | Correct, Wrong, Wrong | **Pass** (1 >= 1) |
+| 3 | 2 | Wrong, Correct, Correct | **Pass** (2 >= 2) |
+| 3 | 2 | Wrong, Wrong, Correct | **Fail** (1 < 2) |
+| 1 | 1 | Correct | **Pass** |
+| 1 | 1 | Wrong | **Fail** |
+
+---
+
+## Quiz as a Sub-Challenge
+
+`QuizChallenge` also appears as a sub-challenge in the [MultiPartyChallenge](/concepts/challenge-multi-party) rotation. When multi-party approval is required, the second approver in the rotation receives a quiz (after the first approver's teach-back).
+
+---
+
+## Configuration via YAML
+
+```yaml attesta.yaml
+policy:
+  challenge_map:
+    high: quiz
+
+  quiz:
+    max_questions: 3
+    min_correct: 2
+
+  min_review_seconds:
+    quiz: 15.0
+```
+
+<CardGroup cols={2}>
+  <Card title="TeachBackChallenge" icon="chalkboard-user" href="/concepts/challenge-teach-back">
+    Free-text explanation challenge for deeper verification
+  </Card>
+  <Card title="ConfirmChallenge" icon="check" href="/concepts/challenge-confirm">
+    Simpler Y/N challenge for medium-risk actions
+  </Card>
+</CardGroup>

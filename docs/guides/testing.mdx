@@ -1,0 +1,634 @@
+---
+title: "Testing with Attesta"
+description: "How to test gated functions, mock challenges, auto-approve in tests, and write integration tests for custom scorers and challenges"
+icon: "vial"
+---
+
+Attesta is designed to be testable from day one. Every component -- scorers, renderers, challenges, and the audit logger -- uses protocol-based interfaces that are trivial to mock. This guide covers testing patterns from unit tests through integration tests.
+
+## Auto-Approve in Tests
+
+The simplest approach: gated functions auto-approve when no TTY is detected. In CI environments, stdin is not a TTY, so Attesta automatically uses the `_DefaultRenderer` which approves everything.
+
+```python
+from attesta import gate
+
+@gate
+def deploy(service: str) -> str:
+    return f"Deployed {service}"
+
+# In CI (no TTY): auto-approved, the function runs normally
+result = deploy("api-gateway")
+assert result == "Deployed api-gateway"
+```
+
+<Note>
+Auto-approval in CI means your tests exercise the real risk scoring and audit logging pipeline -- only the human-interaction step is skipped. This catches configuration errors and pipeline bugs.
+</Note>
+
+---
+
+## Mock Renderers
+
+For explicit control over approval outcomes, use mock renderers.
+
+### ApproveAllRenderer
+
+A renderer that approves every action, regardless of risk level:
+
+```python
+from attesta import (
+    ActionContext, RiskAssessment, ChallengeType,
+    ChallengeResult, Verdict,
+)
+
+class ApproveAllRenderer:
+    """Approves all actions. Use in tests to bypass human interaction."""
+
+    async def render_approval(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> Verdict:
+        return Verdict.APPROVED
+
+    async def render_challenge(
+        self,
+        ctx: ActionContext,
+        risk: RiskAssessment,
+        challenge_type: ChallengeType,
+    ) -> ChallengeResult:
+        return ChallengeResult(
+            passed=True,
+            challenge_type=challenge_type,
+            responder="test-auto",
+        )
+
+    async def render_info(self, message: str) -> None:
+        pass
+
+    async def render_auto_approved(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> None:
+        pass
+```
+
+### DenyAllRenderer
+
+A renderer that denies every action:
+
+```python
+class DenyAllRenderer:
+    """Denies all actions. Use to test denial handling."""
+
+    async def render_approval(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> Verdict:
+        return Verdict.DENIED
+
+    async def render_challenge(
+        self,
+        ctx: ActionContext,
+        risk: RiskAssessment,
+        challenge_type: ChallengeType,
+    ) -> ChallengeResult:
+        return ChallengeResult(
+            passed=False,
+            challenge_type=challenge_type,
+            responder="test-deny",
+        )
+
+    async def render_info(self, message: str) -> None:
+        pass
+
+    async def render_auto_approved(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> None:
+        pass
+```
+
+### RecordingAuditLogger
+
+An audit logger that records entries in memory for assertions:
+
+```python
+from attesta import ActionContext, ApprovalResult
+
+class RecordingAuditLogger:
+    """Records all audit entries in memory for test assertions."""
+
+    def __init__(self):
+        self.entries: list[tuple[ActionContext, ApprovalResult]] = []
+
+    async def log(self, ctx: ActionContext, result: ApprovalResult) -> str:
+        self.entries.append((ctx, result))
+        return f"test-audit-{len(self.entries)}"
+```
+
+---
+
+## Testing Gated Functions
+
+### Test That Approved Actions Execute
+
+```python
+import pytest
+from attesta import gate, AttestaDenied
+
+@gate(renderer=ApproveAllRenderer())
+def transfer_funds(from_account: str, to_account: str, amount: float) -> str:
+    return f"Transferred ${amount} from {from_account} to {to_account}"
+
+def test_approved_transfer():
+    result = transfer_funds("acc-1", "acc-2", 100.0)
+    assert result == "Transferred $100.0 from acc-1 to acc-2"
+    assert "acc-1" in result
+```
+
+### Test That Denied Actions Raise
+
+```python
+@gate(renderer=DenyAllRenderer(), risk="high")
+def delete_database(db_name: str) -> str:
+    return f"Deleted {db_name}"
+
+def test_denied_raises_exception():
+    with pytest.raises(AttestaDenied) as exc_info:
+        delete_database("production")
+
+    assert exc_info.value.result is not None
+    assert exc_info.value.result.verdict.value == "denied"
+```
+
+### Test Risk Level Assignment
+
+```python
+@gate(
+    renderer=ApproveAllRenderer(),
+    audit_logger=RecordingAuditLogger(),
+    risk="critical",
+)
+async def nuke_everything() -> str:
+    return "done"
+
+@pytest.mark.asyncio
+async def test_critical_risk_override():
+    audit = nuke_everything.__gate__._audit  # access internal audit logger
+    # ... or pass the audit logger explicitly:
+
+    audit = RecordingAuditLogger()
+
+    @gate(
+        renderer=ApproveAllRenderer(),
+        audit_logger=audit,
+        risk="critical",
+    )
+    async def dangerous_action():
+        return "executed"
+
+    result = await dangerous_action()
+    assert result == "executed"
+
+    ctx, approval = audit.entries[0]
+    assert approval.risk_assessment.level.value == "critical"
+    assert approval.risk_assessment.score == 0.90
+```
+
+### Test with Async Functions
+
+```python
+@pytest.mark.asyncio
+async def test_async_gated_function():
+    @gate(renderer=ApproveAllRenderer())
+    async def fetch_data(url: str) -> str:
+        return f"Data from {url}"
+
+    result = await fetch_data("https://api.example.com/users")
+    assert "api.example.com" in result
+
+@pytest.mark.asyncio
+async def test_async_denied():
+    @gate(renderer=DenyAllRenderer(), risk="high")
+    async def dangerous_fetch(url: str) -> str:
+        return f"Data from {url}"
+
+    with pytest.raises(AttestaDenied):
+        await dangerous_fetch("https://api.example.com/admin")
+```
+
+---
+
+## Testing Custom Scorers
+
+### Unit Testing a Scorer
+
+```python
+from attesta import ActionContext, RiskScorer
+
+def test_scorer_protocol_compliance():
+    """Every custom scorer must satisfy the RiskScorer protocol."""
+    scorer = MyCustomScorer()
+    assert isinstance(scorer, RiskScorer)
+    assert isinstance(scorer.name, str)
+    assert len(scorer.name) > 0
+
+def test_scorer_returns_bounded_values():
+    """Scores must always be in [0.0, 1.0]."""
+    scorer = MyCustomScorer()
+    test_cases = [
+        ActionContext(function_name="get_user"),
+        ActionContext(function_name="delete_database", environment="production"),
+        ActionContext(
+            function_name="transfer",
+            hints={"amount": 1_000_000, "pii": True},
+        ),
+        ActionContext(function_name=""),  # edge case: empty name
+    ]
+
+    for ctx in test_cases:
+        score = scorer.score(ctx)
+        assert 0.0 <= score <= 1.0, (
+            f"Score {score} out of bounds for {ctx.function_name}"
+        )
+
+def test_scorer_risk_ordering():
+    """Destructive actions should score higher than read-only actions."""
+    scorer = MyCustomScorer()
+    read_ctx = ActionContext(function_name="get_user")
+    write_ctx = ActionContext(function_name="update_user")
+    delete_ctx = ActionContext(function_name="delete_user")
+
+    read_score = scorer.score(read_ctx)
+    write_score = scorer.score(write_ctx)
+    delete_score = scorer.score(delete_ctx)
+
+    assert read_score < write_score
+    assert write_score < delete_score
+```
+
+### Testing DefaultRiskScorer Factors
+
+```python
+from attesta.core.risk import DefaultRiskScorer
+
+def test_default_scorer_novelty_decreases():
+    """Novelty score should decrease with repeated calls."""
+    scorer = DefaultRiskScorer()
+    ctx = ActionContext(function_name="deploy")
+
+    first_score = scorer.score(ctx)
+    second_score = scorer.score(ctx)
+    tenth_score = scorer.score(ctx)
+
+    # Novelty decreases, so total score should decrease
+    # (assuming other factors remain constant)
+    assert first_score >= second_score
+
+def test_default_scorer_reset_novelty():
+    """reset_novelty() should clear call counters."""
+    scorer = DefaultRiskScorer()
+    ctx = ActionContext(function_name="deploy")
+
+    scorer.score(ctx)
+    scorer.score(ctx)
+    scorer.reset_novelty()
+
+    # After reset, novelty should be high again
+    assessment = scorer.assess(ctx)
+    novelty_factor = next(
+        f for f in assessment.factors if f.name == "novelty"
+    )
+    assert "0 time(s)" in novelty_factor.evidence
+```
+
+### Testing Composite Scorers
+
+```python
+from attesta.core.risk import (
+    CompositeRiskScorer, FixedRiskScorer, MaxRiskScorer,
+)
+
+def test_composite_weighted_average():
+    """CompositeRiskScorer should produce a weighted average."""
+    scorer = CompositeRiskScorer(
+        scorers=[
+            (FixedRiskScorer(0.2), 1.0),
+            (FixedRiskScorer(0.8), 1.0),
+        ]
+    )
+    ctx = ActionContext(function_name="test")
+    score = scorer.score(ctx)
+    assert abs(score - 0.5) < 0.01  # (0.2 + 0.8) / 2
+
+def test_max_scorer_takes_highest():
+    """MaxRiskScorer should return the maximum child score."""
+    scorer = MaxRiskScorer(
+        scorers=[FixedRiskScorer(0.3), FixedRiskScorer(0.7)]
+    )
+    ctx = ActionContext(function_name="test")
+    assert scorer.score(ctx) == 0.7
+```
+
+---
+
+## Testing Custom Challenges
+
+### Mock the I/O Layer
+
+Challenges that use `input()` need mocking in tests:
+
+```python
+import pytest
+from attesta import (
+    ActionContext, RiskAssessment, RiskLevel, ChallengeProtocol,
+)
+
+@pytest.mark.asyncio
+async def test_challenge_with_mocked_input(monkeypatch):
+    """Test a challenge by mocking user input."""
+    from attesta.challenges.confirm import ConfirmChallenge
+
+    challenge = ConfirmChallenge(min_review_seconds=0.0)
+
+    # Mock input to return "y"
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+
+    ctx = ActionContext(function_name="deploy")
+    risk = RiskAssessment(score=0.45, level=RiskLevel.MEDIUM)
+
+    result = await challenge.present(ctx, risk)
+    assert result.passed is True
+    assert result.challenge_type.value == "confirm"
+
+@pytest.mark.asyncio
+async def test_challenge_denial(monkeypatch):
+    """Test that 'n' input results in denial."""
+    from attesta.challenges.confirm import ConfirmChallenge
+
+    challenge = ConfirmChallenge(min_review_seconds=0.0)
+    monkeypatch.setattr("builtins.input", lambda _: "n")
+
+    ctx = ActionContext(function_name="deploy")
+    risk = RiskAssessment(score=0.45, level=RiskLevel.MEDIUM)
+
+    result = await challenge.present(ctx, risk)
+    assert result.passed is False
+```
+
+### Test ChallengeResult Details
+
+```python
+@pytest.mark.asyncio
+async def test_challenge_records_response_time(monkeypatch):
+    from attesta.challenges.confirm import ConfirmChallenge
+
+    challenge = ConfirmChallenge(min_review_seconds=0.0)
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+
+    ctx = ActionContext(function_name="deploy")
+    risk = RiskAssessment(score=0.45, level=RiskLevel.MEDIUM)
+
+    result = await challenge.present(ctx, risk)
+    assert result.response_time_seconds >= 0.0
+    assert result.questions_asked >= 0
+```
+
+---
+
+## Testing the Full Pipeline
+
+### Integration Test with evaluate()
+
+```python
+import pytest
+from attesta.core.gate import Attesta
+from attesta import ActionContext, Verdict, RiskLevel
+
+@pytest.mark.asyncio
+async def test_full_pipeline_low_risk():
+    """Low risk should auto-approve without challenge."""
+    audit = RecordingAuditLogger()
+    attesta = Attesta(
+        renderer=ApproveAllRenderer(),
+        audit_logger=audit,
+    )
+
+    ctx = ActionContext(function_name="get_user")
+    result = await attesta.evaluate(ctx)
+
+    assert result.verdict == Verdict.APPROVED
+    assert result.challenge_result is None  # auto-approved
+    assert result.audit_entry_id is not None
+    assert len(audit.entries) == 1
+
+@pytest.mark.asyncio
+async def test_full_pipeline_high_risk():
+    """High risk should go through a QUIZ challenge."""
+    audit = RecordingAuditLogger()
+    attesta = Attesta(
+        renderer=ApproveAllRenderer(),
+        audit_logger=audit,
+        risk_override=RiskLevel.HIGH,
+    )
+
+    ctx = ActionContext(function_name="deploy_to_production")
+    result = await attesta.evaluate(ctx)
+
+    assert result.verdict == Verdict.APPROVED
+    assert result.challenge_result is not None
+    assert result.challenge_result.challenge_type.value == "quiz"
+
+@pytest.mark.asyncio
+async def test_full_pipeline_denied():
+    """Denied actions should have DENIED verdict and no execution."""
+    attesta = Attesta(
+        renderer=DenyAllRenderer(),
+        risk_override=RiskLevel.HIGH,
+    )
+
+    ctx = ActionContext(function_name="delete_users")
+    result = await attesta.evaluate(ctx)
+
+    assert result.verdict == Verdict.DENIED
+    assert result.challenge_result is not None
+    assert result.challenge_result.passed is False
+```
+
+### Integration Test with Trust Engine
+
+```python
+import pytest
+from attesta.core.gate import Attesta
+from attesta.core.trust import TrustEngine
+from attesta import ActionContext, RiskLevel
+
+@pytest.mark.asyncio
+async def test_trust_reduces_risk():
+    """A trusted agent should get lower effective risk."""
+    engine = TrustEngine(initial_score=0.3, influence=0.3)
+
+    # Build up trust with successful actions
+    for _ in range(20):
+        engine.record_success(
+            agent_id="trusted-bot",
+            action_name="safe_action",
+            domain="general",
+            risk_score=0.3,
+        )
+
+    attesta = Attesta(
+        renderer=ApproveAllRenderer(),
+        trust_engine=engine,
+    )
+
+    ctx = ActionContext(
+        function_name="moderate_action",
+        agent_id="trusted-bot",
+        environment="production",
+    )
+    result = await attesta.evaluate(ctx)
+
+    # With high trust, the effective risk should be reduced
+    # (exact value depends on the scorer, but trust should lower it)
+    assert result.verdict == Verdict.APPROVED
+
+@pytest.mark.asyncio
+async def test_trust_never_downgrades_critical():
+    """CRITICAL risk must never be downgraded by trust."""
+    engine = TrustEngine(initial_score=0.9, influence=0.5)
+
+    attesta = Attesta(
+        renderer=ApproveAllRenderer(),
+        trust_engine=engine,
+        risk_override=RiskLevel.CRITICAL,
+    )
+
+    ctx = ActionContext(
+        function_name="delete_everything",
+        agent_id="super-trusted-bot",
+    )
+    result = await attesta.evaluate(ctx)
+
+    # Even with max trust, CRITICAL should remain CRITICAL
+    assert result.risk_assessment.level == RiskLevel.CRITICAL
+```
+
+---
+
+## Testing with from_config()
+
+Test that your YAML configuration loads correctly:
+
+```python
+import tempfile
+import pytest
+from pathlib import Path
+from attesta import Attesta
+
+def test_from_config_loads_yaml():
+    config = """
+policy:
+  fail_mode: deny
+  minimum_review_seconds:
+    medium: 3
+    high: 10
+    critical: 30
+
+trust:
+  initial_score: 0.3
+  ceiling: 0.85
+  influence: 0.25
+"""
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".yaml", delete=False
+    ) as f:
+        f.write(config)
+        f.flush()
+        attesta = Attesta.from_config(f.name)
+
+    assert attesta.policy.get("policy", {}).get("fail_mode") == "deny"
+
+def test_from_config_missing_file():
+    with pytest.raises(FileNotFoundError):
+        Attesta.from_config("/nonexistent/attesta.yaml")
+```
+
+---
+
+## Pytest Configuration
+
+Add these fixtures to your `conftest.py` for reuse across tests:
+
+```python conftest.py
+import pytest
+from attesta import (
+    ActionContext, RiskAssessment, ApprovalResult,
+    ChallengeResult, ChallengeType, RiskLevel, Verdict,
+)
+
+@pytest.fixture
+def approve_renderer():
+    """Renderer that auto-approves everything."""
+    return ApproveAllRenderer()
+
+@pytest.fixture
+def deny_renderer():
+    """Renderer that denies everything."""
+    return DenyAllRenderer()
+
+@pytest.fixture
+def recording_audit():
+    """Audit logger that records entries in memory."""
+    return RecordingAuditLogger()
+
+@pytest.fixture
+def sample_context():
+    """A sample ActionContext for testing."""
+    return ActionContext(
+        function_name="deploy",
+        args=("api-gateway", "2.0.0"),
+        function_doc="Deploy a service to production.",
+        environment="production",
+        agent_id="test-agent",
+        hints={"production": True},
+    )
+
+@pytest.fixture
+def low_risk():
+    return RiskAssessment(score=0.15, level=RiskLevel.LOW)
+
+@pytest.fixture
+def high_risk():
+    return RiskAssessment(score=0.75, level=RiskLevel.HIGH)
+
+@pytest.fixture
+def critical_risk():
+    return RiskAssessment(score=0.92, level=RiskLevel.CRITICAL)
+```
+
+<Tip>
+Put `ApproveAllRenderer`, `DenyAllRenderer`, and `RecordingAuditLogger` in a shared test utilities module. They are useful across your entire test suite, not just Attesta-specific tests.
+</Tip>
+
+---
+
+## Summary
+
+| Testing Scenario | Approach |
+|-----------------|----------|
+| CI/CD auto-approval | No setup needed -- non-TTY environments auto-approve |
+| Test approved execution | `ApproveAllRenderer` |
+| Test denial handling | `DenyAllRenderer` + `pytest.raises(AttestaDenied)` |
+| Verify audit records | `RecordingAuditLogger` + assert on `.entries` |
+| Test risk levels | Use `risk="high"` override + check `result.risk_assessment.level` |
+| Test custom scorers | Unit test with crafted `ActionContext` instances |
+| Test custom challenges | `monkeypatch` input, check `ChallengeResult` |
+| Full pipeline | `Attesta.evaluate()` with mock renderer + audit logger |
+| Trust engine | Pre-populate trust history, verify risk adjustment |
+
+<CardGroup cols={2}>
+  <Card title="Protocols" icon="plug" href="/api/protocols">
+    Protocol definitions for mock implementation
+  </Card>
+  <Card title="Production Deployment" icon="server" href="/guides/production-deployment">
+    Deploy with confidence after thorough testing
+  </Card>
+</CardGroup>

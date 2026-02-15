@@ -1,0 +1,179 @@
+---
+title: "TeachBackChallenge"
+description: "Free-text explanation challenge that validates operator understanding through keyword matching"
+icon: "chalkboard-user"
+---
+
+The `TeachBackChallenge` is the most rigorous single-operator challenge in Attesta. Instead of selecting from multiple-choice options, the operator must write a **free-text explanation** of what the action will do. Attesta validates the response through keyword matching.
+
+The "teach-back" method is borrowed from medical practice, where patients are asked to explain their treatment plan in their own words to confirm understanding.
+
+## When It Is Used
+
+`TeachBackChallenge` is not part of the default challenge map but is commonly used as:
+
+- A replacement for `QuizChallenge` at the **HIGH** risk level in high-assurance environments
+- A sub-challenge within [MultiPartyChallenge](/concepts/challenge-multi-party) (first in the rotation)
+- A standalone challenge for domain-specific critical actions
+
+| Parameter | Default | Description |
+|---|---|---|
+| `min_review_seconds` | **30.0** | Minimum seconds before submission is accepted without rubber-stamp flagging |
+| `min_words` | **15** | Minimum word count for the explanation |
+| `validator` | `KeywordValidator` | Validator for the explanation. Defaults to `KeywordValidator`. You can write your own by implementing the `TeachBackValidator` protocol |
+
+---
+
+## Validation Rules
+
+The teach-back response is validated in two stages:
+
+### Stage 1: Structural Validation
+
+1. **Word count** — The response must contain at least **15 words**. Shorter responses are rejected immediately.
+2. **Key terms** — The response must include key terms extracted from the action context. These are derived from:
+   - The function name (e.g., `deploy`, `delete`)
+   - Important argument values (e.g., `production`, table names)
+   - Domain-specific vocabulary from the active [domain profile](/concepts/domain-profiles)
+
+---
+
+## Usage
+
+<CodeGroup>
+```python Python
+from attesta.challenges import TeachBackChallenge, KeywordValidator
+
+# Default: 15 words, keyword matching only
+teach_back = TeachBackChallenge()
+
+# Stricter: 25 words minimum, longer review time
+teach_back = TeachBackChallenge(
+    min_words=25,
+    min_review_seconds=45.0,
+    validator=KeywordValidator(min_words=25),
+)
+
+# Use as the HIGH-risk challenge
+from attesta import Attesta, RiskLevel
+
+attesta = Attesta(
+    challenge_map={
+        RiskLevel.LOW: None,
+        RiskLevel.MEDIUM: "confirm",
+        RiskLevel.HIGH: teach_back,
+        RiskLevel.CRITICAL: "multi_party",
+    }
+)
+```
+
+```typescript TypeScript
+import { TeachBackChallenge, Attesta, RiskLevel, KeywordValidator } from "@attesta/core";
+
+// Default: 15 words, keyword matching only
+const teachBack = new TeachBackChallenge();
+
+// Stricter: 25 words minimum, longer review time
+const strictTeachBack = new TeachBackChallenge({
+  minWords: 25,
+  minReviewSeconds: 45.0,
+  validator: new KeywordValidator(25),
+});
+
+// Use as the HIGH-risk challenge
+const attesta = new Attesta({
+  challengeMap: {
+    [RiskLevel.LOW]: null,
+    [RiskLevel.MEDIUM]: "confirm",
+    [RiskLevel.HIGH]: strictTeachBack,
+    [RiskLevel.CRITICAL]: "multi_party",
+  },
+});
+```
+</CodeGroup>
+
+---
+
+## Terminal Experience
+
+When using the [TerminalRenderer](/concepts/renderers), the teach-back challenge is presented as:
+
+> **HIGH RISK -- Teach-Back Required**
+>
+> **Action:** `drop_table` | **Arguments:** `table="user_sessions"`, `database="prod"` | **Risk:** 0.74 (HIGH)
+>
+> In your own words, explain what this action will do and what its impact will be. (minimum 15 words)
+
+### Example Responses
+
+**Passing response:**
+> "This action will permanently drop the user_sessions table from the prod database, removing all session data. Active users will be logged out and their sessions invalidated."
+
+Passes because: 25+ words, contains key terms (`drop`, `user_sessions`, `prod`, `database`).
+
+**Failing response — too short:**
+> "It drops a table."
+
+Fails because: Only 4 words (minimum is 15).
+
+**Failing response — missing key terms:**
+> "This operation will modify some data in the system and could have an impact on users who are currently active in the application."
+
+Fails because: Does not mention `drop`, `user_sessions`, or `prod`.
+
+---
+
+## Key Term Extraction
+
+Attesta extracts key terms from the action context using these priorities:
+
+| Source | Examples | Priority |
+|---|---|---|
+| Function name verb | `drop`, `delete`, `deploy` | Always required |
+| Sensitive arguments | `production`, table names, file paths | Required when present |
+| Domain vocabulary | From `required_vocabulary` in domain profile | Required when domain is active |
+
+<Tip>
+If you are using domain profiles, add critical terms to the `required_vocabulary` field. For example, a custom domain profile might require terms like "production", "rollback", or "migration" in teach-back explanations for deployment actions.
+</Tip>
+
+---
+
+## Teach-Back as a Sub-Challenge
+
+In the [MultiPartyChallenge](/concepts/challenge-multi-party), teach-back is the **first** sub-challenge in the rotation:
+
+```
+Approver 1 → TeachBackChallenge  (explain the action)
+Approver 2 → QuizChallenge      (answer comprehension questions)
+Approver 3 → ConfirmChallenge   (simple Y/N)
+Approver 4 → TeachBackChallenge (rotation restarts)
+```
+
+This ensures the first approver must deeply understand the action, while subsequent approvers provide independent verification at progressively lighter levels.
+
+---
+
+## Configuration via YAML
+
+```yaml attesta.yaml
+policy:
+  challenge_map:
+    high: teach_back
+
+  min_review_seconds:
+    teach_back: 45.0
+```
+
+<Note>
+Custom `KeywordValidator` settings (e.g., `min_words`) must be configured programmatically. Pass a configured validator to the `TeachBackChallenge` constructor.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="MultiPartyChallenge" icon="users" href="/concepts/challenge-multi-party">
+    Uses teach-back as the first sub-challenge in rotation
+  </Card>
+  <Card title="QuizChallenge" icon="circle-question" href="/concepts/challenge-quiz">
+    Alternative comprehension challenge with multiple choice
+  </Card>
+</CardGroup>

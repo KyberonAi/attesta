@@ -1,0 +1,175 @@
+---
+title: "Risk Levels"
+description: "The four risk tiers — LOW, MEDIUM, HIGH, CRITICAL — and how scores map to challenges"
+icon: "signal"
+---
+
+Every risk score produced by the [scoring engine](/concepts/risk-scoring) is classified into one of four discrete levels using the `RiskLevel` enum. Each level determines the [challenge type](/concepts/challenges) presented to the human operator.
+
+## Risk Level Thresholds
+
+| Level | Score Range | Default Challenge | Color |
+|---|---|---|---|
+| **LOW** | `0.0` – `0.3` | Auto-approve | Green |
+| **MEDIUM** | `0.3` – `0.6` | [Confirm](/concepts/challenge-confirm) | Yellow |
+| **HIGH** | `0.6` – `0.8` | [Quiz](/concepts/challenge-quiz) | Orange |
+| **CRITICAL** | `0.8` – `1.0` | [Multi-party](/concepts/challenge-multi-party) | Red |
+
+<Note>
+Boundary values are inclusive on the lower bound. A score of exactly `0.3` is **MEDIUM**, a score of exactly `0.6` is **HIGH**, and a score of exactly `0.8` is **CRITICAL**.
+</Note>
+
+## The RiskLevel Enum
+
+<CodeGroup>
+```python Python
+from attesta import RiskLevel
+
+# Enum members
+RiskLevel.LOW        # "low"
+RiskLevel.MEDIUM     # "medium"
+RiskLevel.HIGH       # "high"
+RiskLevel.CRITICAL   # "critical"
+
+# Convert a numeric score to a risk level
+level = RiskLevel.from_score(0.72)
+print(level)          # RiskLevel.HIGH
+print(level.value)    # "high"
+```
+
+```typescript TypeScript
+import { RiskLevel } from "@attesta/core";
+
+// Enum members
+RiskLevel.LOW;       // "low"
+RiskLevel.MEDIUM;    // "medium"
+RiskLevel.HIGH;      // "high"
+RiskLevel.CRITICAL;  // "critical"
+
+// Convert a numeric score to a risk level
+const level = RiskLevel.fromScore(0.72);
+console.log(level);  // "high"
+```
+</CodeGroup>
+
+### `from_score()` Classification Logic
+
+```python
+@classmethod
+def from_score(cls, score: float) -> "RiskLevel":
+    if score < 0.3:
+        return cls.LOW
+    elif score < 0.6:
+        return cls.MEDIUM
+    elif score < 0.8:
+        return cls.HIGH
+    else:
+        return cls.CRITICAL
+```
+
+---
+
+## Visual Risk Bar
+
+When using the [TerminalRenderer](/concepts/renderers), Attesta displays a colored risk bar in the terminal showing the score and level:
+
+```bash
+ Risk Assessment
+ ├── Score: 0.72
+ ├── Level: HIGH
+ └── Bar:   ██████████████████████████████░░░░░░░░░░  72%
+```
+
+The bar color transitions from green through yellow and orange to red as the score increases.
+
+---
+
+## Default Challenge Map
+
+The default mapping from risk levels to challenges is:
+
+| Risk Level | Challenge | Reasoning |
+|---|---|---|
+| **LOW** | Auto-approve | Low-risk reads need no friction |
+| **MEDIUM** | [ConfirmChallenge](/concepts/challenge-confirm) | Simple Y/N confirmation with pause |
+| **HIGH** | [QuizChallenge](/concepts/challenge-quiz) | Forces operator to read and understand the action |
+| **CRITICAL** | [MultiPartyChallenge](/concepts/challenge-multi-party) | Requires 2+ independent approvers |
+
+<Tip>
+You can override the default challenge map in your `attesta.yaml` configuration. For example, you might map HIGH-risk actions to [TeachBackChallenge](/concepts/challenge-teach-back) instead of QuizChallenge.
+</Tip>
+
+### Overriding the Challenge Map
+
+<CodeGroup>
+```python Python
+from attesta import Attesta, RiskLevel
+from attesta.challenges import TeachBackChallenge, MultiPartyChallenge
+
+attesta = Attesta(
+    challenge_map={
+        RiskLevel.LOW: None,                    # auto-approve
+        RiskLevel.MEDIUM: "confirm",
+        RiskLevel.HIGH: TeachBackChallenge(),   # custom override
+        RiskLevel.CRITICAL: MultiPartyChallenge(required_approvers=3),
+    }
+)
+```
+
+```typescript TypeScript
+import { Attesta, RiskLevel } from "@attesta/core";
+
+const attesta = new Attesta({
+  challengeMap: {
+    [RiskLevel.LOW]: null,                  // auto-approve
+    [RiskLevel.MEDIUM]: "confirm",
+    [RiskLevel.HIGH]: "teach_back",         // custom override
+    [RiskLevel.CRITICAL]: { type: "multi_party", requiredApprovers: 3 },
+  },
+});
+```
+</CodeGroup>
+
+---
+
+## Trust-Adjusted Risk
+
+The [Trust Engine](/concepts/trust-engine) can shift the **effective** risk level for agents with a proven track record. A trusted agent's MEDIUM action might be treated as LOW, reducing friction. However, a critical safety invariant applies:
+
+<Warning>
+**CRITICAL actions are never downgraded.** Regardless of an agent's trust score, actions scoring 0.8 or above always require multi-party approval. This invariant is enforced in the Trust Engine and cannot be overridden.
+</Warning>
+
+```python
+# Trust can lower effective risk for non-critical actions:
+
+raw_score = 0.55   # MEDIUM
+trust = "high"
+effective_level = RiskLevel.LOW       # downgraded -> auto-approve
+
+raw_score = 0.85   # CRITICAL
+trust = "high"
+effective_level = RiskLevel.CRITICAL  # NOT downgraded -> multi-party required
+```
+
+---
+
+## Comparison Table
+
+| Aspect | LOW | MEDIUM | HIGH | CRITICAL |
+|---|---|---|---|---|
+| Score range | 0.0–0.3 | 0.3–0.6 | 0.6–0.8 | 0.8–1.0 |
+| Typical actions | Read, list, check | Create, update, set | Deploy, execute, run | Delete, drop, destroy |
+| User friction | None | ~3 seconds | ~10 seconds | ~30+ seconds |
+| Approvers needed | 0 | 1 | 1 | 2+ |
+| Trust can downgrade | N/A | Yes | Yes | **No** |
+| Audit logged | Yes | Yes | Yes | Yes |
+
+<CardGroup cols={2}>
+  <Card title="Risk Scoring" icon="gauge-high" href="/concepts/risk-scoring">
+    How the 5-factor scorer produces a numeric score
+  </Card>
+  <Card title="Challenges" icon="lock" href="/concepts/challenges">
+    The challenge system and how levels map to challenges
+  </Card>
+</CardGroup>

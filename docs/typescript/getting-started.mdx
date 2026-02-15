@@ -1,0 +1,252 @@
+---
+title: "TypeScript Getting Started"
+description: "Install, configure, and use Attesta in TypeScript with full type safety"
+icon: "js"
+---
+
+Attesta ships a first-class TypeScript SDK under the `@attesta/core` package. It provides the same approval pipeline as the Python SDK -- risk scoring, escalating challenges, tamper-proof audit trails, and adaptive trust -- with idiomatic TypeScript conventions and full generic type safety.
+
+## Installation
+
+```bash
+npm install @attesta/core
+```
+
+If you use a specific integration, install the peer dependency alongside it:
+
+<CodeGroup>
+```bash Vercel AI SDK
+npm install @attesta/core ai
+```
+
+```bash LangChain
+npm install @attesta/core @langchain/core
+```
+</CodeGroup>
+
+<Note>
+The `@attesta/core` package has zero runtime dependencies. Integration modules import peer dependencies lazily, so they are only required if you actually use them.
+</Note>
+
+---
+
+## Basic Usage
+
+### Protecting a Function with `gate`
+
+The `gate` function wraps any async function with the Attesta approval pipeline. When the wrapped function is called, Attesta intercepts the invocation, scores the risk, presents the appropriate challenge, and either allows or blocks execution.
+
+```typescript
+import { gate } from "@attesta/core";
+
+const deleteUser = gate(async (userId: string): Promise<string> => {
+  // This only executes if Attesta approves
+  return `Deleted user ${userId}`;
+});
+
+// Triggers risk assessment + approval prompt
+const result = await deleteUser("usr_12345");
+```
+
+### Passing Options
+
+Provide a configuration object as the first argument to customize risk scoring, hints, and metadata:
+
+```typescript
+import { gate } from "@attesta/core";
+
+const deployService = gate(
+  {
+    risk: "high",
+    riskHints: { production: true, destructive: false },
+    agentId: "deploy-bot",
+    environment: "production",
+    minReviewSeconds: 10.0,
+  },
+  async (service: string, version: string): Promise<string> => {
+    return `Deployed ${service} v${version}`;
+  }
+);
+```
+
+### Curried Factory
+
+You can also create a pre-configured gate factory and reuse it across multiple functions:
+
+```typescript
+import { gate } from "@attesta/core";
+
+const productionGate = gate({
+  environment: "production",
+  riskHints: { production: true },
+  minReviewSeconds: 5.0,
+});
+
+const deploy = productionGate(async (service: string, version: string) => {
+  return `Deployed ${service} v${version}`;
+});
+
+const rollback = productionGate(async (service: string) => {
+  return `Rolled back ${service}`;
+});
+```
+
+---
+
+## Using the Attesta Class
+
+For production use, create an `Attesta` instance that holds shared defaults for risk scoring, rendering, audit logging, and trust. All gates created from the instance inherit these defaults.
+
+```typescript
+import { Attesta, gate } from "@attesta/core";
+
+// Create an Attesta instance with shared defaults
+const attesta = new Attesta();
+
+// gate() is a standalone function — pass the attesta instance as an option
+const readConfig = gate(async (key: string) => {
+  return `Value for ${key}`;
+}, { attesta });
+
+const deleteUser = gate(
+  async (userId: string) => {
+    return `Deleted ${userId}`;
+  },
+  { attesta, riskHints: { destructive: true, pii: true } }
+);
+```
+
+Or configure with custom components:
+
+```typescript
+import { Attesta } from "@attesta/core";
+
+const attesta = new Attesta({
+  riskScorer: myCustomScorer,
+  renderer: myCustomRenderer,
+  auditLogger: myCustomLogger,
+  minReviewSeconds: 3.0,
+});
+```
+
+---
+
+## Type Definitions
+
+The TypeScript SDK exports all core types for full type safety. Here are the most commonly used types:
+
+```typescript
+import {
+  // Core API
+  gate,
+  Attesta,
+  AttestaDenied,
+
+  // Types
+  ActionContext,
+  ApprovalResult,
+  RiskAssessment,
+  ChallengeResult,
+
+  // Enums
+  RiskLevel,
+  Verdict,
+  ChallengeType,
+
+  // Protocols (interfaces)
+  RiskScorer,
+  Renderer,
+  AuditLogger,
+  ChallengeProtocol,
+} from "@attesta/core";
+```
+
+### Key Interfaces
+
+| Interface | Description |
+|-----------|-------------|
+| `ActionContext` | Describes a function call under review: name, args, doc, environment, hints |
+| `ApprovalResult` | The outcome of an evaluation: verdict, risk assessment, challenge result, audit ID |
+| `RiskAssessment` | Risk score (0-1), risk level enum, scorer name, and contributing factors |
+| `ChallengeResult` | Whether the challenge was passed, the challenge type, and response time |
+
+### Generics
+
+The `gate` function preserves the original function's type signature using TypeScript generics:
+
+```typescript
+import { gate } from "@attesta/core";
+
+// TypeScript infers the full signature
+const add = gate(async (a: number, b: number): Promise<number> => {
+  return a + b;
+});
+
+// Type-safe: (a: number, b: number) => Promise<number>
+const result: number = await add(1, 2);   // OK
+const bad: string = await add(1, 2);      // Type error
+```
+
+The generic signature ensures that wrapped functions retain their parameter types, return types, and arity through the gate wrapper.
+
+---
+
+## Handling Denials
+
+When an operator denies an action or fails a challenge, the wrapped function throws an `AttestaDenied` error. The protected function is never executed.
+
+```typescript
+import { gate, AttestaDenied } from "@attesta/core";
+
+const dropTable = gate(
+  { risk: "critical" },
+  async (tableName: string) => {
+    return `Dropped ${tableName}`;
+  }
+);
+
+try {
+  await dropTable("users");
+} catch (error) {
+  if (error instanceof AttestaDenied) {
+    console.log(`Blocked: ${error.message}`);
+    console.log(`Verdict: ${error.result?.verdict}`);
+    console.log(`Risk score: ${error.result?.riskAssessment.score}`);
+  }
+}
+```
+
+---
+
+## Python vs TypeScript at a Glance
+
+| Aspect | Python | TypeScript |
+|--------|--------|------------|
+| Package | `pip install attesta` | `npm install @attesta/core` |
+| Gate syntax | `@gate` decorator | `gate(fn)` wrapper |
+| Naming | `snake_case` | `camelCase` |
+| Async | `asyncio` / `await` | Promises / `await` |
+| Config loading | `Attesta.from_config()` | Constructor only (`new Attesta()`) |
+| Protocols | `Protocol` classes (structural) | `interface` (structural) |
+| Custom scorers | Duck typing via `Protocol` | `implements` keyword |
+
+For a detailed comparison, see the [Python vs TypeScript API](/typescript/api-differences) page.
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Python vs TypeScript API" icon="arrows-left-right" href="/typescript/api-differences">
+    Detailed side-by-side comparison of both SDKs
+  </Card>
+  <Card title="@gate Decorator" icon="shield-halved" href="/api/gate-decorator">
+    Full parameter reference for the gate function
+  </Card>
+  <Card title="Vercel AI SDK" icon="triangle" href="/integrations/vercel-ai">
+    TypeScript-native Vercel AI integration
+  </Card>
+  <Card title="Protocols" icon="plug" href="/api/protocols">
+    Implement custom scorers, renderers, and loggers
+  </Card>
+</CardGroup>

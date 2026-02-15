@@ -1,0 +1,115 @@
+---
+title: "Integrations Overview"
+description: "Connect Attesta to any AI agent framework — LangChain, OpenAI, Anthropic, CrewAI, MCP, Vercel AI, and more"
+icon: "puzzle-piece"
+---
+
+Attesta provides first-class integrations for the most popular AI agent frameworks. Every integration follows the same pattern: intercept tool/action calls, evaluate risk through the Attesta pipeline, and only allow approved actions to execute.
+
+## Choosing an Integration
+
+| Framework | Language | Integration Class | Hook Point | Install Extra |
+|---|---|---|---|---|
+| [LangChain / LangGraph](/integrations/langchain) | Python | `AttestaToolWrapper`, `attesta_node` | Tool `func`/`coroutine` replacement; LangGraph node | `attesta[langchain]` |
+| [LangChain (TS)](/integrations/langchain) | TypeScript | `gatedTool`, `createGateNode` | Proxy on `invoke`; LangGraph node | `@attesta/core` |
+| [OpenAI Agents SDK](/integrations/openai-agents) | Python | `attesta_approval_handler`, `AttestaGuardrail` | `Runner.run(approval_handler=...)`, `Agent(tool_guardrails=[...])` | `attesta[openai]` |
+| [Anthropic Claude](/integrations/anthropic-claude) | Python | `AttestaToolGate` | `tool_use` content block evaluation | `attesta[anthropic]` |
+| [CrewAI](/integrations/crewai) | Python | `AttestaHumanInput` | `Task(callback=...)` | `attesta[crewai]` |
+| [MCP](/integrations/mcp) | Python | `attesta_tool_handler`, `MCPProxy` | `call_tool` decorator; stdio proxy | `attesta` (core) |
+| [Vercel AI SDK](/integrations/vercel-ai) | TypeScript | `gatedVercelTool`, `createAttestaMiddleware` | Tool `execute` wrapper; `experimental_onToolCall` | `@attesta/core` |
+
+<Tip>
+Not sure which integration to use? If you are building a **Python agent**, start with the framework-specific integration (LangChain, OpenAI, etc.). If you are building a **TypeScript agent**, use the Vercel AI or LangChain TS integration. If you want to gate **any MCP server** without code changes, use the [MCPProxy](/integrations/mcp).
+</Tip>
+
+## How Integrations Work
+
+Every integration follows the same 4-stage pipeline described in [How It Works](/how-it-works):
+
+<Steps>
+  <Step title="Intercept">
+    The integration intercepts tool calls before they execute. Each framework has a different hook point (tool wrapper, approval handler, decorator, middleware, etc.), but the result is the same: the call is paused.
+  </Step>
+  <Step title="Build ActionContext">
+    The integration extracts the tool name, arguments, and any available metadata (description, agent ID, session) and builds an `ActionContext` object for Attesta to evaluate.
+  </Step>
+  <Step title="Evaluate">
+    The `ActionContext` is passed to `attesta.evaluate()`, which runs risk scoring, challenge selection, verification, and audit logging.
+  </Step>
+  <Step title="Dispatch">
+    Based on the verdict:
+    - **Approved / Modified** -- the original tool call proceeds normally
+    - **Denied / Timed Out / Escalated** -- the call is blocked and a denial message is returned (or an exception is raised, depending on the integration)
+  </Step>
+</Steps>
+
+## Installation
+
+Install Attesta with the extras for your framework:
+
+<CodeGroup>
+```bash Python (specific framework)
+# Pick one or more:
+pip install attesta[langchain]
+pip install attesta[openai]
+pip install attesta[anthropic]
+pip install attesta[crewai]
+
+# MCP is included in the core package:
+pip install attesta
+```
+
+```bash TypeScript
+npm install @attesta/core
+```
+</CodeGroup>
+
+## Common Pattern
+
+Regardless of framework, every integration starts with a configured `Attesta` instance:
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+
+# Minimal (all defaults)
+attesta = Attesta()
+
+# With config file
+attesta = Attesta.from_config("attesta.yaml")
+```
+
+```typescript TypeScript
+import { Attesta } from "@attesta/core";
+
+// Minimal (all defaults)
+const attesta = new Attesta();
+
+// With options
+const attesta = new Attesta({
+  riskHints: { production: true },
+  environment: "production",
+});
+```
+</CodeGroup>
+
+Then pass this instance to the framework-specific integration class. See the individual integration pages for complete examples.
+
+## No-Code Platforms
+
+If you are using a visual workflow builder instead of writing code, see the [No-Code Platforms](/no-code/overview) section for drop-in nodes and components:
+
+<CardGroup cols={2}>
+  <Card title="n8n" icon="diagram-project" href="/no-code/n8n">
+    AttestaGate node for n8n workflows
+  </Card>
+  <Card title="Flowise" icon="robot" href="/no-code/flowise">
+    AttestaGate tool component for chatflows
+  </Card>
+  <Card title="Langflow" icon="wind" href="/no-code/langflow">
+    AttestaGate component for Langflow pipelines
+  </Card>
+  <Card title="Dify" icon="plug" href="/no-code/dify">
+    Attesta plugin for the Dify platform
+  </Card>
+</CardGroup>

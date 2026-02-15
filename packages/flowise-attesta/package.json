@@ -1,0 +1,42 @@
+{
+  "name": "flowise-attesta",
+  "version": "0.1.0",
+  "description": "Flowise community node for Attesta human-in-the-loop approval gates",
+  "main": "dist/src/AttestaGate.js",
+  "types": "dist/src/AttestaGate.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "clean": "rm -rf dist"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.ts$": ["ts-jest", { "diagnostics": false }]
+    },
+    "moduleNameMapper": {
+      "^@attesta/core$": "<rootDir>/__mocks__/@attesta/core.ts",
+      "^@langchain/core/tools$": "<rootDir>/__mocks__/@langchain/core/tools.ts"
+    }
+  },
+  "dependencies": {
+    "@attesta/core": "^0.1.0"
+  },
+  "peerDependencies": {
+    "flowise-components": ">=1.0.0",
+    "@langchain/core": ">=0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "@types/jest": "^29.5.0",
+    "flowise-components": "^1.0.0",
+    "@langchain/core": "^0.2.0"
+  },
+  "keywords": ["flowise", "attesta", "human-in-the-loop", "ai-safety"],
+  "license": "MIT",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  }
+}

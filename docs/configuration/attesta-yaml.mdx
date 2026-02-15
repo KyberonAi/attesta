@@ -1,0 +1,176 @@
+---
+title: "attesta.yaml Reference"
+description: "Complete configuration reference for the attesta.yaml file — policies, risk tuning, trust parameters, domain profiles, and audit settings"
+icon: "file-code"
+---
+
+The `attesta.yaml` file is the central configuration for Attesta. It controls challenge policies, risk scoring, trust engine behavior, domain profile activation, and audit output. Generate a starter config with:
+
+```bash
+attesta init
+```
+
+## Full Annotated Example
+
+```yaml attesta.yaml
+# ─── Domain Profiles ───────────────────────────────────────────────
+# Activate one or more registered domain profiles by name.
+# Register profiles via attesta.domains.presets.register_preset()
+# before loading this config.
+# domain: my-industry
+#
+# Or activate multiple domains (profiles are merged):
+# domain:
+#   - my-industry
+#   - another-domain
+#
+# Optional: disable fail-fast for missing presets.
+# By default, Attesta raises an error if a configured domain is not registered.
+# domain_strict: false
+
+# ─── Policy ────────────────────────────────────────────────────────
+policy:
+  # Minimum seconds the operator must review before approving.
+  # Prevents rubber-stamping by enforcing a per-risk-level delay.
+  minimum_review_seconds:
+    low: 0
+    medium: 3
+    high: 10
+    critical: 30
+
+  # Number of independent approvers required per risk level.
+  # Only levels listed here require multi-party approval.
+  require_multi_party:
+    critical: 2
+
+  # What happens when a challenge times out or the system cannot
+  # reach a human operator.
+  #   "deny"     — block the action (safest, default)
+  #   "allow"    — permit the action (use only in development)
+  #   "escalate" — forward to a secondary approver or webhook
+  fail_mode: deny
+
+  # Maximum seconds to wait for the operator to complete a challenge
+  # before the fail_mode policy kicks in.
+  timeout_seconds: 300
+
+# ─── Risk Scoring ──────────────────────────────────────────────────
+risk:
+  # Force specific actions to a fixed risk level, regardless of
+  # what the scorer calculates.
+  overrides:
+    deploy_production: critical
+    read_config: low
+
+  # Regex-based score amplifiers. If the action name matches the
+  # pattern, the risk score is boosted by the given amount (additive).
+  amplifiers:
+    - pattern: ".*production.*"
+      boost: 0.3
+    - pattern: ".*delete.*"
+      boost: 0.2
+
+# ─── Trust Engine ──────────────────────────────────────────────────
+trust:
+  # Maximum risk reduction that a fully-trusted agent can receive.
+  # A value of 0.3 means trust can lower the risk score by up to 0.3.
+  influence: 0.3
+
+  # Hard cap on the trust score. Prevents any agent from reaching
+  # full trust (1.0), maintaining healthy skepticism.
+  ceiling: 0.9
+
+  # Starting trust score for agents with no history.
+  initial_score: 0.3
+
+  # Trust decay per day of agent inactivity. Ensures idle agents
+  # gradually lose accumulated trust.
+  decay_rate: 0.01
+
+# ─── Audit ─────────────────────────────────────────────────────────
+audit:
+  # Path to the JSONL audit log (SHA-256 hash-chained).
+  path: ".attesta/audit.jsonl"
+```
+
+## Loading the Config
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+
+# Load from file path
+attesta = Attesta.from_config("attesta.yaml")
+
+# Use the configured gate
+@attesta.gate()
+def deploy(service: str, version: str) -> str:
+    """Deploy a service to production."""
+    return f"Deployed {service} v{version}"
+```
+
+```typescript TypeScript
+import { Attesta, gate } from "@attesta/core";
+
+// TypeScript uses the constructor directly (no fromConfig)
+const attesta = new Attesta({
+  // Options loaded from your config
+});
+
+// Use the standalone gate() function
+const deploy = gate(async (service: string, version: string) => {
+  return `Deployed ${service} v${version}`;
+});
+```
+</CodeGroup>
+
+## Top-Level Sections
+
+| Section | Purpose | Required |
+|---------|---------|----------|
+| `domain` | Activate registered domain profiles | No |
+| `policy` | Challenge mappings, review times, fail modes | No |
+| `risk` | Risk overrides and score amplifiers | No |
+| `trust` | Trust engine tuning parameters | No |
+| `audit` | Audit log file path | No |
+
+All sections are optional. When omitted, Attesta uses sensible defaults that enforce safe behavior: actions are denied on timeout, CRITICAL operations require 2-party approval, and trust starts low.
+
+<Note>
+If no `attesta.yaml` is present, Attesta operates with all defaults. You only need a config file when you want to customize behavior.
+</Note>
+
+## Loading the Config File
+
+Pass an explicit path to `Attesta.from_config()`:
+
+```python
+from attesta import Attesta
+
+# Explicit path (required)
+attesta = Attesta.from_config("attesta.yaml")
+
+# Or an absolute path
+attesta = Attesta.from_config("/etc/attesta/production.yaml")
+```
+
+<Note>
+`from_config()` requires an explicit path. Supports `.yaml` and `.yml` file extensions. Requires the `pyyaml` package (`pip install attesta[yaml]`).
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Policy Section" icon="scale-balanced" href="/configuration/policy-section">
+    Challenge mappings, review times, and fail modes
+  </Card>
+  <Card title="Risk Section" icon="gauge-high" href="/configuration/risk-section">
+    Risk overrides and amplifiers
+  </Card>
+  <Card title="Trust Section" icon="brain" href="/configuration/trust-section">
+    Trust engine parameters
+  </Card>
+  <Card title="Domain Activation" icon="hospital" href="/configuration/domain-activation">
+    Activate and configure domain-specific risk profiles
+  </Card>
+</CardGroup>

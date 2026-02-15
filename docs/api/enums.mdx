@@ -1,0 +1,313 @@
+---
+title: "Enums"
+description: "RiskLevel, Verdict, and ChallengeType enumerations used throughout Attesta"
+icon: "list-ol"
+---
+
+Attesta defines three core enumerations that appear throughout the API: `RiskLevel` for discrete risk classifications, `Verdict` for approval outcomes, and `ChallengeType` for verification challenge kinds.
+
+## RiskLevel
+
+Discrete risk classification derived from a continuous 0-1 score.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import RiskLevel
+```
+
+```typescript TypeScript
+import { RiskLevel } from "@attesta/core";
+```
+</CodeGroup>
+
+### Values
+
+| Member | Value | Score Range | Default Challenge | Color |
+|--------|-------|-------------|-------------------|-------|
+| `LOW` | `"low"` | 0.0 - 0.3 | `auto_approve` | Green |
+| `MEDIUM` | `"medium"` | 0.3 - 0.6 | `confirm` | Yellow |
+| `HIGH` | `"high"` | 0.6 - 0.8 | `quiz` | Red |
+| `CRITICAL` | `"critical"` | 0.8 - 1.0 | `multi_party` | Bright Red |
+
+### from_score() Classmethod
+
+Maps a continuous risk score to a discrete level.
+
+<CodeGroup>
+```python Python
+from attesta import RiskLevel
+
+RiskLevel.from_score(0.15)  # RiskLevel.LOW
+RiskLevel.from_score(0.45)  # RiskLevel.MEDIUM
+RiskLevel.from_score(0.72)  # RiskLevel.HIGH
+RiskLevel.from_score(0.91)  # RiskLevel.CRITICAL
+
+# Boundary values
+RiskLevel.from_score(0.0)   # RiskLevel.LOW
+RiskLevel.from_score(0.3)   # RiskLevel.MEDIUM (>= 0.3)
+RiskLevel.from_score(0.6)   # RiskLevel.HIGH   (>= 0.6)
+RiskLevel.from_score(0.8)   # RiskLevel.CRITICAL (>= 0.8)
+RiskLevel.from_score(1.0)   # RiskLevel.CRITICAL
+
+# Out-of-range raises ValueError
+RiskLevel.from_score(1.5)   # ValueError: Risk score must be in [0, 1], got 1.5
+RiskLevel.from_score(-0.1)  # ValueError: Risk score must be in [0, 1], got -0.1
+```
+
+```typescript TypeScript
+import { RiskLevel } from "@attesta/core";
+
+RiskLevel.fromScore(0.15);  // RiskLevel.LOW
+RiskLevel.fromScore(0.45);  // RiskLevel.MEDIUM
+RiskLevel.fromScore(0.72);  // RiskLevel.HIGH
+RiskLevel.fromScore(0.91);  // RiskLevel.CRITICAL
+```
+</CodeGroup>
+
+### Signature
+
+```python
+@classmethod
+def from_score(cls, score: float) -> RiskLevel
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `score` | `float` | A risk score in the range `[0.0, 1.0]`. |
+
+**Returns:** The corresponding `RiskLevel`.
+
+**Raises:** `ValueError` if `score` is outside `[0.0, 1.0]`.
+
+### Using in Configuration
+
+Risk levels are used as keys in the challenge map configuration:
+
+```yaml attesta.yaml
+challenge_map:
+  low: auto_approve
+  medium: confirm
+  high: quiz
+  critical: multi_party
+```
+
+And as values for the `risk=` parameter on the `@gate` decorator:
+
+```python Python
+from attesta import gate
+
+@gate(risk="high")     # String value
+@gate(risk=RiskLevel.HIGH)  # Enum value -- both work
+def dangerous_action():
+    pass
+```
+
+<Warning>
+CRITICAL-level actions are **never** downgraded by the trust engine, regardless of how much trust an agent has accumulated. This is an intentional safety invariant -- CRITICAL actions always require full multi-party verification.
+</Warning>
+
+---
+
+## Verdict
+
+The outcome of an Attesta review. Determines whether the protected function executes.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import Verdict
+```
+
+```typescript TypeScript
+import { Verdict } from "@attesta/core";
+```
+</CodeGroup>
+
+### Values
+
+| Member | Value | Function Executes? | Description |
+|--------|-------|--------------------|-------------|
+| `APPROVED` | `"approved"` | Yes | The action was approved by the operator or auto-approved. |
+| `DENIED` | `"denied"` | No | The operator explicitly rejected the action or failed the challenge. |
+| `MODIFIED` | `"modified"` | Yes (modified) | The action was approved with modifications (e.g., reduced scope). |
+| `TIMED_OUT` | `"timed_out"` | No | The review period expired without a response. |
+| `ESCALATED` | `"escalated"` | No | The action was escalated to a higher authority and is not yet resolved. |
+
+### Behavior in @gate
+
+The `@gate` decorator maps verdicts to behavior:
+
+| Verdict | @gate Behavior |
+|---------|---------------|
+| `APPROVED` | Function executes normally, return value is passed through. |
+| `DENIED` | `AttestaDenied` is raised. Function never executes. |
+| `MODIFIED` | Function executes (the `modification` field on `ApprovalResult` describes changes). |
+| `TIMED_OUT` | `AttestaDenied` is raised with message "Action timed out: ...". |
+| `ESCALATED` | `AttestaDenied` is raised with message "Action escalated (not yet resolved): ...". |
+
+### Checking Verdicts
+
+<CodeGroup>
+```python Python
+from attesta import Attesta, ActionContext, Verdict
+
+attesta = Attesta.from_config("attesta.yaml")
+ctx = ActionContext(function_name="deploy", args=("api",))
+
+result = await attesta.evaluate(ctx)
+
+match result.verdict:
+    case Verdict.APPROVED:
+        print("Proceeding with action")
+    case Verdict.DENIED:
+        print("Action was denied")
+    case Verdict.MODIFIED:
+        print(f"Action modified: {result.modification}")
+    case Verdict.TIMED_OUT:
+        print("Review timed out")
+    case Verdict.ESCALATED:
+        print("Action escalated -- awaiting resolution")
+```
+
+```typescript TypeScript
+import { Attesta, ActionContext, Verdict } from "@attesta/core";
+
+const attesta = new Attesta();
+const ctx: ActionContext = { functionName: "deploy", args: ["api"] };
+
+const result = await attesta.evaluate(ctx);
+
+switch (result.verdict) {
+  case Verdict.APPROVED:
+    console.log("Proceeding with action");
+    break;
+  case Verdict.DENIED:
+    console.log("Action was denied");
+    break;
+  case Verdict.MODIFIED:
+    console.log(`Action modified: ${result.modification}`);
+    break;
+  case Verdict.TIMED_OUT:
+    console.log("Review timed out");
+    break;
+  case Verdict.ESCALATED:
+    console.log("Action escalated");
+    break;
+}
+```
+</CodeGroup>
+
+<Note>
+The `MODIFIED` verdict is currently only produced by custom renderers that return it from `render_approval()`. The built-in renderers never produce `MODIFIED` -- they return either `APPROVED` or `DENIED`.
+</Note>
+
+---
+
+## ChallengeType
+
+The kind of verification challenge presented to the operator. Determines the level of cognitive engagement required before the action can proceed.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import ChallengeType
+```
+
+```typescript TypeScript
+import { ChallengeType } from "@attesta/core";
+```
+</CodeGroup>
+
+### Values
+
+| Member | Value | Risk Level | Description |
+|--------|-------|-----------|-------------|
+| `AUTO_APPROVE` | `"auto_approve"` | LOW | No human interaction. Action proceeds silently. |
+| `CONFIRM` | `"confirm"` | MEDIUM | Simple Y/N prompt. Operator must review the action details and confirm. A minimum review time may be enforced. |
+| `QUIZ` | `"quiz"` | HIGH | 1-3 auto-generated comprehension questions about the action (file paths, parameters, affected resources). |
+| `TEACH_BACK` | `"teach_back"` | HIGH | Operator must explain in their own words what the action does (15+ words, key-term matching). |
+| `MULTI_PARTY` | `"multi_party"` | CRITICAL | 2+ independent approvers, each completing a different sub-challenge (teach-back, quiz, confirm). |
+
+### Default Challenge Map
+
+The built-in mapping from risk level to challenge type:
+
+```python Python
+from attesta import RiskLevel, ChallengeType
+
+DEFAULT_CHALLENGE_MAP = {
+    RiskLevel.LOW:      ChallengeType.AUTO_APPROVE,
+    RiskLevel.MEDIUM:   ChallengeType.CONFIRM,
+    RiskLevel.HIGH:     ChallengeType.QUIZ,
+    RiskLevel.CRITICAL: ChallengeType.MULTI_PARTY,
+}
+```
+
+### Custom Challenge Maps
+
+You can override the default mapping per-gate or via configuration:
+
+<CodeGroup>
+```python Python
+from attesta import gate, RiskLevel, ChallengeType
+
+# Use teach-back for HIGH risk instead of quiz
+@gate(challenge_map={
+    RiskLevel.LOW: ChallengeType.AUTO_APPROVE,
+    RiskLevel.MEDIUM: ChallengeType.CONFIRM,
+    RiskLevel.HIGH: ChallengeType.TEACH_BACK,
+    RiskLevel.CRITICAL: ChallengeType.MULTI_PARTY,
+})
+def sensitive_action():
+    pass
+```
+
+```yaml attesta.yaml
+challenge_map:
+  low: auto_approve
+  medium: confirm
+  high: teach_back
+  critical: multi_party
+```
+</CodeGroup>
+
+### Challenge Escalation in Multi-Party
+
+For CRITICAL actions, the `multi_party` challenge type assigns different sub-challenges to each approver in descending order of rigor:
+
+| Approver | Sub-Challenge |
+|----------|--------------|
+| 1st | `teach_back` |
+| 2nd | `quiz` |
+| 3rd+ | `confirm` |
+
+This ensures that at least one approver demonstrates deep comprehension of the action before it proceeds.
+
+<Warning>
+Downgrading `CRITICAL` actions to a simpler challenge type (e.g., `confirm`) via a custom challenge map is technically possible but strongly discouraged. CRITICAL actions represent the highest-risk operations and should always require multi-party verification in production environments.
+</Warning>
+
+## String Conversion
+
+All enums use lowercase string values. You can construct enum members from strings:
+
+```python Python
+from attesta import RiskLevel, Verdict, ChallengeType
+
+# From string value
+level = RiskLevel("high")           # RiskLevel.HIGH
+verdict = Verdict("approved")       # Verdict.APPROVED
+challenge = ChallengeType("quiz")   # ChallengeType.QUIZ
+
+# To string value
+level.value      # "high"
+verdict.value    # "approved"
+challenge.value  # "quiz"
+
+# Invalid values raise ValueError
+RiskLevel("unknown")  # ValueError: 'unknown' is not a valid RiskLevel
+```

@@ -1,0 +1,318 @@
+---
+title: "MCP (Model Context Protocol)"
+description: "Gate MCP tool calls with a decorator for custom servers or a zero-config stdio proxy for any MCP server"
+icon: "server"
+---
+
+Attesta provides two patterns for enforcing human-in-the-loop approval on MCP tool invocations, regardless of which client (VS Code, Cursor, Claude Code, Windsurf, etc.) calls the tools.
+
+1. **`attesta_tool_handler`** -- a decorator for MCP `call_tool` handlers. Use this when you author your own MCP servers in Python.
+2. **`MCPProxy`** -- a stdio proxy that wraps **any** existing MCP server with Attesta approval, requiring **zero code changes** to the upstream server.
+
+## Installation
+
+```bash
+pip install attesta
+```
+
+MCP support is included in the core package — no additional extras required.
+
+---
+
+## Architecture
+
+```
+ Editor / IDE  <--stdio-->  Attesta MCPProxy  <--stdio-->  Real MCP Server
+                                  |
+                                  +-- risk scoring per tool call
+                                  +-- domain-aware evaluation (custom profiles)
+                                  +-- policy enforcement (approve / deny / audit)
+                                  +-- tamper-proof audit trail
+```
+
+The proxy sits transparently between the MCP client and server. It intercepts `tools/call` JSON-RPC requests, evaluates them through Attesta, and either forwards the request to the upstream server (approved) or returns an error response directly (denied). All other messages (tool listings, notifications, etc.) pass through unchanged.
+
+---
+
+## Pattern 1: Decorator (Custom MCP Servers)
+
+Use `attesta_tool_handler` when you are writing your own MCP server in Python. Place it between `@server.call_tool()` and your handler function.
+
+### API
+
+```python
+attesta_tool_handler(attesta, *, risk_overrides=None) -> Callable
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `attesta` | `Attesta` | A configured Attesta instance |
+| `risk_overrides` | `dict[str, str] \| None` | Optional `{tool_name: risk_level}` mapping |
+
+### Full Example
+
+```python
+from mcp.server import Server
+from mcp.types import TextContent
+from attesta import Attesta
+from attesta.integrations.mcp import attesta_tool_handler
+
+server = Server("my-devops-server")
+attesta = Attesta.from_config("attesta.yaml")
+
+
+@server.list_tools()
+async def list_tools():
+    return [
+        {
+            "name": "run_bash",
+            "description": "Execute a bash command",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string"},
+                },
+                "required": ["command"],
+            },
+        },
+        {
+            "name": "read_file",
+            "description": "Read file contents",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                },
+                "required": ["path"],
+            },
+        },
+    ]
+
+
+@server.call_tool()
+@attesta_tool_handler(
+    attesta,
+    risk_overrides={"run_bash": "critical"},
+)
+async def call_tool(name: str, arguments: dict):
+    """Only executes if Attesta approves the tool call."""
+    if name == "run_bash":
+        import subprocess
+        result = subprocess.run(
+            arguments["command"], shell=True, capture_output=True, text=True,
+        )
+        return [TextContent(type="text", text=result.stdout)]
+
+    if name == "read_file":
+        with open(arguments["path"]) as f:
+            return [TextContent(type="text", text=f.read())]
+
+    return [TextContent(type="text", text=f"Unknown tool: {name}")]
+```
+
+### Behavior on Denial
+
+When a tool call is denied, the decorator returns an MCP-compatible `TextContent` error instead of calling the handler:
+
+```python
+[TextContent(
+    type="text",
+    text="Action denied by Attesta: run_bash (risk: critical, score: 0.92)",
+)]
+```
+
+The MCP client (editor/IDE) displays this message to the user. The handler function is **never executed**.
+
+<Note>
+The decorator sets `metadata={"source": "mcp"}` on all `ActionContext` objects. This allows you to write audit queries that filter for MCP-specific tool calls.
+</Note>
+
+---
+
+## Pattern 2: MCPProxy (Zero Code Changes)
+
+`MCPProxy` wraps **any** existing MCP server with Attesta approval. No modifications to the upstream server are needed. This is the recommended approach for enforcing organization-wide HITL policies across all MCP tools.
+
+### API
+
+```python
+MCPProxy(attesta, upstream_command, *, risk_overrides=None)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `attesta` | `Attesta` | A configured Attesta instance |
+| `upstream_command` | `list[str]` | Command to start the upstream MCP server |
+| `risk_overrides` | `dict[str, str] \| None` | Optional `{tool_name: risk_level}` mapping |
+
+**Methods:**
+
+| Method | Description |
+|---|---|
+| `run()` | Start the proxy. Blocks until the upstream server exits or the client disconnects. |
+
+### CLI Usage
+
+The simplest way to use the proxy is through the `attesta mcp wrap` CLI command:
+
+```bash
+# Wrap the filesystem MCP server
+attesta mcp wrap -- npx @modelcontextprotocol/server-filesystem /home/user/projects
+
+# Wrap a custom MCP server
+attesta mcp wrap -- python my_mcp_server.py
+
+# Wrap with a custom config file
+attesta mcp wrap --config attesta.yaml -- npx @modelcontextprotocol/server-github
+```
+
+### Editor Configuration
+
+Configure your editor to use the proxy instead of calling the MCP server directly:
+
+<CodeGroup>
+```json VS Code (settings.json)
+{
+  "mcp.servers": {
+    "filesystem": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap", "--",
+        "npx", "@modelcontextprotocol/server-filesystem", "/home/user/projects"
+      ]
+    }
+  }
+}
+```
+
+```json Claude Desktop (claude_desktop_config.json)
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap", "--",
+        "npx", "@modelcontextprotocol/server-filesystem", "/home/user/projects"
+      ]
+    }
+  }
+}
+```
+
+```json Cursor (.cursor/mcp.json)
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap", "--",
+        "npx", "@modelcontextprotocol/server-filesystem", "/home/user/projects"
+      ]
+    }
+  }
+}
+```
+</CodeGroup>
+
+### Programmatic Usage
+
+```python
+from attesta import Attesta
+from attesta.integrations.mcp import MCPProxy
+
+attesta = Attesta.from_config("attesta.yaml")
+
+proxy = MCPProxy(
+    attesta,
+    upstream_command=["npx", "@modelcontextprotocol/server-filesystem", "/path"],
+    risk_overrides={
+        "write_file": "high",
+        "delete_file": "critical",
+    },
+)
+
+# Blocks until the upstream server exits
+proxy.run()
+```
+
+---
+
+## How the Proxy Works
+
+<Steps>
+  <Step title="Startup">
+    The proxy spawns the upstream MCP server as a child process via `subprocess.Popen`, connected by stdin/stdout pipes. The upstream server's stderr passes through to the terminal for debugging.
+  </Step>
+  <Step title="Request Interception">
+    The proxy reads JSON-RPC messages from its own stdin (the MCP client). When it sees a `tools/call` request, it extracts the tool name and arguments for evaluation.
+  </Step>
+  <Step title="Attesta Evaluation">
+    The tool call is evaluated through `attesta.evaluate()` with an `ActionContext` containing:
+    - `function_name`: the tool name from the request
+    - `kwargs`: the tool arguments
+    - `metadata`: `{"source": "mcp_proxy"}`
+  </Step>
+  <Step title="Forwarding or Denial">
+    - **Approved**: the original request is forwarded to the upstream server's stdin. The response flows back through the proxy to the client.
+    - **Denied**: the proxy generates a JSON-RPC error response directly. The request never reaches the upstream server.
+  </Step>
+</Steps>
+
+### Denial Response Format
+
+Denied tool calls return a JSON-RPC response with `isError: true`:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 42,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action denied by Attesta: run_bash (risk: critical, score: 0.92). This action requires human approval that was not granted."
+      }
+    ],
+    "isError": true
+  }
+}
+```
+
+---
+
+## Protocol Support
+
+The proxy auto-detects the framing format used by the MCP client and server:
+
+| Format | Description | Used By |
+|---|---|---|
+| **Content-Length framing** | `Content-Length: N\r\n\r\n{...}` (official MCP/LSP spec) | Most MCP servers |
+| **Newline-delimited JSON** | One JSON object per line | Some MCP implementations |
+
+Both formats are supported transparently. The proxy always writes responses using Content-Length framing.
+
+---
+
+## Logging
+
+The proxy logs all approval and denial decisions to stderr (visible in the terminal, not sent to the MCP client):
+
+```
+[attesta] Attesta MCP proxy started, wrapping: npx @modelcontextprotocol/server-filesystem /path
+[attesta]   [approved] read_file (risk: low, score: 0.15)
+[attesta]   [DENIED]   write_file (risk: high, score: 0.72)
+[attesta]   [DENIED]   run_bash (risk: critical, score: 0.95)
+```
+
+<Warning>
+The proxy runs `attesta.evaluate()` synchronously using `asyncio.run()` for each intercepted tool call. This means tool calls are evaluated one at a time, which adds latency. For most MCP use cases (editor-driven tool calls), this is acceptable because humans are in the loop anyway.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="CLI Reference: mcp wrap" icon="terminal" href="/cli/mcp-wrap">
+    Full CLI options for attesta mcp wrap
+  </Card>
+  <Card title="Vercel AI SDK" icon="triangle" href="/integrations/vercel-ai">
+    TypeScript tool wrappers and middleware
+  </Card>
+</CardGroup>

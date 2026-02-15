@@ -1,0 +1,75 @@
+---
+title: "How It Works"
+description: "The 4-stage approval pipeline behind every gated action"
+icon: "diagram-project"
+---
+
+Every time a gated function is called, Attesta executes a 4-stage pipeline before the function runs. If any stage results in denial, the function is **never executed**.
+
+## The Pipeline
+
+<Steps>
+  <Step title="Risk Scoring">
+    The risk scorer analyzes the `ActionContext` — function name, arguments, docstring, caller-supplied hints, and novelty — to produce a continuous score between 0.0 and 1.0.
+
+    The score is then mapped to a discrete risk level:
+
+    | Score Range | Risk Level | Color  |
+    |-------------|-----------|--------|
+    | 0.0 – 0.3  | LOW       | Green  |
+    | 0.3 – 0.6  | MEDIUM    | Yellow |
+    | 0.6 – 0.8  | HIGH      | Red    |
+    | 0.8 – 1.0  | CRITICAL  | Bright Red |
+
+    If a trust engine is configured and the agent has a trust profile, the score is adjusted downward for trusted agents. **CRITICAL actions are never downgraded** — this is a safety invariant.
+  </Step>
+
+  <Step title="Challenge Selection">
+    Based on the risk level, a challenge type is selected from the challenge map:
+
+    | Risk Level | Default Challenge | What Happens |
+    |------------|-------------------|--------------|
+    | LOW        | `auto_approve`    | Action proceeds silently |
+    | MEDIUM     | `confirm`         | Y/N prompt with minimum review time |
+    | HIGH       | `quiz`            | Comprehension questions auto-generated from context |
+    | CRITICAL   | `multi_party`     | 2+ independent approvers, each with a sub-challenge |
+
+    The challenge map is fully configurable via `attesta.yaml` or constructor parameters.
+  </Step>
+
+  <Step title="Verification">
+    The selected challenge is presented to the human operator through the configured renderer (terminal UI, plain text, or custom).
+
+    - **Confirm** — Operator must wait a minimum review time, then type `y` to approve
+    - **Quiz** — 1–3 auto-generated questions about the action (file paths, parameters, SQL tables)
+    - **Teach-back** — Operator must explain what the action does in 15+ words, with key-term matching
+    - **Multi-party** — Each approver completes a different sub-challenge (teach-back -> quiz -> confirm)
+
+    If the challenge is failed or denied, the function is not executed and an `AttestaDenied` exception is raised.
+  </Step>
+
+  <Step title="Audit">
+    Every decision — approved, denied, timed out, or escalated — is recorded as an `AuditEntry` in a JSONL file. Entries are linked by a SHA-256 hash chain, making tampering detectable.
+
+    The audit entry captures:
+    - Action name, arguments, and description
+    - Risk score, level, and contributing factors
+    - Challenge type and whether it was passed
+    - Review duration and whether minimum review time was met
+    - Timestamps, agent ID, session ID, and environment
+  </Step>
+</Steps>
+
+## Trust Feedback Loop
+
+After each evaluation, the trust engine records the outcome:
+
+- **Approved actions** increase the agent's trust score (weighted by recency)
+- **Denied actions** are recorded but do not increase trust
+- **Security incidents** multiply a penalty factor, rapidly reducing trust
+
+Higher trust scores mean slightly lower effective risk on future actions — but trust **never bypasses CRITICAL actions** and is capped below 1.0.
+
+<Warning>
+The trust engine is a risk-reduction mechanism, not a bypass mechanism. CRITICAL-level actions always require full verification regardless of trust score.
+</Warning>

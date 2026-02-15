@@ -1,0 +1,254 @@
+---
+title: "n8n Integration"
+description: "Add human-in-the-loop approval to n8n workflows with the Attesta Approval node"
+icon: "diagram-project"
+---
+
+The `n8n-nodes-attesta` package provides the **Attesta Approval** node for [n8n](https://n8n.io). Place it before any action node in your workflow to gate AI agent actions through risk scoring and human approval.
+
+<Note>
+**Package:** `n8n-nodes-attesta` v0.1.0 | **Language:** TypeScript | **Dependency:** `@attesta/core ^0.1.0` | **Peer:** `n8n-workflow >=1.0.0`
+</Note>
+
+## Installation
+
+<Steps>
+  <Step title="Install the community node">
+    In your n8n instance, go to **Settings > Community Nodes** and install:
+
+    ```
+    n8n-nodes-attesta
+    ```
+
+    For self-hosted n8n, you can also install via the CLI:
+
+    ```bash
+    cd ~/.n8n
+    npm install n8n-nodes-attesta
+    ```
+  </Step>
+  <Step title="Restart n8n">
+    Restart your n8n instance to load the new node:
+
+    ```bash
+    n8n start
+    ```
+  </Step>
+  <Step title="Find the node">
+    Search for **"Attesta Approval"** in the node panel. It appears under the **AI** category.
+  </Step>
+</Steps>
+
+---
+
+## Credentials Setup
+
+The node optionally accepts **Attesta** credentials (`attestaApi`), which configure a default risk threshold:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| Risk Threshold | Number (0--1) | `0.5` | Actions scoring above this threshold are flagged for review |
+
+To configure:
+1. Go to **Credentials > New Credential**
+2. Search for **Attesta**
+3. Set the **Risk Threshold** value (a number between 0 and 1, with 0.1 step increments)
+4. Save and select the credential in the Attesta Approval node
+
+<Tip>
+Credentials are optional. If you do not configure them, the node uses the default Attesta risk scoring without a custom threshold.
+</Tip>
+
+---
+
+## Node Configuration
+
+The Attesta Approval node has four configurable properties:
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| **Function Name** | String | _(required)_ | Name of the action being gated (e.g., `send_email`, `delete_record`). Shown in the node subtitle via `={{$parameter["functionName"]}}`. |
+| **Risk Level** | Options | Auto (Score-based) | Override the risk level. Options: Auto, Low, Medium, High, Critical. |
+| **Risk Hints** | JSON | `{}` | JSON object of risk hints (e.g., `{"destructive": true, "pii": true}`). Must be valid JSON or the node throws an error. |
+| **On Denied** | Options | Error | What to do when denied. **Error** stops the workflow; **Passthrough** adds denial metadata and continues. |
+
+---
+
+## How It Works
+
+When the node executes, it processes each input item through the following steps:
+
+1. The configured **Function Name** and the item's JSON data are combined into an `ActionContext` with `environment: "production"` and `metadata: { source: "n8n", nodeId: <nodeId> }`.
+2. The `ActionContext` is passed to `attesta.evaluate()`, which runs risk scoring and challenge verification.
+3. Based on the verdict:
+   - **Approved** or **Modified**: The item passes through with `_attesta` metadata attached.
+   - **Denied**, **Timed Out**, or **Escalated**: Depending on the **On Denied** setting, the workflow either throws a `NodeOperationError` or passes the item through with denial metadata.
+
+---
+
+## Basic Usage
+
+### Example: Gate an Email Send
+
+```
+[Trigger] --> [AI Agent] --> [Attesta Approval] --> [Send Email]
+```
+
+1. Add an **Attesta Approval** node between your AI agent and the Send Email node.
+2. Set **Function Name** to `send_email`.
+3. Set **Risk Level** to `Auto (Score-based)` (the scorer detects "send" as a mutating verb).
+4. Connect the output to the Send Email node.
+
+When the workflow runs:
+- The node evaluates the input data through Attesta's risk scorer
+- If approved, data flows through with `_attesta` metadata attached
+- If denied and **On Denied** is "Error", the workflow stops with an error message
+
+### Example: Gate a Database Delete
+
+1. Set **Function Name** to `delete_records`.
+2. Set **Risk Level** to `Critical` (force multi-party approval).
+3. Set **Risk Hints** to:
+   ```json
+   {"destructive": true, "affected_rows": 5000}
+   ```
+4. Set **On Denied** to `Error`.
+
+---
+
+## Output Format
+
+The node adds an `_attesta` object to each output item's JSON:
+
+<Tabs>
+  <Tab title="Approved">
+    ```json
+    {
+      "to": "user@example.com",
+      "subject": "Hello",
+      "_attesta": {
+        "verdict": "approved",
+        "riskScore": 0.2,
+        "riskLevel": "low",
+        "auditEntryId": "audit-abc123",
+        "denied": false
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Denied (Passthrough)">
+    ```json
+    {
+      "to": "user@example.com",
+      "subject": "Hello",
+      "_attesta": {
+        "verdict": "denied",
+        "riskScore": 0.8,
+        "riskLevel": "high",
+        "auditEntryId": "audit-def456",
+        "denied": true
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+Use the `_attesta.denied` field in an **IF** node downstream to route approved and denied items to different branches. This is useful with Passthrough mode when you want to log denials instead of stopping the workflow.
+</Tip>
+
+---
+
+## Denial Modes
+
+### Error Mode (default)
+
+Stops the workflow with a descriptive `NodeOperationError`:
+
+```
+Action "delete_records" denied by Attesta (risk: critical, score: 0.92)
+```
+
+Use this when denied actions should halt the entire workflow.
+
+### Passthrough Mode
+
+Continues the workflow with denial metadata attached. Downstream nodes receive the item with `_attesta.denied: true`.
+
+Use this when you want to:
+- Route denied items to a logging or notification node
+- Continue processing other items in a batch
+- Let downstream logic decide how to handle denials
+
+---
+
+## Batch Processing
+
+The Attesta node iterates over every input item independently. In a batch of 5 items, some may be approved while others are denied:
+
+```
+Input:  [item1, item2, item3, item4, item5]
+Output: [item1 approved, item2 denied, item3 approved, item4 approved, item5 denied]
+```
+
+Each item's input JSON is passed as `kwargs` to the `ActionContext`. The risk scorer analyzes the contents of each item separately.
+
+<Note>
+In **Error** mode, the workflow stops at the first denied item. In **Passthrough** mode, all items are processed and denied items are marked with `_attesta.denied: true`.
+</Note>
+
+---
+
+## Workflow Patterns
+
+### Pattern: Gate Before Action
+
+The simplest pattern -- place the gate directly before the action node:
+
+```
+[Webhook Trigger] --> [Attesta Approval] --> [HTTP Request]
+                       functionName: "api_call"
+                       riskLevel: "auto"
+```
+
+### Pattern: Conditional Routing
+
+Use Passthrough mode with an IF node to route approved and denied items:
+
+```
+[AI Agent] --> [Attesta Approval] --> [IF _attesta.denied] --> [Send Email]
+                onDenied: "passthrough"          |
+                                                 --> [Log Denial]
+```
+
+### Pattern: Multi-Step Approval
+
+Chain multiple Attesta nodes for escalating approval:
+
+```
+[Trigger] --> [Attesta: review]    --> [Attesta: approve]     --> [Execute]
+               riskLevel: "medium"      riskLevel: "critical"
+```
+
+<Warning>
+Each Attesta node creates an independent `Attesta` instance. They do not share trust state or audit context within the same workflow execution. If you need coordinated multi-step approval, consider using the [code-based integration](/integrations/overview) with a shared `Attesta` instance instead.
+</Warning>
+
+---
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="Flowise Integration" icon="robot" href="/no-code/flowise">
+    Tool component for Flowise chatflows
+  </Card>
+  <Card title="Langflow Integration" icon="wind" href="/no-code/langflow">
+    Python component for Langflow pipelines
+  </Card>
+  <Card title="Dify Integration" icon="plug" href="/no-code/dify">
+    Plugin tool for the Dify platform
+  </Card>
+  <Card title="No-Code Overview" icon="grid-2" href="/no-code/overview">
+    Compare all no-code platforms
+  </Card>
+</CardGroup>

@@ -1,0 +1,24 @@
+identity:
+  author: attesta
+  name: attesta
+  label:
+    en_US: Attesta
+    zh_Hans: Attesta
+  description:
+    en_US: Human-in-the-loop approval for AI agent actions
+    zh_Hans: AI agent action approval
+  icon: icon.svg
+credentials_for_provider:
+  risk_threshold:
+    type: number
+    required: false
+    default: 0.5
+    label:
+      en_US: Risk Threshold
+      zh_Hans: Risk Threshold
+    placeholder:
+      en_US: "0.5"
+    help:
+      en_US: Default risk threshold (0-1). Actions scoring above this are flagged for review.
+tools:
+  - tools/attesta_gate.yaml

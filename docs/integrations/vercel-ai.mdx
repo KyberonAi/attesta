@@ -1,0 +1,275 @@
+---
+title: "Vercel AI SDK"
+description: "Wrap Vercel AI SDK tools and intercept tool calls with Attesta middleware (TypeScript)"
+icon: "triangle"
+---
+
+Attesta integrates with the Vercel AI SDK (`ai` package) through two mechanisms:
+
+1. **`gatedVercelTool`** -- wraps a single tool definition with Attesta approval before `execute` runs.
+2. **`createAttestaMiddleware`** -- returns middleware that intercepts all tool calls in `generateText` / `streamText` pipelines.
+
+Both are TypeScript-only and ship with `@attesta/core`.
+
+## Installation
+
+```bash
+npm install @attesta/core ai
+```
+
+---
+
+## Tool Wrapper: gatedVercelTool
+
+Wraps a Vercel AI SDK `tool()` definition. The wrapped tool runs the full Attesta evaluation pipeline before delegating to the original `execute` function.
+
+### API
+
+```typescript
+gatedVercelTool<T extends VercelAIToolLike>(
+  name: string,
+  tool: T,
+  options?: GatedVercelToolOptions
+): T
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `name` | `string` | Action name for the `ActionContext` |
+| `tool` | `T` | A Vercel AI SDK tool definition |
+| `options` | `GatedVercelToolOptions` | Configuration options (see below) |
+
+**GatedVercelToolOptions:**
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `agentId` | `string` | -- | Agent ID attached to every action context |
+| `sessionId` | `string` | -- | Session ID for tracking |
+| `environment` | `string` | `"development"` | Environment name |
+| `metadata` | `Record<string, unknown>` | `{}` | Extra metadata |
+| `riskHints` | `Record<string, unknown>` | -- | Risk hints for the scorer |
+| `riskOverride` | `string` | -- | Force a specific risk level |
+| `onDenied` | `(result) => unknown` | throws `AttestaDenied` | Custom denial handler |
+
+### Full Example
+
+```typescript
+import { tool, generateText } from "ai";
+import { z } from "zod";
+import { openai } from "@ai-sdk/openai";
+import { gatedVercelTool } from "@attesta/core/integrations";
+
+// Define a tool
+const deleteFileTool = tool({
+  description: "Delete a file from the filesystem",
+  parameters: z.object({
+    path: z.string().describe("Absolute file path to delete"),
+  }),
+  execute: async ({ path }) => {
+    // This only runs if Attesta approves
+    await fs.unlink(path);
+    return `Deleted ${path}`;
+  },
+});
+
+// Wrap with Attesta
+const safeDeleteTool = gatedVercelTool("deleteFile", deleteFileTool, {
+  agentId: "file-manager",
+  environment: "production",
+  riskHints: { destructive: true },
+});
+
+// Use in generateText
+const result = await generateText({
+  model: openai("gpt-4o"),
+  tools: { deleteFile: safeDeleteTool },
+  prompt: "Delete the old log file at /var/log/app.log",
+});
+```
+
+### Behavior on Denial
+
+By default, `gatedVercelTool` throws an `AttestaDenied` error when a tool call is denied:
+
+```typescript
+AttestaDenied: Action "deleteFile" denied by attesta. Risk: critical (0.92).
+```
+
+You can customize this with the `onDenied` callback:
+
+```typescript
+const safeDeleteTool = gatedVercelTool("deleteFile", deleteFileTool, {
+  onDenied: (result) => {
+    return {
+      error: `Denied (risk: ${result.riskAssessment.level})`,
+      suggestion: "Try a less destructive approach",
+    };
+  },
+});
+```
+
+<Note>
+`gatedVercelTool` creates a **shallow copy** of the original tool with the wrapped `execute` function. The original tool object is not mutated. If the tool has no `execute` function, the original tool is returned unchanged.
+</Note>
+
+---
+
+## Middleware: createAttestaMiddleware
+
+Returns an object with `experimental_onToolCall` that can be spread into `generateText` or `streamText` options. This intercepts **all** tool calls in the pipeline, not just individually wrapped tools.
+
+### API
+
+```typescript
+createAttestaMiddleware(options?: AttestaMiddlewareOptions): {
+  experimental_onToolCall: (params) => Promise<void>;
+}
+```
+
+**AttestaMiddlewareOptions:**
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `agentId` | `string` | -- | Agent ID |
+| `sessionId` | `string` | -- | Session ID |
+| `environment` | `string` | `"development"` | Environment name |
+| `metadata` | `Record<string, unknown>` | `{}` | Extra metadata (includes `vercelToolName` automatically) |
+| `riskHints` | `Record<string, unknown>` | -- | Risk hints |
+| `getActionName` | `(toolName, args) => string` | identity | Custom function to derive the action name from the tool name |
+
+### Full Example
+
+```typescript
+import { generateText, tool } from "ai";
+import { z } from "zod";
+import { openai } from "@ai-sdk/openai";
+import { createAttestaMiddleware } from "@attesta/core/integrations";
+
+// Create middleware
+const attesta = createAttestaMiddleware({
+  agentId: "data-pipeline",
+  environment: "production",
+  riskHints: { pii: true },
+});
+
+// Define tools (not individually wrapped)
+const tools = {
+  queryDatabase: tool({
+    description: "Run a SQL query",
+    parameters: z.object({ sql: z.string() }),
+    execute: async ({ sql }) => {
+      return await db.query(sql);
+    },
+  }),
+  exportData: tool({
+    description: "Export data to CSV",
+    parameters: z.object({ table: z.string(), path: z.string() }),
+    execute: async ({ table, path }) => {
+      return await exportToCsv(table, path);
+    },
+  }),
+};
+
+// Use middleware -- it intercepts ALL tool calls
+const result = await generateText({
+  model: openai("gpt-4o"),
+  tools,
+  prompt: "Export the users table to /tmp/users.csv",
+  ...attesta,  // Spreads experimental_onToolCall
+});
+```
+
+### Behavior on Denial
+
+The middleware throws `AttestaDenied` when a tool call is denied. Unlike `gatedVercelTool`, there is no `onDenied` callback -- the error propagates to the caller:
+
+```typescript
+try {
+  const result = await generateText({
+    model: openai("gpt-4o"),
+    tools,
+    prompt: "DROP TABLE users",
+    ...attesta,
+  });
+} catch (error) {
+  if (error instanceof AttestaDenied) {
+    console.log("Tool call denied:", error.message);
+    // "Tool call "queryDatabase" denied by attesta. Risk: critical (0.95)."
+  }
+}
+```
+
+---
+
+## Streaming with streamText
+
+The middleware works with `streamText` as well:
+
+```typescript
+import { streamText } from "ai";
+import { createAttestaMiddleware } from "@attesta/core/integrations";
+
+const attesta = createAttestaMiddleware({
+  agentId: "chat-agent",
+  environment: "production",
+});
+
+const result = await streamText({
+  model: openai("gpt-4o"),
+  tools,
+  prompt: "Analyze and clean the dataset",
+  ...attesta,
+});
+
+for await (const chunk of result.textStream) {
+  process.stdout.write(chunk);
+}
+```
+
+<Tip>
+When using `streamText`, the `experimental_onToolCall` hook fires before the tool executes. If the tool call is denied, the `AttestaDenied` error interrupts the stream. Make sure your error handling accounts for stream interruption.
+</Tip>
+
+---
+
+## Custom Action Names
+
+Use `getActionName` to derive meaningful action names from tool calls:
+
+```typescript
+const attesta = createAttestaMiddleware({
+  getActionName: (toolName, args) => {
+    // Prefix with the module for better audit trails
+    if (toolName.startsWith("db_")) return `database.${toolName}`;
+    if (toolName.startsWith("fs_")) return `filesystem.${toolName}`;
+    return toolName;
+  },
+});
+```
+
+This is useful when tool names are generic (e.g., `query`, `execute`) but the risk depends on the context.
+
+---
+
+## Tool Wrapper vs. Middleware
+
+| Feature | `gatedVercelTool` | `createAttestaMiddleware` |
+|---|---|---|
+| Scope | Single tool | All tools in the pipeline |
+| Denial handling | `onDenied` callback or `AttestaDenied` | `AttestaDenied` only |
+| Per-tool config | Yes (different options per tool) | No (same options for all tools) |
+| Tool mutation | Creates shallow copy | No mutation |
+| Best for | Fine-grained per-tool policies | Blanket approval across all tools |
+
+<Warning>
+Do not combine `gatedVercelTool` and `createAttestaMiddleware` on the same tool. This would evaluate the tool call twice -- once by the wrapper and once by the middleware. Use one or the other.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="LangChain (TS)" icon="link-horizontal" href="/integrations/langchain">
+    TypeScript LangChain integration
+  </Card>
+  <Card title="Integrations Overview" icon="puzzle-piece" href="/integrations/overview">
+    Compare all framework integrations
+  </Card>
+</CardGroup>

@@ -1,0 +1,94 @@
+# Attesta Configuration
+# Copy to attesta.yaml and customize for your project.
+# Requires: pip install attesta[yaml]
+
+# ---------------------------------------------------------------------------
+# Domain Profiles (optional)
+# ---------------------------------------------------------------------------
+# Activate registered domain profiles by name.
+# Register profiles with attesta.domains.presets.register_preset()
+# before loading this config.
+#
+# domain: my-industry
+#
+# Or activate multiple domains (profiles are merged):
+# domain:
+#   - my-industry
+#   - another-domain
+#
+# Domain strictness (default: true):
+# - true  -> fail fast if a configured domain preset is missing
+# - false -> warn and continue without domain scoring
+# domain_strict: false
+
+# ---------------------------------------------------------------------------
+# Policy
+# ---------------------------------------------------------------------------
+policy:
+  # Minimum seconds the operator must review before approving.
+  # Prevents rubber-stamping by enforcing a per-risk-level delay.
+  minimum_review_seconds:
+    low: 0
+    medium: 3
+    high: 10
+    critical: 30
+
+  # Number of independent approvers required per risk level.
+  # Only levels listed here require multi-party approval.
+  require_multi_party:
+    critical: 2
+
+  # What happens when a challenge times out or the system cannot
+  # reach a human operator.
+  #   "deny"     — block the action (safest, default)
+  #   "allow"    — permit the action (use only in development)
+  #   "escalate" — forward to a secondary approver or webhook
+  fail_mode: deny
+
+  # Maximum seconds to wait for the operator to complete a challenge
+  # before the fail_mode policy kicks in.
+  timeout_seconds: 300
+
+# ---------------------------------------------------------------------------
+# Risk Scoring
+# ---------------------------------------------------------------------------
+risk:
+  # Force specific actions to a fixed risk level, regardless of
+  # what the scorer calculates.
+  overrides:
+    deploy_production: critical
+    read_config: low
+
+  # Regex-based score amplifiers. If the action name matches the
+  # pattern, the risk score is boosted by the given amount (additive).
+  amplifiers:
+    - pattern: ".*production.*"
+      boost: 0.3
+    - pattern: ".*delete.*"
+      boost: 0.2
+
+# ---------------------------------------------------------------------------
+# Trust Engine
+# ---------------------------------------------------------------------------
+trust:
+  # Maximum risk reduction that a fully-trusted agent can receive.
+  # A value of 0.3 means trust can lower the risk score by up to 0.3.
+  influence: 0.3
+
+  # Hard cap on the trust score. Prevents any agent from reaching
+  # full trust (1.0), maintaining healthy skepticism.
+  ceiling: 0.9
+
+  # Starting trust score for agents with no history.
+  initial_score: 0.3
+
+  # Trust decay per day of agent inactivity. Ensures idle agents
+  # gradually lose accumulated trust.
+  decay_rate: 0.01
+
+# ---------------------------------------------------------------------------
+# Audit Trail
+# ---------------------------------------------------------------------------
+audit:
+  # Path to the JSONL audit log (SHA-256 hash-chained).
+  path: ".attesta/audit.jsonl"

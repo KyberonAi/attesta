@@ -1,0 +1,831 @@
+---
+title: "Multi-Framework Example"
+description: "Share a single attesta.yaml across LangChain, OpenAI Agents SDK, and Anthropic Claude for unified risk policies, trust scores, and audit trails"
+icon: "puzzle-piece"
+---
+
+This example demonstrates the core value proposition of Attesta: **one configuration file, one audit trail, one trust engine** -- regardless of which AI framework executes the tool call. You will define a single `attesta.yaml` and use it with LangChain, OpenAI Agents SDK, and Anthropic Claude simultaneously. All three frameworks share the same risk scoring, challenge policies, and tamper-proof audit log.
+
+## Why Multi-Framework Matters
+
+When your application uses multiple AI frameworks, each framework typically has its own tool execution path. Without a shared governance layer:
+
+- Risk policies are duplicated and drift apart
+- Trust scores are fragmented -- an agent trusted in LangChain starts from zero in OpenAI
+- Audit logs are scattered in different formats, making compliance audits painful
+- Rubber-stamp detection cannot correlate approval patterns across frameworks
+
+A shared Attesta instance solves all of these problems with a single `attesta.yaml`.
+
+---
+
+## Configuration
+
+This config works identically across all three frameworks:
+
+```yaml attesta.yaml
+# ─── Domain Profile ───────────────────────────────────────────────
+# domain: my-domain  # Optional: activate a registered domain profile
+
+# ─── Policy ───────────────────────────────────────────────────────
+policy:
+  minimum_review_seconds:
+    low: 0
+    medium: 3
+    high: 10
+    critical: 30
+
+  require_multi_party:
+    critical: 2
+
+  fail_mode: deny
+  timeout_seconds: 300
+
+# ─── Risk Scoring ─────────────────────────────────────────────────
+risk:
+  overrides:
+    deploy_to_production: critical
+    delete_database: critical
+    modify_firewall: critical
+
+  amplifiers:
+    - pattern: ".*production.*"
+      boost: 0.3
+    - pattern: ".*delete.*"
+      boost: 0.2
+    - pattern: ".*deploy.*"
+      boost: 0.15
+
+# ─── Trust Engine ─────────────────────────────────────────────────
+trust:
+  influence: 0.3
+  ceiling: 0.9
+  initial_score: 0.3
+  decay_rate: 0.01
+
+# ─── Audit ────────────────────────────────────────────────────────
+audit:
+  path: ".attesta/unified-audit.jsonl"
+```
+
+<Note>
+The key insight is that `attesta.yaml` is framework-agnostic. It defines **what** your policies are -- the integrations handle **how** they are enforced in each framework's tool execution path.
+</Note>
+
+---
+
+## Architecture
+
+<Steps>
+  <Step title="attesta.yaml">
+    A single configuration file defines all policies, risk scoring, and trust settings.
+  </Step>
+  <Step title="Shared Attesta Instance">
+    One `Attesta` instance loads the config and serves all frameworks.
+  </Step>
+  <Step title="Framework agents execute tool calls">
+    - **LangChain Agent** -- uses `AttestaToolWrapper`
+    - **OpenAI Agent** -- uses `attesta_approval_handler`
+    - **Anthropic Claude** -- uses `AttestaToolGate`
+  </Step>
+  <Step title="Shared Audit Trail and Trust Store">
+    - **Audit Trail** -- `.attesta/unified-audit.jsonl` (single hash-chained log)
+    - **Trust Store** -- `.attesta/trust.json` (unified per-agent trust scores)
+  </Step>
+</Steps>
+
+Every tool call from every framework flows through the same Attesta instance -- same risk scorer, same challenge map, same audit log.
+
+---
+
+## Shared Tools Module
+
+First, define the tool functions that all frameworks will use. These are plain Python functions with Attesta gating.
+
+```python shared_tools.py
+from attesta import Attesta
+from attesta import AttestaDenied
+
+# Single Attesta instance shared across all frameworks
+attesta = Attesta.from_config("attesta.yaml")
+
+
+# ─── Low risk: read-only operations ──────────────────────────────
+@attesta.gate()
+def get_service_status(service: str) -> dict:
+    """Check the health status of a service. Read-only."""
+    return {
+        "service": service,
+        "status": "healthy",
+        "version": "2.0.3",
+        "uptime": "99.97%",
+    }
+
+
+@attesta.gate()
+def list_services(environment: str = "production") -> dict:
+    """List all services in an environment. Read-only."""
+    return {
+        "environment": environment,
+        "services": [
+            {"name": "api-gateway", "version": "2.0.3", "status": "healthy"},
+            {"name": "auth-service", "version": "1.8.1", "status": "healthy"},
+            {"name": "worker", "version": "3.2.0", "status": "healthy"},
+        ],
+    }
+
+
+# ─── Medium risk: state-changing but reversible ──────────────────
+@attesta.gate(risk_hints={"affects_config": True})
+def update_config(
+    service: str, key: str, value: str, environment: str = "staging"
+) -> dict:
+    """Update a configuration value for a service."""
+    return {
+        "service": service,
+        "key": key,
+        "value": value,
+        "environment": environment,
+        "status": "config_updated",
+    }
+
+
+# ─── High risk: production database query ────────────────────────
+@attesta.gate(risk_hints={"production": True, "database": True})
+def execute_query(query: str, database: str = "primary") -> dict:
+    """Execute a SQL query against a production database.
+
+    Read queries are lower risk; write queries are flagged by the
+    risk scorer based on SQL verb detection (INSERT, UPDATE, DELETE).
+    """
+    return {
+        "query": query,
+        "database": database,
+        "rows_affected": 0,
+        "status": "query_executed",
+    }
+
+
+# ─── Critical risk: production deployment ────────────────────────
+@attesta.gate(risk_hints={"production": True})
+def deploy_to_production(
+    service: str, version: str, strategy: str = "canary"
+) -> dict:
+    """Deploy a service to the production environment.
+
+    This is a critical action requiring multi-party approval from
+    the SRE lead and release manager.
+    """
+    return {
+        "deployment_id": "DEP-2026-042",
+        "service": service,
+        "version": version,
+        "environment": "production",
+        "strategy": strategy,
+        "status": "deployed",
+    }
+
+
+# ─── Critical risk: destructive operations ───────────────────────
+@attesta.gate(risk_hints={"destructive": True, "production": True})
+def delete_database(database: str, confirm_name: str) -> dict:
+    """Delete a production database. Irreversible.
+
+    The confirm_name parameter must match the database name exactly
+    as a safety check.
+    """
+    if confirm_name != database:
+        raise ValueError("Confirmation name does not match database name")
+    return {
+        "database": database,
+        "status": "deleted",
+    }
+```
+
+---
+
+## Framework 1: LangChain
+
+<Steps>
+  <Step title="Install LangChain dependencies">
+    ```bash
+    pip install attesta[langchain] langchain-openai
+    ```
+  </Step>
+
+  <Step title="Create the LangChain agent">
+    ```python langchain_agent.py
+    from langchain_openai import ChatOpenAI
+    from langchain_core.tools import StructuredTool
+    from langchain.agents import AgentExecutor, create_tool_calling_agent
+    from langchain_core.prompts import ChatPromptTemplate
+
+    from attesta.integrations.langchain import AttestaToolWrapper
+    from shared_tools import (
+        attesta,
+        get_service_status,
+        list_services,
+        update_config,
+        execute_query,
+        deploy_to_production,
+    )
+
+    # Create LangChain tools
+    tools = [
+        StructuredTool.from_function(get_service_status),
+        StructuredTool.from_function(list_services),
+        StructuredTool.from_function(update_config),
+        StructuredTool.from_function(execute_query),
+        StructuredTool.from_function(deploy_to_production),
+    ]
+
+    # Wrap with Attesta (risk overrides are in attesta.yaml)
+    wrapper = AttestaToolWrapper(attesta)
+    protected_tools = wrapper.wrap_tools(tools)
+
+    # Build the agent
+    llm = ChatOpenAI(model="gpt-4o")
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a DevOps assistant. Help with deployments and monitoring."),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
+
+    agent = create_tool_calling_agent(llm, protected_tools, prompt)
+    executor = AgentExecutor(agent=agent, tools=protected_tools)
+
+
+    if __name__ == "__main__":
+        # This tool call goes through Attesta, scored by the shared instance
+        result = executor.invoke({
+            "input": "Deploy api-gateway v2.1.0 to production with canary strategy"
+        })
+        print(f"LangChain result: {result['output']}")
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Framework 2: OpenAI Agents SDK
+
+<Steps>
+  <Step title="Install OpenAI dependencies">
+    ```bash
+    pip install attesta[openai] openai-agents
+    ```
+  </Step>
+
+  <Step title="Create the OpenAI agent">
+    ```python openai_agent.py
+    import asyncio
+    from openai.agents import Agent, Runner
+    from attesta.integrations.openai_sdk import (
+        attesta_approval_handler,
+        AttestaGuardrail,
+    )
+    from shared_tools import (
+        attesta,
+        get_service_status,
+        execute_query,
+        deploy_to_production,
+    )
+
+    # Define the agent with tool guardrails
+    agent = Agent(
+        name="Database Operations Agent",
+        instructions=(
+            "You help manage database operations and deployments. "
+            "Always verify query syntax before executing. "
+            "If an action is denied, explain the compliance requirement."
+        ),
+        tools=[get_service_status, execute_query, deploy_to_production],
+        tool_guardrails=[AttestaGuardrail(attesta)],
+    )
+
+
+    async def run_openai_agent(user_message: str) -> str:
+        """Run the OpenAI agent with Attesta approval gating."""
+        result = await Runner.run(
+            agent,
+            input=user_message,
+            approval_handler=attesta_approval_handler(attesta),
+        )
+        return result.final_output
+
+
+    if __name__ == "__main__":
+        # This tool call goes through the SAME Attesta instance
+        result = asyncio.run(
+            run_openai_agent(
+                "Run SELECT count(*) FROM orders WHERE status='pending' "
+                "on the primary database."
+            )
+        )
+        print(f"OpenAI result: {result}")
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Framework 3: Anthropic Claude
+
+<Steps>
+  <Step title="Install Anthropic dependencies">
+    ```bash
+    pip install attesta[anthropic] anthropic
+    ```
+  </Step>
+
+  <Step title="Create the Claude agent">
+    ```python claude_agent.py
+    import asyncio
+    from anthropic import Anthropic
+    from attesta.integrations.anthropic import AttestaToolGate
+    from shared_tools import (
+        attesta,
+        get_service_status,
+        list_services,
+        update_config,
+        deploy_to_production,
+    )
+
+    # Tool definitions for Claude
+    TOOLS = [
+        {
+            "name": "get_service_status",
+            "description": "Check the health status of a service.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "service": {"type": "string", "description": "Service name"},
+                },
+                "required": ["service"],
+            },
+        },
+        {
+            "name": "list_services",
+            "description": "List all services in an environment.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "environment": {
+                        "type": "string",
+                        "default": "production",
+                    },
+                },
+                "required": [],
+            },
+        },
+        {
+            "name": "update_config",
+            "description": "Update a configuration value for a service.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "service": {"type": "string"},
+                    "key": {"type": "string"},
+                    "value": {"type": "string"},
+                    "environment": {"type": "string", "default": "staging"},
+                },
+                "required": ["service", "key", "value"],
+            },
+        },
+        {
+            "name": "deploy_to_production",
+            "description": "Deploy a service to production. Requires multi-party approval.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "service": {"type": "string"},
+                    "version": {"type": "string"},
+                    "strategy": {
+                        "type": "string",
+                        "enum": ["canary", "rolling", "blue-green"],
+                        "default": "canary",
+                    },
+                },
+                "required": ["service", "version"],
+            },
+        },
+    ]
+
+    TOOL_FUNCTIONS = {
+        "get_service_status": get_service_status,
+        "list_services": list_services,
+        "update_config": update_config,
+        "deploy_to_production": deploy_to_production,
+    }
+
+    # Attesta gate -- uses the SAME shared instance
+    gate = AttestaToolGate(attesta)
+
+
+    async def run_claude_agent(user_message: str) -> str:
+        """Run the Claude agent with Attesta gating."""
+        client = Anthropic()
+        messages = [{"role": "user", "content": user_message}]
+
+        for turn in range(10):
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=(
+                    "You are a DevOps assistant. Help with service "
+                    "management and production deployments."
+                ),
+                tools=TOOLS,
+                messages=messages,
+            )
+
+            if response.stop_reason == "end_turn":
+                for block in response.content:
+                    if block.type == "text":
+                        return block.text
+                break
+
+            results = []
+            for block in response.content:
+                if block.type != "tool_use":
+                    continue
+
+                # Gate through the SAME Attesta instance
+                approved, eval_result = await gate.evaluate_tool_use(block)
+
+                if approved:
+                    func = TOOL_FUNCTIONS[block.name]
+                    output = func(**block.input)
+                    results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": str(output),
+                    })
+                else:
+                    level = eval_result.risk_assessment.level.value
+                    results.append(
+                        gate.make_denial_result(
+                            block.id, reason=f"risk: {level}"
+                        )
+                    )
+
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": results})
+
+        return "Max turns reached"
+
+
+    if __name__ == "__main__":
+        # This tool call goes through the SAME Attesta instance
+        result = asyncio.run(
+            run_claude_agent(
+                "Check the status of api-gateway, then deploy v2.1.0 "
+                "to production with a canary strategy."
+            )
+        )
+        print(f"Claude result: {result}")
+    ```
+  </Step>
+</Steps>
+
+---
+
+## TypeScript: All Three Frameworks
+
+The same pattern works in TypeScript. A single `Attesta` instance is shared across all framework integrations.
+
+```typescript multi-framework.ts
+import { Attesta, createActionContext, Verdict } from "@attesta/core";
+import { gatedTool } from "@attesta/core/integrations";
+
+// ─── Shared Attesta instance ──────────────────────────────────────
+const attesta = new Attesta();
+
+// ─── Shared tool functions ────────────────────────────────────────
+async function getServiceStatus(service: string) {
+  return { service, status: "healthy", version: "2.0.3" };
+}
+
+async function deployToProduction(service: string, version: string) {
+  return { service, version, environment: "production", status: "deployed" };
+}
+
+// ─── LangChain integration ────────────────────────────────────────
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+
+const lcGetStatus = gatedTool(
+  tool(
+    async ({ service }) => JSON.stringify(await getServiceStatus(service)),
+    {
+      name: "get_service_status",
+      description: "Check service health",
+      schema: z.object({ service: z.string() }),
+    }
+  ),
+  { agentId: "devops-agent", environment: "production" }
+);
+
+const lcDeploy = gatedTool(
+  tool(
+    async ({ service, version }) =>
+      JSON.stringify(await deployToProduction(service, version)),
+    {
+      name: "deploy_to_production",
+      description: "Deploy to production",
+      schema: z.object({ service: z.string(), version: z.string() }),
+    }
+  ),
+  {
+    agentId: "devops-agent",
+    environment: "production",
+    riskHints: { production: true },
+  }
+);
+
+// ─── OpenAI integration ───────────────────────────────────────────
+// Uses the same attesta instance via createActionContext
+async function gateForOpenAI(
+  toolName: string,
+  args: Record<string, unknown>
+): Promise<boolean> {
+  const ctx = createActionContext({
+    functionName: toolName,
+    args: [],
+    kwargs: args,
+    hints: {},
+    environment: "production",
+    metadata: { source: "openai-agents" },
+  });
+
+  const result = await attesta.evaluate(ctx);
+  return result.verdict === Verdict.APPROVED;
+}
+
+// ─── Anthropic integration ────────────────────────────────────────
+// Uses the same attesta instance via createActionContext
+async function gateForClaude(
+  toolName: string,
+  args: Record<string, unknown>
+): Promise<boolean> {
+  const ctx = createActionContext({
+    functionName: toolName,
+    args: [],
+    kwargs: args,
+    hints: {},
+    environment: "production",
+    metadata: { source: "anthropic-claude" },
+  });
+
+  const result = await attesta.evaluate(ctx);
+  return result.verdict === Verdict.APPROVED;
+}
+
+// ─── All three frameworks use the same audit trail ────────────────
+async function main() {
+  // LangChain agent calls get_service_status
+  console.log("--- LangChain: get_service_status ---");
+  const statusResult = await lcGetStatus.invoke({ service: "api-gateway" });
+  console.log(statusResult);
+
+  // OpenAI agent calls deploy_to_production
+  console.log("\n--- OpenAI: deploy_to_production ---");
+  const openaiApproved = await gateForOpenAI("deploy_to_production", {
+    service: "api-gateway",
+    version: "2.1.0",
+  });
+  if (openaiApproved) {
+    console.log(await deployToProduction("api-gateway", "2.1.0"));
+  } else {
+    console.log("Deployment denied by Attesta");
+  }
+
+  // Claude agent calls get_service_status
+  console.log("\n--- Claude: get_service_status ---");
+  const claudeApproved = await gateForClaude("get_service_status", {
+    service: "auth-service",
+  });
+  if (claudeApproved) {
+    console.log(await getServiceStatus("auth-service"));
+  }
+}
+
+main().catch(console.error);
+```
+
+---
+
+## Running All Three Together
+
+Create a unified runner that exercises all three frameworks against the same Attesta instance:
+
+```python run_all_frameworks.py
+import asyncio
+from shared_tools import attesta
+
+# Import the three agents
+from langchain_agent import executor as langchain_executor
+from openai_agent import run_openai_agent
+from claude_agent import run_claude_agent
+
+
+async def main():
+    print("=" * 60)
+    print("MULTI-FRAMEWORK DEMO")
+    print("All three frameworks share the same attesta.yaml")
+    print("=" * 60)
+
+    # 1. LangChain: status check (LOW -- auto-approved)
+    print("\n--- LangChain Agent: Service Status (LOW) ---")
+    lc_result = langchain_executor.invoke({
+        "input": "What is the status of api-gateway?"
+    })
+    print(f"Result: {lc_result['output']}")
+
+    # 2. OpenAI: database query (HIGH -- quiz)
+    print("\n--- OpenAI Agent: Database Query (HIGH) ---")
+    oai_result = await run_openai_agent(
+        "Run SELECT count(*) FROM orders WHERE status='pending'"
+    )
+    print(f"Result: {oai_result}")
+
+    # 3. Claude: production deployment (CRITICAL -- multi-party)
+    print("\n--- Claude Agent: Production Deploy (CRITICAL) ---")
+    claude_result = await run_claude_agent(
+        "Deploy api-gateway v2.1.0 to production with canary strategy"
+    )
+    print(f"Result: {claude_result}")
+
+    # 4. LangChain: config update (MEDIUM -- confirm)
+    print("\n--- LangChain Agent: Config Update (MEDIUM) ---")
+    lc_result2 = langchain_executor.invoke({
+        "input": "Update the log_level to debug for api-gateway in staging"
+    })
+    print(f"Result: {lc_result2['output']}")
+
+    print("\n" + "=" * 60)
+    print("All actions recorded in a single audit trail")
+    print("=" * 60)
+
+
+asyncio.run(main())
+```
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+python run_all_frameworks.py
+```
+
+---
+
+## Unified Audit Trail
+
+After running all three frameworks, a single audit log at `.attesta/unified-audit.jsonl` contains every action from every framework:
+
+```bash
+attesta audit stats .attesta/unified-audit.jsonl
+```
+
+```
+Audit Statistics
+  Log file             : .attesta/unified-audit.jsonl
+
+  Totals
+    Total entries       : 4
+    Approved           : 4
+    Denied             : 0
+    Timed out          : 0
+
+  By Source
+    langchain          : 2   (get_service_status, update_config)
+    openai-agents      : 1   (execute_query)
+    anthropic-claude   : 1   (deploy_to_production)
+
+  Risk Distribution
+    Low                : 1   (get_service_status via LangChain)
+    Medium             : 1   (update_config via LangChain)
+    High               : 1   (execute_query via OpenAI)
+    Critical           : 1   (deploy_to_production via Claude)
+
+  Review Quality
+    Avg review time    : 14.2s
+    Rubber stamp rate  : 0.0%
+    Min review met     : 100%
+```
+
+Each audit entry includes a `metadata.source` field identifying which framework originated the action:
+
+```json
+{
+  "entry_id": "aud_mf_001",
+  "action_name": "deploy_to_production",
+  "risk_level": "critical",
+  "verdict": "approved",
+  "metadata": {
+    "source": "anthropic-claude",
+    "domain": "infrastructure"
+  }
+}
+```
+
+```json
+{
+  "entry_id": "aud_mf_002",
+  "action_name": "execute_query",
+  "risk_level": "high",
+  "verdict": "approved",
+  "metadata": {
+    "source": "openai-agents",
+    "domain": "infrastructure"
+  }
+}
+```
+
+Query actions across frameworks:
+
+```bash
+# All critical actions regardless of framework
+attesta audit export --risk-level critical .attesta/unified-audit.jsonl
+
+# All actions from a specific agent
+attesta audit export --agent "devops-agent" .attesta/unified-audit.jsonl
+
+# Verify the entire cross-framework chain
+attesta audit verify .attesta/unified-audit.jsonl
+
+# Output:
+# ✓ Chain integrity verified (4 entries)
+# ✓ Sources: langchain (2), openai-agents (1), anthropic-claude (1)
+# ✓ All minimum review times met
+```
+
+---
+
+## Cross-Framework Trust
+
+When multiple frameworks use the same `agent_id`, the trust engine maintains a unified trust profile. Trust earned in LangChain carries over to OpenAI and Claude.
+
+```bash
+attesta trust show devops-agent
+```
+
+```
+Trust Profile: devops-agent
+
+  Overall score  : 0.48
+  History entries : 4    # Includes actions from ALL frameworks
+  Incidents      : 0
+
+  Score Breakdown
+    LangChain actions    : 2  (both approved)
+    OpenAI actions       : 1  (approved)
+    Claude actions       : 1  (approved)
+
+  Effect on Risk
+    Current reduction    : -0.14  (influence * score = 0.3 * 0.48)
+    A LOW action (0.15)  : stays LOW  (0.15 - 0.14 = 0.01)
+    A HIGH action (0.65) : stays HIGH (0.65 - 0.14 = 0.51)
+```
+
+<Warning>
+Trust never bypasses CRITICAL actions. Even if an agent has maximum trust (0.9), a CRITICAL action still requires full multi-party verification. This is a safety invariant enforced by Attesta regardless of trust score.
+</Warning>
+
+---
+
+## What Gets Shared
+
+| Component | Shared Across Frameworks | Details |
+|-----------|-------------------------|---------|
+| Risk scorer | Yes | Same 5-factor scorer + domain patterns |
+| Challenge map | Yes | Same risk-to-challenge mapping |
+| Trust engine | Yes | Unified per-agent trust across all frameworks |
+| Audit trail | Yes | Single JSONL file with hash chain |
+| Risk overrides | Yes | Same overrides apply to all tool calls |
+| Amplifiers | Yes | Same regex amplifiers for all function names |
+| Domain profile | Yes | Same domain-specific patterns and escalation rules |
+| Review times | Yes | Same minimum review times for all challenges |
+
+<Tip>
+For production deployments, create a single `shared_tools.py` (Python) or `shared-tools.ts` (TypeScript) module that all your framework integrations import from. This ensures configuration changes propagate everywhere and the trust engine sees all agent activity in one place.
+</Tip>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="LangChain Integration" icon="link-horizontal" href="/integrations/langchain">
+    Full LangChain and LangGraph reference
+  </Card>
+  <Card title="OpenAI Agents SDK" icon="bolt" href="/integrations/openai-agents">
+    Approval handlers and guardrails
+  </Card>
+  <Card title="Anthropic Claude" icon="message-bot" href="/integrations/anthropic-claude">
+    Gate Claude tool_use blocks
+  </Card>
+  <Card title="Audit Trail" icon="file-shield" href="/concepts/audit-trail">
+    Tamper-proof logging across frameworks
+  </Card>
+</CardGroup>

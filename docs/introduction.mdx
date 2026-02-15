@@ -1,0 +1,173 @@
+---
+title: "Introduction"
+description: "Human-in-the-loop approval framework for AI agent actions"
+icon: "shield-check"
+---
+
+<Warning>
+**Early Release (v0.1.x)** — Attesta is under active development. The core API is functional and tested, but interfaces may change between minor versions. Pin your dependency to a specific version in production. [Report issues on GitHub](https://github.com/KyberonAi/attesta/issues).
+</Warning>
+
+<Note>
+**Attesta** = *Attestation* + *Gate*. Every AI agent action passes through a trust gate before it touches the real world.
+</Note>
+
+## The Problem: Approval Fatigue
+
+Every AI agent framework has a human-in-the-loop mechanism. LangChain has `HumanApprovalCallbackHandler`. CrewAI has `human_input=True`. OpenAI Agents SDK has handoffs. They all do the same thing: pause execution and ask a human to click **Yes** or **No**.
+
+**A human who sees 200 approval prompts a day stops reading them.** Approval fatigue turns your safety layer into a rubber stamp.
+
+{/* ── Option A (Default): Comparison Matrix ── */}
+
+| Capability | Baseline HITL | **Attesta** ✓ |
+|---|---|---|
+| **Risk awareness** | None — all actions get the same Y/N | 5-factor scoring auto-detects risk from function signature |
+| **Challenge depth** | Binary confirm for everything | Scales by risk: auto-approve → confirm → quiz → teach-back → multi-party |
+| **Approval fatigue** | High — every action prompts | Low — only risky actions surface; safe actions pass silently |
+| **Audit integrity** | Basic logs (if any) | SHA-256 hash-chained JSONL; tamper-evident |
+| **Multi-party support** | No | CRITICAL actions require 2+ independent approvers |
+| **Trust adaptation** | No | Bayesian trust engine; incidents instantly revoke trust |
+| **`drop_database()` outcome** | "Confirm? [Y/N]" → instant click → executed | Score 0.95 CRITICAL → multi-party review, 30s+ minimum, teach-back + quiz |
+
+<sub>Illustrative comparison; baseline behavior varies by framework.</sub>
+
+{/*
+── Option B (Alternative): Improved Tabs ──
+To switch, uncomment this block and comment out the table above.
+
+<Accordion title="Alternative view: side-by-side tabs">
+
+### Attesta
+
+Attesta gates every AI agent action through a risk-proportional approval pipeline.
+Low-risk actions pass silently; critical actions require proven comprehension.
+
+| Action | What Happens |
+|--------|-------------|
+| `get_user()` | Score 0.08 LOW → auto-approved silently |
+| `deploy_to_prod()` | Score 0.82 CRITICAL → multi-party: teach-back + quiz, 30s min review |
+| `drop_database()` | Score 0.95 CRITICAL → multi-party: 2+ approvers with different challenges |
+
+**Outcome:** Only risky actions surface. Approvers prove comprehension before approval.
+
+### Baseline HITL
+
+Standard HITL mechanisms pause execution and ask a human to click Yes or No.
+
+| Action | What Happens |
+|--------|-------------|
+| `get_user()` | "Confirm? [Y/N]" → Y → execute |
+| `deploy_to_prod()` | "Confirm? [Y/N]" → Y → execute |
+| `drop_database()` | "Confirm? [Y/N]" → Y → execute |
+
+**Outcome:** Every action gets the same prompt. No risk awareness. No comprehension check.
+
+<sub>Illustrative comparison; baseline behavior varies by framework.</sub>
+
+</Accordion>
+
+── End Option B ──
+*/}
+
+## The Attesta Pipeline
+
+AI agents can write code, execute shell commands, manage infrastructure, and access sensitive data. **Attesta ensures no high-risk action happens without informed human approval** — while letting low-risk actions fly through silently.
+
+<Frame>
+  <img src="/images/attesta-flow.svg" alt="Attesta approval pipeline: AI Agent → Risk Scoring → Trust Engine → Challenge Branching (LOW/MEDIUM/HIGH/CRITICAL) → Decision → Audit Trail → Trust Feedback Loop" />
+</Frame>
+
+## Core Pillars
+
+<CardGroup cols={2}>
+  <Card title="Risk-Aware Scoring" icon="gauge-high" color="#16A34A">
+    A 5-factor scoring engine analyzes the function name, arguments, docstring, caller hints, and call novelty. `get_user()` scores 0.1. `drop_database()` scores 0.95. The challenge scales accordingly — no manual risk tagging required.
+  </Card>
+  <Card title="Escalating Challenges" icon="lock" color="#15803D">
+    Low-risk actions pass through silently. High-risk actions require the approver to answer auto-generated comprehension questions. Critical actions require multiple independent approvers, each completing a different challenge type. You can't just click through.
+  </Card>
+  <Card title="Tamper-Proof Audit" icon="file-shield" color="#22C55E">
+    Every decision is recorded in a SHA-256 hash-chained log. Modify any entry and every subsequent hash breaks. `attesta audit verify` checks the entire chain. `attesta audit rubber-stamps` flags suspiciously fast approvals.
+  </Card>
+  <Card title="Adaptive Trust" icon="brain" color="#16A34A">
+    A Bayesian trust engine tracks each agent's approval history with exponential decay. Trusted agents see reduced friction over time. A single security incident instantly penalizes trust. Critical actions are immune to trust discounts — always fully gated.
+  </Card>
+</CardGroup>
+
+## What Makes Attesta Different
+
+1. **Risk is computed, not assumed** — The scorer auto-detects risk from the function signature. No manual tagging.
+2. **Challenges test comprehension** — Quiz and teach-back challenges force the approver to prove they understand the action.
+3. **Minimum review times** — A wall-clock minimum prevents instant approvals. 3s for medium, 10s for high, 30s+ for critical.
+4. **Trust is earned** — Agents build trust through consistent safe behavior. Incidents instantly revoke it.
+
+## Quick Example
+
+<CodeGroup>
+```python Python
+from attesta import gate
+
+@gate
+def deploy(service: str, version: str) -> str:
+    """Deploy a service to production."""
+    return f"Deployed {service} v{version}"
+
+# Attesta intercepts, scores risk, and prompts for approval
+deploy("api-gateway", "2.1.0")
+```
+
+```typescript TypeScript
+import { gate } from "@attesta/core";
+
+const deploy = gate(async (service: string, version: string) => {
+  return `Deployed ${service} v${version}`;
+});
+
+// Attesta intercepts, scores risk, and prompts for approval
+await deploy("api-gateway", "2.1.0");
+```
+</CodeGroup>
+
+## Risk Levels at a Glance
+
+| Score | Level | Default Challenge | Example |
+|-------|-------|-------------------|---------|
+| 0.0 - 0.3 | **LOW** | Auto-approve | `get_user_profile()` |
+| 0.3 - 0.6 | **MEDIUM** | Confirm (Y/N) | `send_email()` |
+| 0.6 - 0.8 | **HIGH** | Quiz (comprehension) | `deploy_service()` |
+| 0.8 - 1.0 | **CRITICAL** | Multi-party approval | `drop_database()` |
+
+## Works With
+
+<Tabs>
+  <Tab title="Code Frameworks">
+    LangChain, OpenAI Agents SDK, Anthropic Claude, CrewAI, MCP, Vercel AI SDK
+  </Tab>
+  <Tab title="No-Code Platforms">
+    n8n, Flowise, Langflow, Dify
+  </Tab>
+  <Tab title="Domain Profiles">
+    Custom domain profiles via `register_preset()` — define industry-specific risk patterns, escalation rules, and compliance references
+  </Tab>
+  <Tab title="Languages">
+    Python (full SDK + CLI + domain profiles) and TypeScript (core SDK + LangChain + Vercel AI)
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" color="#16A34A" href="/quickstart">
+    Get up and running in 5 minutes
+  </Card>
+  <Card title="How It Works" icon="diagram-project" color="#15803D" href="/how-it-works">
+    Understand the 4-stage approval pipeline
+  </Card>
+  <Card title="Integrations" icon="puzzle-piece" color="#22C55E" href="/integrations/overview">
+    Connect Attesta to your AI framework
+  </Card>
+  <Card title="Configuration" icon="gear" color="#16A34A" href="/configuration/attesta-yaml">
+    Customize policies, risk scoring, and trust
+  </Card>
+</CardGroup>

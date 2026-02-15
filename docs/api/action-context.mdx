@@ -1,0 +1,221 @@
+---
+title: "ActionContext"
+description: "Dataclass representing all information about a function call under review"
+icon: "crosshairs"
+---
+
+`ActionContext` is a dataclass that captures everything Attesta needs to know about a single function invocation. The `@gate` decorator builds it automatically from the wrapped call, but you can also construct one manually for programmatic use with `Attesta.evaluate()`.
+
+## Import
+
+<CodeGroup>
+```python Python
+from attesta import ActionContext
+```
+
+```typescript TypeScript
+import { ActionContext } from "@attesta/core";
+```
+</CodeGroup>
+
+## Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `function_name` | `str` | *required* | Qualified name of the function being gated (e.g., `"module.ClassName.method_name"`). |
+| `args` | `tuple` | `()` | Positional arguments passed to the function call. |
+| `kwargs` | `dict[str, Any]` | `{}` | Keyword arguments passed to the function call. |
+| `function_doc` | `str \| None` | `None` | The function's docstring. Used by the risk scorer to detect danger keywords and by quiz challenges to generate questions. |
+| `hints` | `dict[str, Any]` | `{}` | Caller-supplied risk hints. Merged with `risk_hints` from the `@gate` decorator. Common keys: `production`, `destructive`, `pii`, `risk_override`. |
+| `agent_id` | `str \| None` | `None` | Identifier for the AI agent making the call. Required for trust engine integration. |
+| `session_id` | `str \| None` | `None` | Session identifier for grouping related actions in audit logs and analysis. |
+| `environment` | `str` | `"development"` | Environment tag. The default risk scorer assigns higher base risk to `"production"`. |
+| `timestamp` | `datetime` | `datetime.now()` | When the action was intercepted. Auto-populated on construction. |
+| `source_code` | `str \| None` | `None` | Source code of the decorated function, extracted via `inspect.getsource()`. Available for quiz question generation and audit. |
+| `metadata` | `dict[str, Any]` | `{}` | Arbitrary metadata for custom scorers, renderers, or audit needs. Not used by the built-in pipeline. |
+
+## Construction
+
+### Automatic (via @gate)
+
+When you use the `@gate` decorator, `ActionContext` is built automatically from the live function call. The decorator populates `function_name` from `__qualname__`, extracts the docstring with `inspect.getdoc()`, and captures the source code with `inspect.getsource()`.
+
+<CodeGroup>
+```python Python
+from attesta import gate
+
+@gate(
+    agent_id="deploy-bot",
+    environment="production",
+    risk_hints={"pii": True},
+    metadata={"team": "platform"},
+)
+def export_data(table: str, format: str = "csv") -> str:
+    """Export data from a database table."""
+    return f"Exported {table}"
+
+# When called, the decorator builds:
+# ActionContext(
+#     function_name="export_data",
+#     args=("users",),
+#     kwargs={"format": "json"},
+#     function_doc="Export data from a database table.",
+#     hints={"pii": True},
+#     agent_id="deploy-bot",
+#     environment="production",
+#     source_code="def export_data(table: str, ...",
+#     metadata={"team": "platform"},
+# )
+export_data("users", format="json")
+```
+
+```typescript TypeScript
+import { gate } from "@attesta/core";
+
+const exportData = gate(
+  {
+    agentId: "deploy-bot",
+    environment: "production",
+    riskHints: { pii: true },
+    metadata: { team: "platform" },
+  },
+  async (table: string, format: string = "csv") => {
+    return `Exported ${table}`;
+  }
+);
+
+await exportData("users", "json");
+```
+</CodeGroup>
+
+### Manual Construction
+
+For framework integrations (LangChain, MCP, etc.) or testing, construct `ActionContext` directly.
+
+<CodeGroup>
+```python Python
+from attesta import ActionContext
+
+ctx = ActionContext(
+    function_name="execute_sql",
+    args=("DROP TABLE users",),
+    kwargs={},
+    function_doc="Execute raw SQL against the production database.",
+    hints={"destructive": True, "production": True},
+    agent_id="sql-agent-01",
+    session_id="sess_abc123",
+    environment="production",
+    metadata={"database": "main", "cluster": "us-east-1"},
+)
+```
+
+```typescript TypeScript
+import { ActionContext } from "@attesta/core";
+
+const ctx: ActionContext = {
+  functionName: "executeSql",
+  args: ["DROP TABLE users"],
+  kwargs: {},
+  functionDoc: "Execute raw SQL against the production database.",
+  hints: { destructive: true, production: true },
+  agentId: "sql-agent-01",
+  sessionId: "sess_abc123",
+  environment: "production",
+  metadata: { database: "main", cluster: "us-east-1" },
+};
+```
+</CodeGroup>
+
+## description Property
+
+A computed property that returns a human-readable one-liner describing the function call, formatted as `function_name(arg1, key=val)`.
+
+<CodeGroup>
+```python Python
+from attesta import ActionContext
+
+ctx = ActionContext(
+    function_name="deploy",
+    args=("api-gateway", "2.1.0"),
+    kwargs={"force": True},
+)
+
+print(ctx.description)
+# Output: "deploy('api-gateway', '2.1.0', force=True)"
+```
+
+```typescript TypeScript
+import { ActionContext } from "@attesta/core";
+
+const ctx: ActionContext = {
+  functionName: "deploy",
+  args: ["api-gateway", "2.1.0"],
+  kwargs: { force: true },
+};
+
+console.log(ctx.description);
+// Output: "deploy('api-gateway', '2.1.0', force=true)"
+```
+</CodeGroup>
+
+The `description` property is used throughout Attesta:
+
+- **Audit logs** -- as the `action_description` field in every audit entry
+- **Terminal UI** -- displayed to the operator during challenges
+- **Error messages** -- included in `AttestaDenied` exception messages
+- **Logging** -- used in debug and info log lines
+
+## How Fields Influence Risk Scoring
+
+The `DefaultRiskScorer` analyzes `ActionContext` fields across five weighted factors:
+
+| Factor | Weight | Fields Used |
+|--------|--------|-------------|
+| Function name | 0.30 | `function_name` -- detects destructive, mutating, and read verbs |
+| Arguments | 0.25 | `args`, `kwargs` -- scans for sensitive patterns, SQL, shell commands |
+| Docstring | 0.20 | `function_doc` -- checks for danger keywords like "irreversible", "destructive" |
+| Hints | 0.15 | `hints` -- evaluates boolean and numeric hint values |
+| Novelty | 0.10 | `function_name` -- first-time calls receive higher novelty scores |
+
+<Note>
+The `environment` field is checked separately from the hint-based scoring. Setting `environment="production"` adds `+0.3` to the base risk score in the default scorer, **in addition to** any hint contributions.
+</Note>
+
+## Hints Reference
+
+The `hints` dict is a flexible mechanism for caller-supplied risk metadata. The default risk scorer recognizes these patterns:
+
+| Hint Key | Type | Effect |
+|----------|------|--------|
+| `production` | `bool` | When `True`, adds +0.30 to the hints factor score |
+| `destructive` | `bool` | When `True`, adds +0.30 to the hints factor score |
+| `pii` | `bool` | When `True`, adds +0.30 to the hints factor score |
+| `risk_override` | `str \| RiskLevel` | Bypasses the scorer entirely and uses this risk level |
+| *(any boolean)* | `bool` | When `True`, adds +0.30 per hint |
+| *(any numeric)* | `int \| float` | Contributes `min(value / 10000, 1.0) * 0.8` to the hints factor |
+
+<Warning>
+Boolean hint contributions are additive. Three `True` boolean hints (`production`, `destructive`, `pii`) would contribute `0.90` to the hints factor alone, which when weighted at 0.15 adds `0.135` to the overall score. Combined with a destructive function name, this can easily push into CRITICAL territory.
+</Warning>
+
+## Serialization
+
+`ActionContext` is a standard Python `dataclass`. You can convert it to a dictionary using `dataclasses.asdict()`:
+
+```python Python
+from dataclasses import asdict
+from attesta import ActionContext
+
+ctx = ActionContext(
+    function_name="deploy",
+    args=("api-gateway",),
+    environment="production",
+)
+
+data = asdict(ctx)
+# {'function_name': 'deploy', 'args': ('api-gateway',), 'kwargs': {}, ...}
+```
+
+<Note>
+The `timestamp` field contains a `datetime` object. If you need JSON serialization, convert it to an ISO 8601 string first: `data["timestamp"] = data["timestamp"].isoformat()`.
+</Note>

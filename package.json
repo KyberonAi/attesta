@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "workspaces": [
+    "typescript",
+    "packages/n8n-nodes-attesta",
+    "packages/flowise-attesta"
+  ]
+}

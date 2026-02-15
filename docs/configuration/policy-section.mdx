@@ -1,0 +1,212 @@
+---
+title: "Policy Section"
+description: "Configure challenge mappings, minimum review times, multi-party approval, fail modes, and timeouts"
+icon: "scale-balanced"
+---
+
+The `policy` section of `attesta.yaml` controls how Attesta responds to different risk levels. It defines the challenge type for each risk tier, minimum review durations, multi-party approval requirements, and what happens when things go wrong.
+
+## Default Challenge Mappings
+
+When no policy is configured, Attesta uses these defaults:
+
+| Risk Level | Challenge Type | Description |
+|------------|---------------|-------------|
+| LOW | `auto_approve` | Action proceeds silently with no human interaction |
+| MEDIUM | `confirm` | Y/N prompt with minimum review time |
+| HIGH | `quiz` | Comprehension quiz auto-generated from context |
+| CRITICAL | `multi_party` | 2+ independent approvers, each with a sub-challenge |
+
+These mappings are exposed as fields on the `Policy` dataclass: `auto_approve`, `confirm`, `challenge`, and `teach_back`.
+
+## Configuration
+
+```yaml attesta.yaml
+policy:
+  minimum_review_seconds:
+    low: 0
+    medium: 3
+    high: 10
+    critical: 30
+
+  require_multi_party:
+    critical: 2
+
+  fail_mode: deny
+  timeout_seconds: 300
+```
+
+## Minimum Review Seconds
+
+The `minimum_review_seconds` setting enforces a mandatory waiting period before an operator can approve an action. This is Attesta's primary defense against rubber-stamping -- approving actions without actually reading them.
+
+```yaml
+policy:
+  minimum_review_seconds:
+    low: 0        # Auto-approved, no delay needed
+    medium: 3     # Must wait 3 seconds before pressing "y"
+    high: 10      # Must wait 10 seconds before answering quiz
+    critical: 30  # Must wait 30 seconds per approver
+```
+
+The timer starts when the challenge is first presented. If the operator attempts to approve before the timer expires, the approval is rejected and they must wait.
+
+<Tip>
+Custom domain profiles can set even longer review times via the `min_review_overrides` field. For example, a compliance-focused profile might override CRITICAL to 60 seconds and HIGH to 20 seconds.
+</Tip>
+
+### Programmatic Access
+
+The `Policy` dataclass exposes minimum review times through the `min_review_time()` method:
+
+```python
+from attesta.config.loader import Policy
+
+policy = Policy()
+
+# Get minimum review time for a risk level
+review_time = policy.min_review_time("high")  # Returns 10
+
+# Or use the dict directly
+policy.minimum_review_seconds  # {"low": 0, "medium": 3, "high": 10, "critical": 30}
+```
+
+## Multi-Party Approval
+
+The `require_multi_party` setting specifies how many independent approvers are needed for each risk level. Only risk levels listed in this mapping trigger multi-party review.
+
+```yaml
+policy:
+  require_multi_party:
+    critical: 2    # Two independent approvers
+    high: 2        # Optionally require 2 approvers for HIGH too
+```
+
+When multi-party approval is required, each approver completes a different sub-challenge in a rotating pattern: teach-back, then quiz, then confirm. This ensures that at least one approver demonstrates genuine comprehension.
+
+<Warning>
+The `critical_always_verify` flag on the `Policy` dataclass is hardcoded to `True` and cannot be disabled via configuration. CRITICAL actions always require full verification regardless of trust score. This is a safety invariant.
+</Warning>
+
+## Fail Mode
+
+The `fail_mode` setting controls what happens when a challenge times out or the system cannot reach a human operator.
+
+<Tabs>
+  <Tab title="deny (default)">
+    ```yaml
+    policy:
+      fail_mode: deny
+    ```
+    The action is blocked. An `AttestaDenied` exception is raised. This is the safest option and the recommended setting for production.
+  </Tab>
+  <Tab title="allow">
+    ```yaml
+    policy:
+      fail_mode: allow
+    ```
+    The action is permitted without approval. **Use only in local development.** This mode is logged as a warning in the audit trail.
+  </Tab>
+  <Tab title="escalate">
+    ```yaml
+    policy:
+      fail_mode: escalate
+    ```
+    The action is forwarded to a secondary approver or external webhook. Use this when you have a fallback approval chain (e.g., on-call engineer, Slack notification, or PagerDuty integration).
+  </Tab>
+</Tabs>
+
+<Warning>
+Never deploy with `fail_mode: allow` in production. If a timeout or network issue prevents human review, the action will execute without any approval -- this defeats the entire purpose of Attesta.
+</Warning>
+
+## Timeout
+
+The `timeout_seconds` setting defines the maximum time (in seconds) to wait for the operator to complete a challenge. After this duration, the `fail_mode` policy takes effect.
+
+```yaml
+policy:
+  timeout_seconds: 300  # 5 minutes (default)
+```
+
+For long-running operations where operators may need extra time to investigate:
+
+```yaml
+policy:
+  timeout_seconds: 600  # 10 minutes for complex reviews
+```
+
+## Policy Dataclass
+
+The full `Policy` dataclass provides programmatic access to all policy settings and several convenience methods:
+
+```python
+from attesta.config.loader import Policy
+
+policy = Policy(
+    fail_mode="deny",
+    timeout_seconds=300,
+    minimum_review_seconds={"low": 0, "medium": 3, "high": 10, "critical": 30},
+    require_multi_party={"critical": 2},
+    risk_overrides={"deploy_production": "critical"},
+    risk_amplifiers=[{"pattern": ".*production.*", "boost": 0.3}],
+    trust_influence=0.3,
+    trust_ceiling=0.9,
+    trust_initial=0.3,
+    trust_decay_rate=0.01,
+    domain="my-domain",
+)
+
+# Key methods
+policy.challenge_for_risk("high")       # Returns the challenge type for a risk level
+policy.min_review_time("critical")      # Returns 30
+policy.to_challenge_map()               # Returns full challenge mapping dict
+policy.build_risk_scorer()              # Returns a configured risk scorer
+policy.to_trust_engine_kwargs()         # Returns kwargs for TrustEngine constructor
+```
+
+### Method Reference
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `challenge_for_risk(level)` | `str` | Challenge type for the given risk level |
+| `min_review_time(level)` | `float` | Minimum review seconds for the given risk level |
+| `to_challenge_map()` | `dict` | Full mapping of risk levels to challenge types |
+| `build_risk_scorer()` | `RiskScorer` | Configured scorer with overrides and amplifiers |
+| `to_trust_engine_kwargs()` | `dict` | Trust engine constructor arguments |
+
+## Example: Strict Production Policy
+
+```yaml attesta.yaml
+policy:
+  minimum_review_seconds:
+    low: 0
+    medium: 5
+    high: 15
+    critical: 60
+
+  require_multi_party:
+    critical: 3
+    high: 2
+
+  fail_mode: deny
+  timeout_seconds: 600
+```
+
+This policy enforces:
+- 15-second minimum review for HIGH-risk actions
+- 60-second minimum review for CRITICAL actions
+- 3 independent approvers for CRITICAL, 2 for HIGH
+- 10-minute timeout before actions are denied
+- All timeouts result in denial (never auto-allow)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Risk Section" icon="gauge-high" href="/configuration/risk-section">
+    Force risk levels and amplify scores with patterns
+  </Card>
+  <Card title="Challenges" icon="lock" href="/concepts/challenges">
+    Learn how each challenge type works
+  </Card>
+</CardGroup>

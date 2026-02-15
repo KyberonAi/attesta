@@ -1,0 +1,124 @@
+---
+title: "Quickstart"
+description: "Get Attesta running in 5 minutes"
+icon: "rocket"
+---
+
+<Steps>
+  <Step title="Install Attesta">
+    <Tabs>
+      <Tab title="Python">
+        ```bash
+        pip install attesta[terminal]
+        ```
+        This installs the core library plus the rich terminal UI for interactive approval prompts.
+
+        For YAML config support add:
+        ```bash
+        pip install attesta[terminal,yaml]
+        ```
+
+        <Note>
+        `pip install attesta` (without extras) installs the core library only. Without the `terminal` extra, Attesta auto-approves all actions in non-interactive environments. Use `attesta[terminal]` to see approval prompts.
+        </Note>
+      </Tab>
+      <Tab title="TypeScript">
+        ```bash
+        npm install @attesta/core
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Protect a function">
+    Add the `@gate` decorator to any function that should require human approval.
+
+    <CodeGroup>
+    ```python Python
+    from attesta import gate
+
+    @gate
+    def delete_user(user_id: str) -> str:
+        """Permanently delete a user account."""
+        return f"Deleted user {user_id}"
+    ```
+
+    ```typescript TypeScript
+    import { gate } from "@attesta/core";
+
+    const deleteUser = gate(async (userId: string) => {
+      return `Deleted user ${userId}`;
+    });
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Call the function">
+    When you call a gated function, Attesta intercepts the call, scores the risk, and presents the appropriate challenge.
+
+    <CodeGroup>
+    ```python Python
+    # This triggers a risk assessment + approval prompt
+    result = delete_user("usr_12345")
+    ```
+
+    ```typescript TypeScript
+    // This triggers a risk assessment + approval prompt
+    const result = await deleteUser("usr_12345");
+    ```
+    </CodeGroup>
+
+    For `delete_user`, the risk scorer will detect the destructive verb "delete" and score it as HIGH risk, presenting a comprehension quiz before allowing execution.
+  </Step>
+
+  <Step title="Initialize a config file (optional)">
+    For production use, create a configuration file to customize policies:
+
+    ```bash
+    attesta init
+    ```
+
+    This generates an `attesta.yaml` with sensible defaults for challenge mappings, review times, trust settings, and risk overrides.
+  </Step>
+
+  <Step title="Use with a config file">
+    Load the config to apply your custom policies:
+
+    <CodeGroup>
+    ```python Python
+    from attesta import Attesta
+
+    attesta = Attesta.from_config("attesta.yaml")
+
+    @attesta.gate(risk_hints={"production": True})
+    def deploy(service: str, version: str) -> str:
+        """Deploy a service to production."""
+        return f"Deployed {service} v{version}"
+    ```
+
+    ```typescript TypeScript
+    import { Attesta, gate } from "@attesta/core";
+
+    const attesta = new Attesta({
+      riskHints: { production: true },
+      environment: "production",
+    });
+
+    const deploy = gate(async (service: string, version: string) => {
+      return `Deployed ${service} v${version}`;
+    }, { attesta });
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## What Happens When You Call a Gated Function
+
+1. **Risk scoring** — The `DefaultRiskScorer` analyzes the function name, arguments, docstring, hints, and novelty
+2. **Challenge selection** — The risk level determines the challenge: LOW -> auto-approve, MEDIUM -> confirm, HIGH -> quiz, CRITICAL -> multi-party
+3. **Verification** — The human operator completes the challenge (or the action is auto-approved for low risk)
+4. **Audit** — The decision is recorded in a SHA-256 hash-chained audit log
+
+<Note>
+If the operator denies the action or fails the challenge, Attesta raises an `AttestaDenied` exception. The protected function is **never executed**.
+</Note>

@@ -1,0 +1,198 @@
+---
+title: "attesta audit"
+description: "Verify audit log integrity, view approval statistics, and detect rubber-stamp approvals"
+icon: "file-shield"
+---
+
+The `attesta audit` subcommands let you inspect and verify the SHA-256 hash-chained audit trail that Attesta produces. Every gated action -- approved, denied, timed out, or escalated -- is recorded in a JSONL file with cryptographic integrity guarantees.
+
+## Shared Options
+
+All `attesta audit` subcommands accept:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--log PATH` | `.attesta/audit.jsonl` | Path to the audit log file |
+
+---
+
+## attesta audit verify
+
+Verify the hash-chain integrity of the audit log. Each entry contains a SHA-256 hash of the previous entry, forming a tamper-evident chain. If any entry has been modified, inserted, or deleted, the chain breaks.
+
+### Usage
+
+```bash
+attesta audit verify [--log PATH]
+```
+
+### Example Output (Intact)
+
+```bash
+$ attesta audit verify
+Audit log : .attesta/audit.jsonl
+Entries   : 247
+Status    : INTACT -- all hashes verified
+```
+
+### Example Output (Broken)
+
+```bash
+$ attesta audit verify
+Audit log : .attesta/audit.jsonl
+Entries   : 247
+Status    : BROKEN -- 2 invalid link(s)
+Broken at : 42, 43
+```
+
+<Warning>
+A broken audit chain indicates that one or more entries have been tampered with, manually edited, or that the log file was corrupted. Investigate immediately -- the broken link indices tell you exactly which entries to examine.
+</Warning>
+
+The command exits with code `0` on success and code `1` if the chain is broken, making it suitable for CI pipelines:
+
+```bash
+attesta audit verify || echo "Audit chain compromised!"
+```
+
+---
+
+## attesta audit stats
+
+Print comprehensive approval statistics from the audit log, including totals by verdict, average review time, rubber-stamp rate, and risk level distribution.
+
+### Usage
+
+```bash
+attesta audit stats [--log PATH]
+```
+
+### Example Output
+
+```
+Audit Statistics
+  Log file             : .attesta/audit.jsonl
+
+  Totals
+    Total entries       : 247
+    Approved           : 198
+    Denied             : 31
+    Modified           : 5
+    Escalated          : 8
+    Timed out          : 5
+
+  Review Quality
+    Avg review time    : 12.4s
+    Rubber stamp rate  : 3.2%
+    Rubber stamps      : 6
+
+  Risk Distribution
+    Low                : 89
+    Medium             : 94
+    High               : 47
+    Critical           : 17
+```
+
+### Understanding the Output
+
+| Metric | Description |
+|--------|-------------|
+| **Approved** | Actions that passed their challenge and were executed |
+| **Denied** | Actions explicitly rejected by the operator |
+| **Modified** | Actions approved with modifications to the original parameters |
+| **Escalated** | Actions forwarded to a secondary approver or webhook |
+| **Timed out** | Actions where the review period expired without a response |
+| **Avg review time** | Mean time operators spent reviewing before making a decision |
+| **Rubber stamp rate** | Percentage of approved high/critical actions with suspiciously fast review times |
+
+<Tip>
+A rubber-stamp rate above 10% (shown in yellow) or 20% (shown in red) suggests operators may be approving high-risk actions without adequate review. Consider increasing `minimum_review_seconds` in your `attesta.yaml`.
+</Tip>
+
+---
+
+## attesta audit rubber-stamps
+
+List individual audit entries that were approved suspiciously fast relative to their risk level. These are potential rubber stamps -- approvals where the operator likely did not read or understand the action.
+
+### Usage
+
+```bash
+attesta audit rubber-stamps [--log PATH] [--max-seconds 5.0] [--min-risk high]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--max-seconds` | `5.0` | Maximum review time (in seconds) to flag as a rubber stamp |
+| `--min-risk` | `high` | Minimum risk level to consider (`low`, `medium`, `high`, `critical`) |
+
+### Example Output
+
+```
+Found 3 rubber stamp(s):
+
+  1. deploy_to_production  [High]  2.1s review  a4f8b2c1e3d5...
+     Agent: gpt-4-agent
+     Time:  2025-01-15T14:32:18
+
+  2. execute_migration  [Critical]  1.8s review  b7e2a9f4c6d8...
+     Agent: claude-agent
+     Time:  2025-01-15T15:01:42
+
+  3. modify_firewall  [High]  3.4s review  c1d5e8f2a9b7...
+     Agent: ops-bot
+     Time:  2025-01-16T09:15:33
+```
+
+### Narrowing the Search
+
+Find only critical-risk rubber stamps approved in under 3 seconds:
+
+```bash
+attesta audit rubber-stamps --min-risk critical --max-seconds 3.0
+```
+
+Find all rubber stamps including medium-risk actions:
+
+```bash
+attesta audit rubber-stamps --min-risk medium --max-seconds 5.0
+```
+
+When no rubber stamps are found:
+
+```bash
+$ attesta audit rubber-stamps
+No rubber stamps found.
+```
+
+---
+
+## CI/CD Integration
+
+You can use audit commands in CI/CD pipelines to enforce audit hygiene:
+
+```yaml github-actions.yml
+- name: Verify audit integrity
+  run: attesta audit verify
+
+- name: Check rubber stamp rate
+  run: |
+    attesta audit stats
+    # Fail if rubber stamp rate is concerning
+    attesta audit rubber-stamps --min-risk high --max-seconds 3.0
+```
+
+<Note>
+The audit log is append-only by design. Attesta never modifies or deletes existing entries. The hash chain makes any external tampering detectable via `attesta audit verify`.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="attesta trust" icon="brain" href="/cli/trust">
+    Manage agent trust profiles
+  </Card>
+  <Card title="Audit Trail Concepts" icon="file-shield" href="/concepts/audit-trail">
+    Learn how the hash-chained audit log works
+  </Card>
+</CardGroup>

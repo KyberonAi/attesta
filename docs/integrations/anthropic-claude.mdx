@@ -1,0 +1,273 @@
+---
+title: "Anthropic Claude"
+description: "Gate Claude tool_use blocks with AttestaToolGate before executing tool calls"
+icon: "message-bot"
+---
+
+`AttestaToolGate` evaluates `tool_use` content blocks from Claude's API response through the Attesta approval pipeline before your application executes the requested tool. This gives you full control over which tool calls Claude is allowed to make.
+
+## Installation
+
+```bash
+pip install attesta[anthropic]
+```
+
+---
+
+## API Reference
+
+### AttestaToolGate
+
+```python
+AttestaToolGate(attesta, risk_overrides=None)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `attesta` | `Attesta` | A configured Attesta instance |
+| `risk_overrides` | `dict[str, str] \| None` | Optional mapping of `{tool_name: risk_level}` to force specific risk levels |
+
+**Methods:**
+
+| Method | Signature | Returns | Description |
+|---|---|---|---|
+| `evaluate_tool_use` | `async (tool_use_block) -> tuple[bool, ApprovalResult]` | `(approved, result)` | Evaluates a `tool_use` content block |
+| `make_denial_result` | `(tool_use_id, reason) -> dict` | `tool_result` block | Creates a `tool_result` block with `is_error=True` |
+
+<Note>
+`evaluate_tool_use` accepts both the Anthropic SDK's `ToolUseBlock` objects (attribute access) and plain `dict` representations (key access). This means it works with both the official SDK and raw API responses.
+</Note>
+
+---
+
+## Full Example
+
+```python
+import asyncio
+from anthropic import Anthropic
+from attesta import Attesta
+from attesta.integrations.anthropic import AttestaToolGate
+
+# Configure
+client = Anthropic()
+attesta = Attesta.from_config("attesta.yaml")
+gate = AttestaToolGate(
+    attesta,
+    risk_overrides={"run_bash": "critical"},
+)
+
+# Define tools for Claude
+tools = [
+    {
+        "name": "run_bash",
+        "description": "Execute a bash command on the server",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "The bash command to run"},
+            },
+            "required": ["command"],
+        },
+    },
+    {
+        "name": "read_file",
+        "description": "Read the contents of a file",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "File path to read"},
+            },
+            "required": ["path"],
+        },
+    },
+]
+
+
+async def chat_with_claude():
+    messages = [{"role": "user", "content": "Delete all log files older than 30 days"}]
+
+    while True:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            tools=tools,
+            messages=messages,
+        )
+
+        # Process each content block
+        tool_results = []
+        for block in response.content:
+            if block.type == "text":
+                print(block.text)
+
+            elif block.type == "tool_use":
+                # Gate the tool call through Attesta
+                approved, result = await gate.evaluate_tool_use(block)
+
+                if approved:
+                    # Execute the tool
+                    output = execute_tool(block.name, block.input)
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": output,
+                    })
+                else:
+                    # Send denial back to Claude
+                    reason = f"risk: {result.risk_assessment.level.value}"
+                    denial = gate.make_denial_result(block.id, reason=reason)
+                    tool_results.append(denial)
+
+        if response.stop_reason == "end_turn":
+            break
+
+        # Continue the conversation with tool results
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "user", "content": tool_results})
+
+
+asyncio.run(chat_with_claude())
+```
+
+---
+
+## How tool_use Evaluation Works
+
+When Claude responds with a `tool_use` block:
+
+```json
+{
+  "type": "tool_use",
+  "id": "toolu_01ABC",
+  "name": "run_bash",
+  "input": {"command": "find /var/log -mtime +30 -delete"}
+}
+```
+
+`evaluate_tool_use` extracts the tool name and input, builds an `ActionContext`, and runs the full Attesta evaluation:
+
+```python
+# Internally, AttestaToolGate builds:
+ctx = ActionContext(
+    function_name="run_bash",
+    kwargs={"command": "find /var/log -mtime +30 -delete"},
+    hints={},               # or risk_override if configured
+    agent_id="claude",      # always set to "claude"
+)
+```
+
+<Tip>
+The `agent_id` is always set to `"claude"` on all contexts created by `AttestaToolGate`. This allows the trust engine to build a trust profile specific to Claude's tool-calling behavior over time.
+</Tip>
+
+---
+
+## Denial Messages
+
+When a tool call is denied, `make_denial_result` creates a `tool_result` block that Claude understands:
+
+```python
+denial = gate.make_denial_result(
+    tool_use_id="toolu_01ABC",
+    reason="risk: critical",
+)
+
+# Returns:
+{
+    "type": "tool_result",
+    "tool_use_id": "toolu_01ABC",
+    "content": "[ATTESTA DENIED] risk: critical. Please suggest an alternative approach or explain why this action is necessary.",
+    "is_error": True,
+}
+```
+
+The `is_error=True` flag tells Claude that the tool call failed. The denial message asks Claude to suggest alternatives, which typically produces more helpful responses than a silent failure.
+
+---
+
+## Agentic Loop with Gating
+
+Here is a complete agentic loop that processes multiple tool calls per turn and handles both approvals and denials:
+
+```python
+import asyncio
+from anthropic import Anthropic
+from attesta import Attesta
+from attesta.integrations.anthropic import AttestaToolGate
+
+
+async def agentic_loop(user_message: str):
+    client = Anthropic()
+    attesta = Attesta.from_config("attesta.yaml")
+    gate = AttestaToolGate(attesta)
+
+    messages = [{"role": "user", "content": user_message}]
+
+    for turn in range(10):  # Max 10 turns
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4096,
+            tools=tools,
+            messages=messages,
+        )
+
+        if response.stop_reason == "end_turn":
+            # Claude is done -- extract final text
+            for block in response.content:
+                if block.type == "text":
+                    return block.text
+            break
+
+        # Process tool_use blocks
+        results = []
+        for block in response.content:
+            if block.type != "tool_use":
+                continue
+
+            approved, eval_result = await gate.evaluate_tool_use(block)
+            if approved:
+                output = await execute_tool_async(block.name, block.input)
+                results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": str(output),
+                })
+            else:
+                level = eval_result.risk_assessment.level.value
+                results.append(
+                    gate.make_denial_result(block.id, reason=f"risk: {level}")
+                )
+
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "user", "content": results})
+
+    return "Max turns reached"
+```
+
+---
+
+## Risk Overrides
+
+Force specific risk levels for known-dangerous tools:
+
+```python
+gate = AttestaToolGate(
+    attesta,
+    risk_overrides={
+        "run_bash": "critical",     # Shell commands always critical
+        "write_file": "high",       # File writes always high
+        "read_file": "low",         # File reads always low
+    },
+)
+```
+
+When a tool name matches a risk override, the hint `{"risk_override": "critical"}` is passed to the scorer, which forces the specified risk level regardless of the heuristic score.
+
+<CardGroup cols={2}>
+  <Card title="CrewAI" icon="users" href="/integrations/crewai">
+    Gate CrewAI task outputs
+  </Card>
+  <Card title="OpenAI Agents SDK" icon="bolt" href="/integrations/openai-agents">
+    Approval handlers and guardrails
+  </Card>
+</CardGroup>

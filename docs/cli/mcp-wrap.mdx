@@ -1,0 +1,426 @@
+---
+title: "attesta mcp wrap"
+description: "Wrap any MCP server with Attesta approval gating using a single CLI command"
+icon: "shield-halved"
+---
+
+The `attesta mcp wrap` command starts a stdio proxy between your MCP client (VS Code, Cursor, Claude Desktop, Claude Code, Windsurf, etc.) and any upstream MCP server. Every `tools/call` request is intercepted, risk-scored, and either approved or denied before reaching the upstream server. No code changes to the MCP server are required.
+
+## Architecture
+
+```
+Editor / IDE  <--stdio-->  Attesta MCPProxy  <--stdio-->  Real MCP Server
+                                |
+                                +-- risk scoring per tool call
+                                +-- domain-aware evaluation (custom profiles)
+                                +-- policy enforcement (approve / deny / audit)
+                                +-- tamper-proof audit trail
+```
+
+## Usage
+
+```bash
+attesta mcp wrap [OPTIONS] -- <server-command> [server-args...]
+```
+
+The `--` separator is required. Everything after it is the command to start the upstream MCP server.
+
+## Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--config`, `-c` | `attesta.yaml` | Path to the Attesta configuration file. If not found, uses built-in defaults. |
+| `--risk-override TOOL=LEVEL` | _(none)_ | Override the risk level for a specific tool. Can be repeated. Levels: `low`, `medium`, `high`, `critical`. |
+| `--log PATH` | `.attesta/audit.jsonl` | Path to the audit log file. |
+| `--trust-store PATH` | `.attesta/trust.json` | Path to the trust store file. |
+| `--agent-id ID` | `mcp-proxy` | Agent ID recorded in audit entries and used by the trust engine. |
+| `--environment ENV` | `development` | Environment tag. Set to `production` for stricter risk scoring. |
+| `--verbose` | `false` | Print detailed log messages to stderr for every intercepted request. |
+
+---
+
+## Quick Examples
+
+<CodeGroup>
+```bash Filesystem server
+attesta mcp wrap -- npx @modelcontextprotocol/server-filesystem /home/user/projects
+```
+
+```bash GitHub server (production)
+attesta mcp wrap --environment production -- npx @modelcontextprotocol/server-github
+```
+
+```bash Database server with risk overrides
+attesta mcp wrap \
+  --risk-override execute_sql=critical \
+  --risk-override read_query=low \
+  -- npx @modelcontextprotocol/server-postgres "postgresql://localhost/mydb"
+```
+
+```bash Custom Python MCP server
+attesta mcp wrap --config /etc/attesta/prod.yaml -- python my_mcp_server.py
+```
+
+```bash Brave Search server
+attesta mcp wrap -- npx @modelcontextprotocol/server-brave-search
+```
+</CodeGroup>
+
+---
+
+## How It Works
+
+<Steps>
+  <Step title="Spawn upstream server">
+    The proxy starts the upstream MCP server as a child process using the provided command. The server's stdin/stdout are connected via pipes. Its stderr passes through to your terminal for debugging.
+  </Step>
+  <Step title="Intercept tool calls">
+    The proxy reads JSON-RPC messages from its own stdin (the MCP client). When it sees a `tools/call` request, it extracts the tool name and arguments for evaluation. All other messages (tool listings, notifications, pings) pass through unchanged.
+  </Step>
+  <Step title="Evaluate with Attesta">
+    The tool call is evaluated through the full Attesta pipeline: risk scoring, trust adjustment, challenge selection, and operator verification. The challenge is presented in the terminal where `attesta mcp wrap` is running.
+  </Step>
+  <Step title="Forward or deny">
+    If approved, the original request is forwarded to the upstream server. If denied, the proxy returns a JSON-RPC error response directly -- the request never reaches the upstream server.
+  </Step>
+  <Step title="Audit">
+    Every decision (approved or denied) is recorded in the hash-chained audit log. Use `attesta audit verify` to check integrity at any time.
+  </Step>
+</Steps>
+
+---
+
+## Risk Overrides
+
+Use `--risk-override` to pin specific tools to a risk level, bypassing the automatic risk scorer for those tools:
+
+```bash
+attesta mcp wrap \
+  --risk-override write_file=high \
+  --risk-override delete_file=critical \
+  --risk-override run_bash=critical \
+  --risk-override read_file=low \
+  -- npx @modelcontextprotocol/server-filesystem /home/user
+```
+
+Risk overrides can also be defined in `attesta.yaml`:
+
+```yaml attesta.yaml
+risk:
+  overrides:
+    write_file: high
+    delete_file: critical
+    run_bash: critical
+    read_file: low
+```
+
+<Note>
+CLI `--risk-override` flags take precedence over overrides defined in `attesta.yaml`. This lets you tighten risk levels for specific invocations without modifying the config file.
+</Note>
+
+---
+
+## Editor Configuration
+
+Configure your editor to launch the proxy instead of the upstream MCP server directly. The proxy is transparent -- the editor sees the same tool list and responses as it would from the upstream server.
+
+<CodeGroup>
+```json Claude Desktop (claude_desktop_config.json)
+{
+  "mcpServers": {
+    "filesystem-gated": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap",
+        "--environment", "production",
+        "--risk-override", "delete_file=critical",
+        "--", "npx",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/user/projects"
+      ]
+    }
+  }
+}
+```
+
+```json VS Code (settings.json)
+{
+  "mcp.servers": {
+    "filesystem-gated": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap",
+        "--config", "attesta.yaml",
+        "--risk-override", "write_file=high",
+        "--", "npx",
+        "@modelcontextprotocol/server-filesystem",
+        "/workspace"
+      ]
+    }
+  }
+}
+```
+
+```json Cursor (.cursor/mcp.json)
+{
+  "mcpServers": {
+    "filesystem-gated": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap",
+        "--environment", "production",
+        "--", "npx",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/user/projects"
+      ]
+    }
+  }
+}
+```
+
+```json Windsurf
+{
+  "mcpServers": {
+    "filesystem-gated": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap", "--",
+        "npx", "@modelcontextprotocol/server-filesystem",
+        "/home/user/projects"
+      ]
+    }
+  }
+}
+```
+</CodeGroup>
+
+<Tip>
+When using `attesta mcp wrap` with an editor that manages the proxy process in the background, approval challenges are presented in the terminal where the editor launched the proxy. If you need a visible terminal, run the proxy manually in a separate terminal window and configure the editor to connect to it.
+</Tip>
+
+---
+
+## Common MCP Server Examples
+
+### Filesystem Server
+
+The filesystem MCP server provides `read_file`, `write_file`, `delete_file`, `list_directory`, and other file operations. Wrapping it with Attesta adds approval gates to destructive operations while auto-approving reads.
+
+```bash
+attesta mcp wrap \
+  --risk-override write_file=high \
+  --risk-override delete_file=critical \
+  -- npx @modelcontextprotocol/server-filesystem /home/user/projects
+```
+
+### PostgreSQL Server
+
+The PostgreSQL MCP server exposes SQL query execution. Gate write and DDL statements at critical risk to prevent unreviewed schema or data changes.
+
+```bash
+attesta mcp wrap \
+  --risk-override execute_sql=critical \
+  --environment production \
+  -- npx @modelcontextprotocol/server-postgres "postgresql://localhost:5432/production"
+```
+
+### GitHub Server
+
+The GitHub MCP server provides repository management, issue creation, and pull request operations. Gate write operations while allowing reads to flow through.
+
+```bash
+attesta mcp wrap \
+  --risk-override create_issue=medium \
+  --risk-override merge_pull_request=high \
+  --risk-override delete_branch=high \
+  -- npx @modelcontextprotocol/server-github
+```
+
+### Custom MCP Servers
+
+Any MCP server that communicates over stdio can be wrapped, including custom Python or TypeScript servers:
+
+<CodeGroup>
+```bash Python server
+attesta mcp wrap -- python my_devops_server.py
+```
+
+```bash TypeScript server
+attesta mcp wrap -- npx tsx my_server.ts
+```
+
+```bash Docker container
+attesta mcp wrap -- docker run -i my-mcp-server:latest
+```
+</CodeGroup>
+
+### Multiple MCP Servers
+
+You can wrap multiple MCP servers independently, each with their own risk policies:
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "filesystem-gated": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap",
+        "--risk-override", "delete_file=critical",
+        "--", "npx", "@modelcontextprotocol/server-filesystem", "/tmp"
+      ]
+    },
+    "postgres-gated": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap",
+        "--config", "infra-attesta.yaml",
+        "--risk-override", "query=high",
+        "--", "npx", "@modelcontextprotocol/server-postgres",
+        "postgresql://localhost/mydb"
+      ]
+    },
+    "github-gated": {
+      "command": "attesta",
+      "args": [
+        "mcp", "wrap",
+        "--risk-override", "create_pull_request=medium",
+        "--risk-override", "merge_pull_request=critical",
+        "--", "npx", "@modelcontextprotocol/server-github"
+      ]
+    }
+  }
+}
+```
+
+---
+
+## Domain-Aware Proxying
+
+Combine MCP wrapping with domain profiles for industry-specific risk scoring:
+
+```yaml attesta.yaml
+# domain: my-domain  # Optional: activate a registered domain profile
+
+policy:
+  minimum_review_seconds:
+    high: 15
+    critical: 45
+  fail_mode: deny
+
+risk:
+  overrides:
+    drop_table: critical
+    truncate_table: critical
+    create_index: medium
+  amplifiers:
+    - pattern: ".*production.*"
+      boost: 0.3
+```
+
+```bash
+attesta mcp wrap --config attesta.yaml -- npx @modelcontextprotocol/server-postgres postgresql://prod-host/mydb
+```
+
+Now database operations inherit domain-specific risk patterns:
+- `DROP TABLE` and `TRUNCATE` are always CRITICAL
+- Production-targeted queries receive a +0.3 risk boost
+- Custom domain escalation rules (dual DBA approval, change ticket verification) apply if configured
+
+---
+
+## Runtime Output
+
+The proxy logs decisions to stderr (visible in your terminal but not sent to the MCP client):
+
+```
+[attesta] Attesta MCP proxy started, wrapping: npx @modelcontextprotocol/server-filesystem /home/user
+[attesta]   config: attesta.yaml
+[attesta]   audit:  .attesta/audit.jsonl
+[attesta]   agent:  mcp-proxy
+[attesta]   [approved]  read_file          (risk: low, score: 0.12)
+[attesta]   [approved]  list_directory     (risk: low, score: 0.08)
+[attesta]   [DENIED]    write_file         (risk: high, score: 0.72)
+[attesta]   [DENIED]    delete_file        (risk: critical, score: 0.95)
+```
+
+Use `--verbose` for additional detail including the full tool arguments and evaluation timing:
+
+```bash
+attesta mcp wrap --verbose -- npx @modelcontextprotocol/server-filesystem /home/user
+```
+
+---
+
+## Denial Response
+
+When Attesta denies a tool call, the proxy returns an MCP-compatible error response to the client:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 42,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action denied by Attesta: delete_file (risk: critical, score: 0.92). This action requires human approval that was not granted."
+      }
+    ],
+    "isError": true
+  }
+}
+```
+
+The client sees the denial message. The upstream server never receives the request.
+
+<Warning>
+The proxy evaluates tool calls synchronously one at a time. This adds latency proportional to the time the operator takes to respond to challenges. For most MCP use cases this is acceptable, since the entire purpose is to insert a human into the loop.
+</Warning>
+
+---
+
+## Protocol Support
+
+The proxy auto-detects the framing format used by the MCP client and server:
+
+| Format | Description | Used By |
+|--------|-------------|---------|
+| **Content-Length framing** | `Content-Length: N\r\n\r\n{...}` (official MCP/LSP spec) | Most MCP servers |
+| **Newline-delimited JSON** | One JSON object per line | Some MCP implementations |
+
+Both formats are supported transparently. The proxy always writes responses using Content-Length framing.
+
+---
+
+## Exit Behavior
+
+The proxy exits when:
+
+- The upstream MCP server process exits (exit code is forwarded)
+- The MCP client disconnects (stdin closes)
+- The proxy receives `SIGINT` or `SIGTERM` (the upstream server is terminated gracefully)
+
+On exit, any in-progress audit entries are flushed to disk.
+
+<Warning>
+The MCP proxy operates over stdio. It only works with MCP servers that use the stdio transport. If your MCP server uses HTTP/SSE transport, use the Python decorator pattern (`attesta_tool_handler`) instead. See the [MCP Integration](/integrations/mcp) page for details.
+</Warning>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="MCP Integration" icon="server" href="/integrations/mcp">
+    Programmatic MCP integration with MCPProxy and decorators
+  </Card>
+  <Card title="attesta audit" icon="file-shield" href="/cli/audit">
+    Verify and inspect the audit trail
+  </Card>
+  <Card title="attesta trust" icon="brain" href="/cli/trust">
+    Manage agent trust profiles
+  </Card>
+  <Card title="Domain Profiles" icon="hospital" href="/domains/overview">
+    Activate domain-specific risk scoring for MCP tools
+  </Card>
+</CardGroup>

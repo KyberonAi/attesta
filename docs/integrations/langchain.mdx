@@ -1,0 +1,261 @@
+---
+title: "LangChain & LangGraph"
+description: "Wrap LangChain tools and insert LangGraph gate nodes with Attesta approval"
+icon: "link-horizontal"
+---
+
+Attesta integrates with LangChain and LangGraph at two levels:
+
+1. **Tool wrapping** -- replace every tool's `func`/`coroutine` with a gated version that evaluates risk before execution.
+2. **Graph node** -- insert a gate node into a LangGraph `StateGraph` that filters tool calls between the agent and tool-execution nodes.
+
+## Installation
+
+<CodeGroup>
+```bash Python
+pip install attesta[langchain]
+```
+
+```bash TypeScript
+npm install @attesta/core @langchain/core
+```
+</CodeGroup>
+
+---
+
+## Tool Wrapping (Python)
+
+`AttestaToolWrapper` wraps a list of LangChain tools so that every invocation passes through Attesta approval. The original tool objects are mutated in-place (their `func` and `coroutine` attributes are replaced).
+
+### API
+
+```python
+AttestaToolWrapper(attesta, risk_overrides=None)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `attesta` | `Attesta` | A configured Attesta instance |
+| `risk_overrides` | `dict[str, str] \| None` | Optional mapping of `{tool_name: risk_level}` to force specific risk levels |
+
+**Methods:**
+
+| Method | Signature | Description |
+|---|---|---|
+| `wrap_tools` | `(tools: list) -> list` | Wraps all tools; returns a new list (but mutates tool objects in-place) |
+
+### Full Example
+
+```python
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
+from langchain_core.tools import StructuredTool
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_openai_functions_agent, AgentExecutor
+
+from attesta import Attesta
+from attesta.integrations.langchain import AttestaToolWrapper
+
+# 1. Create your tools
+def delete_user(user_id: str) -> str:
+    """Permanently delete a user account from the database."""
+    return f"Deleted user {user_id}"
+
+def get_user(user_id: str) -> str:
+    """Retrieve user profile information."""
+    return f"User {user_id}: Alice"
+
+tools = [
+    StructuredTool.from_function(delete_user),
+    StructuredTool.from_function(get_user),
+    WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper()),
+]
+
+# 2. Wrap tools with Attesta
+attesta = Attesta.from_config("attesta.yaml")
+wrapper = AttestaToolWrapper(
+    attesta,
+    risk_overrides={"delete_user": "critical"},  # Force critical for deletes
+)
+protected_tools = wrapper.wrap_tools(tools)
+
+# 3. Use with an agent as normal
+llm = ChatOpenAI(model="gpt-4o")
+agent = create_openai_functions_agent(llm, protected_tools, prompt)
+executor = AgentExecutor(agent=agent, tools=protected_tools)
+
+result = executor.invoke({"input": "Delete user usr_123"})
+# Attesta intercepts the delete_user call, scores risk as CRITICAL,
+# and requires multi-party approval before execution.
+```
+
+### Behavior on Denial
+
+When a tool call is denied, the wrapper returns a string message instead of raising an exception. This allows the LLM agent to understand the denial and suggest alternatives:
+
+```
+"Action denied by Attesta: delete_user (risk: critical)"
+```
+
+<Note>
+Both sync (`func`) and async (`coroutine`) paths are wrapped. If your tool has a `coroutine` attribute, the async path is also gated. The wrapper auto-detects whether it is running inside an existing event loop (e.g., Jupyter or LangServe) and handles both cases.
+</Note>
+
+---
+
+## Tool Wrapping (TypeScript)
+
+The TypeScript SDK provides `gatedTool` which wraps a LangChain tool's `invoke` method using a Proxy.
+
+### API
+
+```typescript
+gatedTool<T extends LangChainToolLike>(tool: T, options?: GatedToolOptions): T
+```
+
+| Option | Type | Description |
+|---|---|---|
+| `agentId` | `string` | Agent ID for action context |
+| `sessionId` | `string` | Session ID for action context |
+| `environment` | `string` | Environment name (default: `"development"`) |
+| `metadata` | `Record<string, unknown>` | Extra metadata |
+| `riskHints` | `Record<string, unknown>` | Risk hint overrides |
+| `onDenied` | `(result) => string` | Custom denial handler (default: returns denial string) |
+
+### Full Example
+
+```typescript
+import { WikipediaQueryRun } from "@langchain/community/tools/wikipedia_query";
+import { ChatOpenAI } from "@langchain/openai";
+import { gatedTool } from "@attesta/core/integrations";
+
+const wiki = new WikipediaQueryRun();
+
+const safeWiki = gatedTool(wiki, {
+  agentId: "research-agent",
+  environment: "production",
+  riskHints: { pii: false },
+});
+
+// Use safeWiki anywhere you would use wiki -- the invoke() method
+// now runs through Attesta approval first.
+const result = await safeWiki.invoke("LangChain framework");
+```
+
+---
+
+## LangGraph Node (Python)
+
+`attesta_node()` returns an async function suitable for use as a LangGraph node. Insert it between the agent node and the tool-execution node so that only approved tool calls are forwarded.
+
+### API
+
+```python
+attesta_node(attesta) -> Callable
+```
+
+Returns an async node function with signature `async (state: dict) -> dict`. The function:
+
+1. Reads `tool_calls` from the last message in `state["messages"]`
+2. Evaluates each tool call through `attesta.evaluate()`
+3. Replaces `tool_calls` on the message with only the approved subset
+4. Returns the modified state
+
+### Full Example
+
+```python
+from langgraph.graph import StateGraph, MessagesState
+from langchain_openai import ChatOpenAI
+
+from attesta import Attesta
+from attesta.integrations.langchain import attesta_node
+
+attesta = Attesta.from_config("attesta.yaml")
+llm = ChatOpenAI(model="gpt-4o")
+
+# Define nodes
+async def agent_node(state: MessagesState) -> MessagesState:
+    response = await llm.ainvoke(state["messages"])
+    return {"messages": [response]}
+
+async def tool_node(state: MessagesState) -> MessagesState:
+    # Execute approved tool calls
+    ...
+
+# Build the graph
+builder = StateGraph(MessagesState)
+builder.add_node("agent", agent_node)
+builder.add_node("gate", attesta_node(attesta))   # <-- Attesta gate
+builder.add_node("tools", tool_node)
+
+builder.add_edge("agent", "gate")
+builder.add_edge("gate", "tools")
+builder.add_edge("tools", "agent")
+builder.set_entry_point("agent")
+
+graph = builder.compile()
+
+# When the agent requests a tool call, the gate node evaluates it.
+# Denied calls are silently filtered out -- they never reach tool_node.
+result = await graph.ainvoke({"messages": [("user", "Delete user usr_123")]})
+```
+
+<Warning>
+Denied tool calls are silently removed from the message's `tool_calls` list. The agent will see fewer tool calls than it requested. This is intentional -- it prevents the agent from retrying denied actions in the same turn. If you want the agent to receive explicit denial messages, use `AttestaToolWrapper` instead.
+</Warning>
+
+---
+
+## LangGraph Node (TypeScript)
+
+The TypeScript SDK provides `createGateNode` for LangGraph.
+
+```typescript
+import { StateGraph } from "@langchain/langgraph";
+import { createGateNode } from "@attesta/core/integrations";
+
+const gateNode = createGateNode({
+  actionName: "process-order",
+  riskOverride: "high",
+  agentId: "order-agent",
+  environment: "production",
+});
+
+const graph = new StateGraph(stateSchema)
+  .addNode("agent", agentNode)
+  .addNode("gate", gateNode)
+  .addNode("tools", toolNode)
+  .addEdge("agent", "gate")
+  .addEdge("gate", "tools")
+  .addEdge("tools", "agent");
+```
+
+The gate node adds `_attesta` metadata to the state on approval, or throws `AttestaDenied` on denial.
+
+---
+
+## Risk Overrides
+
+Force specific risk levels for sensitive tools using `risk_overrides`:
+
+```python
+wrapper = AttestaToolWrapper(
+    attesta,
+    risk_overrides={
+        "delete_user": "critical",      # Always multi-party approval
+        "send_email": "high",           # Always quiz challenge
+        "get_user": "low",             # Always auto-approve
+    },
+)
+```
+
+This bypasses the risk scorer's heuristic for named tools while keeping all other pipeline stages (challenge, verification, audit) intact.
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Agents SDK" icon="bolt" href="/integrations/openai-agents">
+    Approval handler and tool guardrails
+  </Card>
+  <Card title="MCP Integration" icon="server" href="/integrations/mcp">
+    Gate any MCP server with zero code changes
+  </Card>
+</CardGroup>

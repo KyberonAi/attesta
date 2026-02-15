@@ -1,0 +1,269 @@
+---
+title: "Risk Scorers"
+description: "Combine, override, or compose multiple risk scoring strategies with Composite, Max, and Fixed scorers"
+icon: "sliders"
+---
+
+While the [DefaultRiskScorer](/concepts/risk-scoring) handles most use cases, Attesta provides three additional scorer types that let you combine, override, or compose scoring strategies. All scorers implement the same `RiskScorer` protocol and can be used interchangeably.
+
+## Scorer Types at a Glance
+
+| Scorer | Strategy | Use Case |
+|---|---|---|
+| `DefaultRiskScorer` | 5-factor weighted analysis | General-purpose scoring |
+| `CompositeRiskScorer` | Weighted average of multiple scorers | Blending domain + default logic |
+| `MaxRiskScorer` | Maximum score across scorers | Conservative / safety-first |
+| `FixedRiskScorer` | Always returns a constant score | Testing, overrides, bypass |
+
+---
+
+## CompositeRiskScorer
+
+The `CompositeRiskScorer` combines multiple scorers by computing a **weighted average** of their scores. Weights are normalized internally, so they do not need to sum to 1.0.
+
+```
+composite_score = Σ(scorer_i.score × weight_i) / Σ(weight_i)
+```
+
+<CodeGroup>
+```python Python
+from attesta.scoring import (
+    DefaultRiskScorer,
+    CompositeRiskScorer,
+    FixedRiskScorer,
+)
+
+# A custom scorer that adds a baseline risk floor
+composite = CompositeRiskScorer(
+    scorers=[
+        (DefaultRiskScorer(), 3.0),       # primary scorer, weight 3
+        (FixedRiskScorer(0.4), 1.0),      # baseline floor, weight 1
+    ]
+)
+
+# The weights are normalized: 3/(3+1) = 0.75 and 1/(3+1) = 0.25
+# If DefaultRiskScorer returns 0.20 → composite = (0.20 × 0.75) + (0.40 × 0.25) = 0.25
+# If DefaultRiskScorer returns 0.80 → composite = (0.80 × 0.75) + (0.40 × 0.25) = 0.70
+```
+
+```typescript TypeScript
+import {
+  DefaultRiskScorer,
+  CompositeRiskScorer,
+  FixedRiskScorer,
+} from "@attesta/core";
+
+const composite = new CompositeRiskScorer([
+  { scorer: new DefaultRiskScorer(), weight: 3.0 },
+  { scorer: new FixedRiskScorer(0.4), weight: 1.0 },
+]);
+
+// Weights normalized: 3/(3+1) = 0.75 and 1/(3+1) = 0.25
+// If DefaultRiskScorer returns 0.20 → composite = (0.20 × 0.75) + (0.40 × 0.25) = 0.25
+// If DefaultRiskScorer returns 0.80 → composite = (0.80 × 0.75) + (0.40 × 0.25) = 0.70
+```
+</CodeGroup>
+
+### When to Use CompositeRiskScorer
+
+- **Domain blending** — Combine a domain-specific scorer with the default scorer
+- **Risk floor** — Add a `FixedRiskScorer` to ensure no action scores below a certain threshold
+- **Gradual migration** — Transition from one scorer to another by adjusting weights over time
+
+<Note>
+Weights are normalized internally. Passing weights of `(3, 1)` is identical to passing `(0.75, 0.25)`. Use whatever scale is most readable for your team.
+</Note>
+
+---
+
+## MaxRiskScorer
+
+The `MaxRiskScorer` runs multiple scorers and takes the **maximum score** across all of them. This is the most conservative strategy — if any scorer considers an action risky, the overall score reflects that.
+
+```
+max_score = max(scorer_1.score, scorer_2.score, ..., scorer_n.score)
+```
+
+<CodeGroup>
+```python Python
+from attesta.scoring import (
+    DefaultRiskScorer,
+    MaxRiskScorer,
+)
+
+# Your custom domain scorer
+class ComplianceScorer:
+    def score(self, context) -> float:
+        if "pii" in str(context.arguments).lower():
+            return 0.9  # PII operations are always high risk
+        return 0.1
+
+# If either scorer flags the action, the higher score wins
+conservative = MaxRiskScorer(
+    scorers=[DefaultRiskScorer(), ComplianceScorer()]
+)
+```
+
+```typescript TypeScript
+import { DefaultRiskScorer, MaxRiskScorer } from "@attesta/core";
+
+class ComplianceScorer {
+  score(context: ActionContext): number {
+    if (JSON.stringify(context.arguments).toLowerCase().includes("pii")) {
+      return 0.9;
+    }
+    return 0.1;
+  }
+}
+
+const conservative = new MaxRiskScorer([
+  new DefaultRiskScorer(),
+  new ComplianceScorer(),
+]);
+```
+</CodeGroup>
+
+### When to Use MaxRiskScorer
+
+- **Defense in depth** — Multiple independent scorers act as safety nets
+- **Compliance overlays** — A compliance scorer can veto the default scorer's low rating
+- **Red lines** — Ensure certain patterns always trigger high-risk regardless of other factors
+
+<Warning>
+MaxRiskScorer is deliberately conservative. If you combine it with a scorer that returns high values for common operations, you may cause excessive approval friction. Monitor your approval rates after deployment.
+</Warning>
+
+---
+
+## FixedRiskScorer
+
+The `FixedRiskScorer` always returns the same pre-configured score, regardless of the action context. While simple, it has several practical applications.
+
+<CodeGroup>
+```python Python
+from attesta.scoring import FixedRiskScorer
+
+# Always returns 0.0 — effectively disables challenges
+bypass = FixedRiskScorer(0.0)
+
+# Always returns 0.85 — forces CRITICAL challenge for everything
+lockdown = FixedRiskScorer(0.85)
+
+# Always returns 0.5 — consistent MEDIUM challenge
+testing = FixedRiskScorer(0.5)
+```
+
+```typescript TypeScript
+import { FixedRiskScorer } from "@attesta/core";
+
+// Always returns 0.0 — effectively disables challenges
+const bypass = new FixedRiskScorer(0.0);
+
+// Always returns 0.85 — forces CRITICAL challenge for everything
+const lockdown = new FixedRiskScorer(0.85);
+
+// Always returns 0.5 — consistent MEDIUM challenge
+const testing = new FixedRiskScorer(0.5);
+```
+</CodeGroup>
+
+### When to Use FixedRiskScorer
+
+| Score | Effect | Use Case |
+|---|---|---|
+| `0.0` | Auto-approve everything | Development / testing |
+| `0.5` | MEDIUM challenge for everything | Uniform approval policy |
+| `0.85` | CRITICAL for everything | Lockdown / incident response |
+| Any value | Baseline in a CompositeRiskScorer | Risk floor strategy |
+
+<Tip>
+During incident response, you can swap to `FixedRiskScorer(0.85)` to force multi-party approval on all agent actions while you investigate. Return to the default scorer once the incident is resolved.
+</Tip>
+
+---
+
+## The RiskScorer Protocol
+
+All scorers implement the same protocol, making it straightforward to build your own.
+
+<CodeGroup>
+```python Python
+from attesta.protocols import RiskScorer
+from attesta.types import ActionContext
+
+class MyCustomScorer:
+    """Custom scorer implementing the RiskScorer protocol."""
+
+    def score(self, context: ActionContext) -> float:
+        """Return a risk score between 0.0 and 1.0."""
+        # Your custom logic here
+        risk = 0.0
+
+        if "admin" in context.action_name:
+            risk += 0.4
+
+        if context.hints.get("production"):
+            risk += 0.3
+
+        return min(risk, 1.0)
+```
+
+```typescript TypeScript
+import { RiskScorer, ActionContext } from "@attesta/core";
+
+class MyCustomScorer implements RiskScorer {
+  score(context: ActionContext): number {
+    let risk = 0.0;
+
+    if (context.actionName.includes("admin")) {
+      risk += 0.4;
+    }
+
+    if (context.hints?.production) {
+      risk += 0.3;
+    }
+
+    return Math.min(risk, 1.0);
+  }
+}
+```
+</CodeGroup>
+
+---
+
+## Combining Strategies
+
+You can nest scorers to build sophisticated policies:
+
+```python
+from attesta.scoring import (
+    DefaultRiskScorer,
+    CompositeRiskScorer,
+    MaxRiskScorer,
+    FixedRiskScorer,
+)
+
+# Layer 1: Blend default + domain scorer
+blended = CompositeRiskScorer(
+    scorers=[
+        (DefaultRiskScorer(), 2.0),
+        (ComplianceScorer(), 1.0),
+    ]
+)
+
+# Layer 2: Take the max of blended score and a risk floor
+final = MaxRiskScorer(
+    scorers=[blended, FixedRiskScorer(0.2)]
+)
+
+# No action can score below 0.2, and compliance concerns always raise the score
+```
+
+<CardGroup cols={2}>
+  <Card title="Risk Scoring" icon="gauge-high" href="/concepts/risk-scoring">
+    How DefaultRiskScorer's 5 factors work
+  </Card>
+  <Card title="Custom Scorer Guide" icon="code" href="/guides/custom-risk-scorer">
+    Build your own scorer from scratch
+  </Card>
+</CardGroup>

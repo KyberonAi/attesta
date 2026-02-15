@@ -1,0 +1,48 @@
+---
+title: "Changelog"
+description: "Version history and release notes for Attesta"
+icon: "clock-rotate-left"
+---
+
+All notable changes to Attesta are documented here. This project follows [Semantic Versioning](https://semver.org/). Until v1.0.0, minor versions may include breaking changes.
+
+<Note>
+Attesta is in early development (v0.1.x). APIs may change between minor releases. Pin your dependency to a specific version in production.
+</Note>
+
+---
+
+## v0.1.0 — Initial Release
+
+### Added
+
+- **`@gate` decorator** -- protect any Python function with human-in-the-loop approval. Supports sync and async functions with automatic event loop bridging.
+- **`gate()` wrapper** -- TypeScript equivalent of the `@gate` decorator with full generic type safety.
+- **`Attesta` class** -- high-level entry point for production use with shared defaults for risk scoring, rendering, audit logging, and trust.
+- **`Attesta.from_config()`** -- load configuration from YAML files with auto-detection of rich vs. legacy formats.
+- **`DefaultRiskScorer`** -- 5-factor heuristic risk scorer analyzing function name, arguments, docstring, caller hints, and novelty.
+- **`CompositeRiskScorer`** and **`MaxRiskScorer`** -- combine multiple scorers with weighted averaging or conservative max.
+- **Four risk levels** -- LOW, MEDIUM, HIGH, CRITICAL with configurable challenge mappings.
+- **Four challenge types** -- auto-approve, confirm, quiz, and teach-back.
+- **Multi-party challenge** -- CRITICAL actions can require approval from multiple independent reviewers.
+- **Adaptive trust engine** -- Bayesian trust scoring that adjusts risk based on agent history. Trusted agents see reduced friction; incidents revoke trust immediately.
+- **`min_review_seconds`** -- enforce minimum review duration to prevent rubber-stamping.
+- **`TerminalRenderer`** -- rich terminal UI with color-coded risk panels and interactive prompts (requires `pip install attesta[terminal]`).
+- **Pluggable protocols** -- `RiskScorer`, `Renderer`, `AuditLogger`, `TeachBackValidator`, and `ChallengeProtocol` interfaces for custom implementations.
+- **JSONL audit logger** -- append-only audit trail with SHA-256 hash chaining.
+- **`attesta` CLI** -- `init`, `audit verify`, `audit stats`, `audit rubber-stamps`, `trust show/list/revoke`, and `version` commands.
+- **Domain profile framework** -- `DomainProfile`, `DomainRegistry`, `DomainRiskScorer`, and `register_preset()` for custom industry-specific risk patterns.
+- **Risk amplifiers** in `attesta.yaml` -- regex patterns that boost risk scores for matching action names.
+- **MCP proxy** (`MCPProxy` class and `attesta mcp wrap` CLI) for wrapping any MCP server with Attesta approval.
+- **`attesta_tool_handler`** decorator for custom MCP servers written in Python.
+- **LangChain integration** -- `AttestaToolWrapper` for gating LangChain tool executions.
+- **OpenAI Agents SDK integration** -- approval hooks for OpenAI function calling.
+- **Anthropic Claude integration** -- tool-use interception for Claude API responses.
+- **CrewAI integration** -- `AttestaCrewAIToolWrapper` for gating CrewAI tool executions.
+- **Vercel AI SDK integration** -- `gatedVercelTool` and `createAttestaMiddleware` for TypeScript (TypeScript only).
+- **No-code nodes** -- n8n (`n8n-nodes-attesta`), Flowise (`flowise-attesta`), Langflow (`langflow-attesta`), and Dify (`dify-attesta`) integration packages.
+- **TypeScript SDK** (`@attesta/core`) -- full implementation with `gate()`, `Attesta`, `evaluate()`, and all core protocols.
+
+<Tip>
+Run `attesta audit verify` after installation to confirm the audit chain is working. The hash-chained JSONL format is tamper-evident -- modify any entry and every subsequent hash breaks.
+</Tip>

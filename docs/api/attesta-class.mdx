@@ -1,0 +1,333 @@
+---
+title: "Attesta Class"
+description: "High-level entry point for configuring and using Attesta in production"
+icon: "cube"
+---
+
+The `Attesta` class is the recommended high-level entry point for production use. It holds shared defaults for risk scoring, rendering, audit logging, and trust that are applied to every gate created from the instance.
+
+## Constructor
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+
+attesta = Attesta(
+    policy={"min_review_seconds": 3.0, "default_environment": "production"},
+    risk_scorer=my_scorer,
+    renderer=my_renderer,
+    audit_logger=my_logger,
+    trust_engine=my_trust_engine,
+)
+```
+
+```typescript TypeScript
+import { Attesta } from "@attesta/core";
+
+const attesta = new Attesta({
+  riskScorer: myScorer,
+  renderer: myRenderer,
+  auditLogger: myLogger,
+  minReviewSeconds: 3.0,
+});
+```
+</CodeGroup>
+
+### Parameters (Python)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `policy` | `dict[str, Any] \| None` | `None` | Configuration mapping, typically loaded from YAML. See recognized keys below. |
+| `risk_scorer` | `RiskScorer \| None` | `None` | Default risk scorer for all gates created by this instance. |
+| `renderer` | `Renderer \| None` | `None` | Default renderer for all gates. |
+| `audit_logger` | `AuditLogger \| None` | `None` | Default audit logger for all gates. |
+| `trust_engine` | `TrustEngine \| None` | `None` | Adaptive trust engine for risk adjustment based on agent history. |
+
+### Parameters (TypeScript)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `riskScorer` | `RiskScorer` | `DefaultRiskScorer` | Risk scorer for evaluating actions. |
+| `renderer` | `Renderer` | `DefaultRenderer` | Renderer for presenting challenges. |
+| `auditLogger` | `AuditLoggerProtocol` | No-op logger | Audit logger for recording decisions. |
+| `challengeMap` | `Partial<Record<RiskLevel, ChallengeType>>` | Default map | Override risk-level-to-challenge mapping. |
+| `minReviewSeconds` | `number` | `0` | Minimum review time in seconds. |
+| `riskOverride` | `RiskLevel` | — | Explicitly override the risk level. |
+| `riskHints` | `Record<string, unknown>` | `{}` | Extra hints for the risk scorer. |
+| `eventBus` | `EventBus` | — | Event bus for lifecycle notifications. |
+
+### Recognized Policy Keys
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `default_environment` | `str` | Default environment tag applied to all gates (e.g., `"production"`). |
+| `min_review_seconds` | `float` | Minimum wall-clock review time before approval is accepted. |
+| `challenge_map` | `dict[str, str]` | Mapping from risk level names to challenge type names. |
+| `challenges` | `dict[str, str]` | Alias for `challenge_map` (both are supported). |
+
+## from_config()
+
+Class method that loads configuration from a YAML file. This is the recommended way to create an `Attesta` instance in production.
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+
+# Load from YAML
+attesta = Attesta.from_config("attesta.yaml")
+
+# Use a Path object
+from pathlib import Path
+attesta = Attesta.from_config(Path("/etc/attesta/config.yaml"))
+```
+
+```typescript TypeScript
+import { Attesta } from "@attesta/core";
+
+const attesta = new Attesta();
+```
+</CodeGroup>
+
+### Config Format Detection
+
+`from_config()` auto-detects two configuration formats:
+
+**Rich format** (preferred) -- contains `policy:`, `risk:`, or `trust:` top-level sections:
+
+```yaml attesta.yaml (rich format)
+policy:
+  minimum_review_seconds:
+    medium: 3
+    high: 10
+  fail_mode: deny
+
+risk:
+  overrides:
+    deploy_production: critical
+
+trust:
+  influence: 0.3
+  ceiling: 0.9
+```
+
+**Legacy flat format** -- a simple key-value dict without structured sections:
+
+```yaml attesta.yaml (legacy format)
+default_environment: production
+min_review_seconds: 2.0
+challenge_map:
+  low: auto_approve
+  medium: confirm
+  high: quiz
+  critical: multi_party
+```
+
+<Note>
+When using the rich format, `from_config()` automatically initializes a `TrustEngine`, domain-aware risk scorer, `AuditLogger`, and `TerminalRenderer` (if `rich` is installed) based on the configuration sections. You do not need to wire these up manually.
+</Note>
+
+### Signature
+
+```python
+@classmethod
+def from_config(cls, path: str | Path) -> Attesta
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | `str \| Path` | Filesystem path to the YAML configuration file. |
+
+**Returns:** A fully configured `Attesta` instance.
+
+**Raises:**
+- `FileNotFoundError` if the config file does not exist.
+- `TypeError` if the file does not contain a top-level mapping.
+- `ImportError` if `pyyaml` is not installed (install with `pip install attesta[yaml]`).
+
+## gate() Method
+
+Decorator factory that creates gated functions using this instance's defaults. Supports the same three calling styles as the module-level `@gate`.
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+
+attesta = Attesta.from_config("attesta.yaml")
+
+# Style 1: Bare decorator
+@attesta.gate
+def read_file(path: str) -> str:
+    return open(path).read()
+
+# Style 2: Empty parentheses
+@attesta.gate()
+def list_users() -> list[str]:
+    return ["alice", "bob"]
+
+# Style 3: With per-gate overrides
+@attesta.gate(
+    risk="high",
+    risk_hints={"production": True},
+    agent_id="deploy-bot",
+    environment="production",
+    min_review_seconds=10.0,
+)
+def deploy(service: str, version: str) -> str:
+    """Deploy a service to production."""
+    return f"Deployed {service} v{version}"
+```
+
+```typescript TypeScript
+import { Attesta, gate } from "@attesta/core";
+
+const attesta = new Attesta();
+
+// gate() is a standalone function, not an instance method
+const deploy = gate(
+  async (service: string, version: string) => {
+    return `Deployed ${service} v${version}`;
+  },
+  {
+    attesta,
+    risk: "high",
+    riskHints: { production: true },
+    agentId: "deploy-bot",
+  }
+);
+```
+</CodeGroup>
+
+### Parameters
+
+All parameters from the module-level [`@gate`](/api/gate-decorator) are supported. Per-gate values override instance defaults. The following parameters are resolved from the instance if not explicitly provided:
+
+| Parameter | Fallback Source |
+|-----------|-----------------|
+| `risk_scorer` | `Attesta.risk_scorer` |
+| `renderer` | `Attesta.renderer` |
+| `audit_logger` | `Attesta.audit_logger` |
+| `challenge_map` | Parsed from `Attesta.policy` |
+| `min_review_seconds` | `Attesta.policy["min_review_seconds"]` |
+| `environment` | `Attesta.policy["default_environment"]` |
+
+<Warning>
+The `trust_engine` is always inherited from the `Attesta` instance and cannot be overridden per-gate. This ensures consistent trust tracking across all gates.
+</Warning>
+
+## evaluate() Method
+
+The primary entry point for framework integrations. Runs the full approval pipeline for an `ActionContext` and returns an `ApprovalResult`. Unlike the `@gate` decorator, this method does not raise `AttestaDenied` -- the caller is responsible for checking the verdict.
+
+<CodeGroup>
+```python Python
+from attesta import Attesta, ActionContext, Verdict
+
+attesta = Attesta.from_config("attesta.yaml")
+
+ctx = ActionContext(
+    function_name="deploy",
+    args=("api-gateway", "2.1.0"),
+    function_doc="Deploy a service to production.",
+    environment="production",
+    agent_id="deploy-bot",
+)
+
+result = await attesta.evaluate(ctx)
+
+if result.verdict == Verdict.APPROVED:
+    # Safe to proceed
+    deploy("api-gateway", "2.1.0")
+elif result.verdict == Verdict.DENIED:
+    print(f"Denied. Risk score: {result.risk_assessment.score}")
+```
+
+```typescript TypeScript
+import { Attesta, ActionContext, Verdict } from "@attesta/core";
+
+const attesta = new Attesta();
+
+const ctx: ActionContext = {
+  functionName: "deploy",
+  args: ["api-gateway", "2.1.0"],
+  functionDoc: "Deploy a service to production.",
+  environment: "production",
+  agentId: "deploy-bot",
+};
+
+const result = await attesta.evaluate(ctx);
+
+if (result.verdict === Verdict.APPROVED) {
+  await deploy("api-gateway", "2.1.0");
+}
+```
+</CodeGroup>
+
+### Signature
+
+```python
+async def evaluate(self, ctx: ActionContext) -> ApprovalResult
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `ctx` | `ActionContext` | The action context describing the function call under review. |
+
+**Returns:** An [`ApprovalResult`](/api/approval-result) containing the verdict, risk assessment, challenge result, and audit entry ID.
+
+<Note>
+The `evaluate()` method is `async`. In synchronous code, use `asyncio.run(attesta.evaluate(ctx))` or the `@gate` decorator which handles the async bridging automatically.
+</Note>
+
+## policy Property
+
+Returns a shallow copy of the active policy dictionary. Useful for inspecting the resolved configuration.
+
+```python Python
+from attesta import Attesta
+
+attesta = Attesta.from_config("attesta.yaml")
+
+policy = attesta.policy
+print(policy.get("default_environment"))   # "production"
+print(policy.get("min_review_seconds"))    # 3.0
+```
+
+### Signature
+
+```python
+@property
+def policy(self) -> dict[str, Any]
+```
+
+**Returns:** A copy of the internal policy dict. Modifying the returned dict does not affect the instance.
+
+## CoreAttesta (Orchestrator)
+
+The `CoreAttesta` class (importable as `from attesta import CoreAttesta`) is the low-level orchestrator that executes the full approval pipeline for a single action. Each `@gate` decorator creates one internally. You rarely need to use it directly.
+
+### Pipeline Steps
+
+The `evaluate()` method on `CoreAttesta` executes these steps in order:
+
+1. **Merge hints** -- Extra `risk_hints` are merged into `ctx.hints`
+2. **Risk scoring** -- The risk scorer produces a 0-1 score and risk level
+3. **Trust adjustment** -- If a trust engine is configured, the score is adjusted based on agent history (CRITICAL actions are never downgraded)
+4. **Challenge selection** -- The risk level is mapped to a challenge type via the challenge map
+5. **Verification** -- The challenge is presented through the renderer
+6. **Minimum review time** -- Enforces `min_review_seconds` with `asyncio.sleep`
+7. **Build result** -- Constructs the `ApprovalResult`
+8. **Audit** -- Logs the result via the audit logger
+9. **Update trust** -- Records the outcome in the trust engine
+
+```python Python
+from attesta import CoreAttesta
+from attesta.core.risk import DefaultRiskScorer
+
+core = CoreAttesta(
+    risk_scorer=DefaultRiskScorer(),
+    min_review_seconds=5.0,
+    risk_hints={"production": True},
+)
+
+result = await core.evaluate(ctx)
+```

@@ -1,0 +1,160 @@
+---
+title: "ConfirmChallenge"
+description: "Simple Y/N approval with a mandatory review pause to prevent rubber-stamping"
+icon: "check"
+---
+
+The `ConfirmChallenge` is the simplest verification step in Attesta's [challenge system](/concepts/challenges). It presents the operator with a summary of the action and asks for a **Y/N confirmation**. A built-in minimum review timer ensures the operator has enough time to actually read the summary before responding.
+
+## When It Is Used
+
+By default, `ConfirmChallenge` is assigned to **MEDIUM** risk actions (score `0.3`–`0.6`). These are typically state-changing operations that are well-understood and reversible — things like creating resources, updating configurations, or sending notifications.
+
+| Parameter | Default | Description |
+|---|---|---|
+| `min_review_seconds` | **3.0** | Minimum seconds before a response is accepted without rubber-stamp flagging |
+
+---
+
+## How It Works
+
+1. The operator is shown a panel with the action name, arguments, risk score, and risk level
+2. A timer starts counting from the moment the panel is displayed
+3. The operator types `Y` (approve) or `N` (deny)
+4. If the response arrives before `min_review_seconds`, the approval is still accepted but flagged as a **rubber stamp** in the [audit trail](/concepts/audit-trail)
+
+> **MEDIUM RISK -- Approval Required**
+>
+> **Action:** `create_user` | **Arguments:** `name="Jane Doe"`, `role="editor"` | **Risk:** 0.42 (MEDIUM) | **Agent:** content-bot
+>
+> Approve this action? [Y/n]
+
+---
+
+## Usage
+
+<CodeGroup>
+```python Python
+from attesta.challenges import ConfirmChallenge
+
+# Default: 3-second minimum review
+confirm = ConfirmChallenge()
+
+# Custom: require 5 seconds of review
+confirm = ConfirmChallenge(min_review_seconds=5.0)
+
+# Use in a custom challenge map
+from attesta import Attesta, RiskLevel
+
+attesta = Attesta(
+    challenge_map={
+        RiskLevel.LOW: None,
+        RiskLevel.MEDIUM: ConfirmChallenge(min_review_seconds=5.0),
+        RiskLevel.HIGH: "quiz",
+        RiskLevel.CRITICAL: "multi_party",
+    }
+)
+```
+
+```typescript TypeScript
+import { ConfirmChallenge, Attesta, RiskLevel } from "@attesta/core";
+
+// Default: 3-second minimum review
+const confirm = new ConfirmChallenge();
+
+// Custom: require 5 seconds of review
+const confirm = new ConfirmChallenge({ minReviewSeconds: 5.0 });
+
+// Use in a custom challenge map
+const attesta = new Attesta({
+  challengeMap: {
+    [RiskLevel.LOW]: null,
+    [RiskLevel.MEDIUM]: new ConfirmChallenge({ minReviewSeconds: 5.0 }),
+    [RiskLevel.HIGH]: "quiz",
+    [RiskLevel.CRITICAL]: "multi_party",
+  },
+});
+```
+</CodeGroup>
+
+---
+
+## Rubber-Stamp Detection
+
+If the operator responds in less than `min_review_seconds`, Attesta does **not** block the approval. Instead, it records the event with `min_review_met: false` in the audit trail. This allows security teams to retroactively identify patterns of insufficient review.
+
+```json
+{
+  "action_name": "create_user",
+  "challenge_type": "confirm",
+  "challenge_passed": true,
+  "review_duration_seconds": 0.8,
+  "min_review_met": false
+}
+```
+
+<Warning>
+Rubber-stamped approvals are valid but flagged. Use `audit.find_rubber_stamps()` to query all approvals that did not meet the minimum review time. Persistent rubber-stamping may indicate that the operator is not genuinely reviewing actions.
+</Warning>
+
+### Querying Rubber Stamps
+
+<CodeGroup>
+```python Python
+from attesta import AuditLogger
+
+audit = AuditLogger("./audit.jsonl")
+
+# Find all rubber-stamped approvals
+stamps = audit.find_rubber_stamps()
+for entry in stamps:
+    print(f"{entry.action_name}: {entry.review_duration_seconds}s "
+          f"(min: {entry.min_review_seconds}s)")
+```
+
+```typescript TypeScript
+import { AuditLogger } from "@attesta/core";
+
+const audit = new AuditLogger("./audit.jsonl");
+
+const stamps = await audit.findRubberStamps();
+for (const entry of stamps) {
+  console.log(
+    `${entry.actionName}: ${entry.reviewDurationSeconds}s ` +
+    `(min: ${entry.minReviewSeconds}s)`
+  );
+}
+```
+</CodeGroup>
+
+---
+
+## Confirm as a Sub-Challenge
+
+`ConfirmChallenge` also appears as a sub-challenge in [MultiPartyChallenge](/concepts/challenge-multi-party). When multi-party approval is required, each approver receives a different sub-challenge in a rotating pattern. Confirm is the lightest sub-challenge in the rotation (after teach-back and quiz).
+
+---
+
+## Configuration via YAML
+
+```yaml attesta.yaml
+policy:
+  challenge_map:
+    medium: confirm
+
+  min_review_seconds:
+    confirm: 5.0
+```
+
+<Tip>
+For environments where operators are trained and trusted, you can reduce `min_review_seconds` to `1.0`. For high-compliance environments (healthcare, finance), consider increasing it to `10.0` or higher.
+</Tip>
+
+<CardGroup cols={2}>
+  <Card title="QuizChallenge" icon="circle-question" href="/concepts/challenge-quiz">
+    Next level up: auto-generated comprehension questions
+  </Card>
+  <Card title="Audit Trail" icon="file-shield" href="/concepts/audit-trail">
+    How rubber stamps and review times are recorded
+  </Card>
+</CardGroup>

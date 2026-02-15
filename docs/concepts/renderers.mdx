@@ -1,0 +1,366 @@
+---
+title: "Renderers"
+description: "Terminal, plain-text, and custom renderers that control how Attesta presents challenges and results to operators"
+icon: "display"
+---
+
+Renderers control how Attesta presents risk assessments, challenges, and results to human operators. Attesta ships with two built-in renderers and supports custom implementations through the `Renderer` protocol.
+
+## Built-in Renderers
+
+| Renderer | Library | Best For |
+|---|---|---|
+| `TerminalRenderer` | [Rich](https://github.com/Textualize/rich) | Interactive terminals, local development, demos |
+| `PlainRenderer` | Built-in `print()`/`input()` | CI/CD, logging, environments without Rich |
+
+---
+
+## TerminalRenderer
+
+The `TerminalRenderer` uses the Rich library to create a polished, interactive terminal UI with colored panels, formatted tables, progress bars, and real-time prompts.
+
+### Features
+
+- **Colored risk panels** — Green (LOW), Yellow (MEDIUM), Orange (HIGH), Red (CRITICAL)
+- **Risk bar visualization** — Filled/empty bar showing the score position
+- **Formatted action details** — Function name, arguments, docstring, agent ID
+- **Interactive prompts** — Y/N, multiple choice, free-text input
+- **Timer display** — Shows elapsed review time
+- **Auto-approve notification** — Brief flash for low-risk actions
+
+### Example Output
+
+```
+╭──────────────────────────────────────────────────────╮
+│              HIGH RISK — Quiz Required                │
+│                                                      │
+│  Action:      deploy_service                         │
+│  Description: Deploy api-gateway v2.1.0 to staging   │
+│  Agent:       deploy-bot                             │
+│                                                      │
+│  Risk: ████████████████████████░░░░░░░░░░  0.68      │
+│  Level: HIGH                                         │
+│                                                      │
+│  Arguments:                                          │
+│    service = "api-gateway"                           │
+│    version = "2.1.0"                                 │
+│    env     = "staging"                               │
+╰──────────────────────────────────────────────────────╯
+```
+
+### Usage
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+from attesta.renderers import TerminalRenderer
+
+# TerminalRenderer is the default when Rich is installed
+attesta = Attesta()
+
+# Explicit selection
+attesta = Attesta(renderer=TerminalRenderer())
+
+# With custom theme colors
+attesta = Attesta(
+    renderer=TerminalRenderer(
+        theme={
+            "low": "green",
+            "medium": "yellow",
+            "high": "orange1",
+            "critical": "red",
+        }
+    )
+)
+```
+
+```typescript TypeScript
+import { Attesta, TerminalRenderer } from "@attesta/core";
+
+// TerminalRenderer is the default
+const attesta = new Attesta();
+
+// Explicit selection
+const attesta = new Attesta({
+  renderer: new TerminalRenderer(),
+});
+
+// With custom theme
+const attesta = new Attesta({
+  renderer: new TerminalRenderer({
+    theme: {
+      low: "green",
+      medium: "yellow",
+      high: "orange",
+      critical: "red",
+    },
+  }),
+});
+```
+</CodeGroup>
+
+<Note>
+If the Rich library is not installed, Attesta automatically falls back to `PlainRenderer`. Install Rich with `pip install attesta[terminal]` or `pip install attesta[all]` to enable the terminal UI.
+</Note>
+
+---
+
+## PlainRenderer
+
+The `PlainRenderer` uses Python's built-in `print()` and `input()` functions. No external dependencies are required. This renderer is ideal for environments where Rich is unavailable or where structured output is preferred over visual formatting.
+
+### Example Output
+
+```
+--- HIGH RISK --- Quiz Required ---
+Action:      deploy_service
+Description: Deploy api-gateway v2.1.0 to staging
+Agent:       deploy-bot
+Risk Score:  0.68 (HIGH)
+Arguments:   service="api-gateway", version="2.1.0", env="staging"
+
+Q1: Which service will be deployed?
+  a) auth-service
+  b) api-gateway
+  c) web-frontend
+  d) data-pipeline
+Your answer (a/b/c/d):
+```
+
+### Usage
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+from attesta.renderers import PlainRenderer
+
+attesta = Attesta(renderer=PlainRenderer())
+```
+
+```typescript TypeScript
+import { Attesta, PlainRenderer } from "@attesta/core";
+
+const attesta = new Attesta({
+  renderer: new PlainRenderer(),
+});
+```
+</CodeGroup>
+
+---
+
+## The Renderer Protocol
+
+All renderers implement the `Renderer` protocol with four methods:
+
+| Method | Purpose | When Called |
+|---|---|---|
+| `render_approval()` | Display the risk assessment panel and collect the challenge response | MEDIUM, HIGH, CRITICAL risk actions |
+| `render_challenge()` | Present a specific challenge (quiz, teach-back, etc.) and collect the response | During challenge execution |
+| `render_info()` | Display informational messages (e.g., trust score updates) | Various lifecycle events |
+| `render_auto_approved()` | Brief notification that an action was auto-approved | LOW risk actions |
+
+<CodeGroup>
+```python Python
+from attesta.protocols import Renderer
+from attesta.types import ActionContext, RiskAssessment, ChallengeResult
+
+class MyCustomRenderer:
+    """Custom renderer implementing the Renderer protocol."""
+
+    def render_approval(
+        self,
+        context: ActionContext,
+        assessment: RiskAssessment,
+    ) -> bool:
+        """Display the risk panel and return True (approve) or False (deny)."""
+        print(f"Action: {context.action_name}")
+        print(f"Risk: {assessment.score:.2f} ({assessment.level.value})")
+        response = input("Approve? [Y/n]: ")
+        return response.strip().lower() != "n"
+
+    def render_challenge(
+        self,
+        context: ActionContext,
+        challenge_type: str,
+        challenge_data: dict,
+    ) -> ChallengeResult:
+        """Present the challenge and return the result."""
+        # Implement challenge-specific rendering
+        ...
+
+    def render_info(self, message: str) -> None:
+        """Display an informational message."""
+        print(f"[INFO] {message}")
+
+    def render_auto_approved(
+        self,
+        context: ActionContext,
+        assessment: RiskAssessment,
+    ) -> None:
+        """Notify that an action was auto-approved."""
+        print(f"Auto-approved: {context.action_name} "
+              f"(risk: {assessment.score:.2f})")
+```
+
+```typescript TypeScript
+import {
+  Renderer,
+  ActionContext,
+  RiskAssessment,
+  ChallengeResult,
+} from "@attesta/core";
+
+class MyCustomRenderer implements Renderer {
+  async renderApproval(
+    context: ActionContext,
+    assessment: RiskAssessment
+  ): Promise<boolean> {
+    console.log(`Action: ${context.actionName}`);
+    console.log(`Risk: ${assessment.score.toFixed(2)} (${assessment.level})`);
+    // Collect approval from your UI
+    return true;
+  }
+
+  async renderChallenge(
+    context: ActionContext,
+    challengeType: string,
+    challengeData: Record<string, unknown>
+  ): Promise<ChallengeResult> {
+    // Implement challenge-specific rendering
+    ...
+  }
+
+  renderInfo(message: string): void {
+    console.log(`[INFO] ${message}`);
+  }
+
+  renderAutoApproved(
+    context: ActionContext,
+    assessment: RiskAssessment
+  ): void {
+    console.log(
+      `Auto-approved: ${context.actionName} (risk: ${assessment.score.toFixed(2)})`
+    );
+  }
+}
+```
+</CodeGroup>
+
+---
+
+## Custom Renderer Examples
+
+### Web UI Renderer
+
+Build a renderer that sends challenges to a web dashboard:
+
+```python
+import aiohttp
+
+class WebUIRenderer:
+    def __init__(self, dashboard_url: str):
+        self.dashboard_url = dashboard_url
+
+    async def render_approval(self, context, assessment):
+        async with aiohttp.ClientSession() as session:
+            # POST the challenge to the web dashboard
+            resp = await session.post(
+                f"{self.dashboard_url}/api/challenges",
+                json={
+                    "action": context.action_name,
+                    "arguments": context.arguments,
+                    "risk_score": assessment.score,
+                    "risk_level": assessment.level.value,
+                },
+            )
+            result = await resp.json()
+            return result["approved"]
+```
+
+### Slack Renderer
+
+Send approval requests to a Slack channel:
+
+```python
+from slack_sdk.web.async_client import AsyncWebClient
+
+class SlackRenderer:
+    def __init__(self, channel: str, token: str):
+        self.client = AsyncWebClient(token=token)
+        self.channel = channel
+
+    async def render_approval(self, context, assessment):
+        message = await self.client.chat_postMessage(
+            channel=self.channel,
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f"*{assessment.level.value.upper()} RISK*\n"
+                            f"Action: `{context.action_name}`\n"
+                            f"Risk: {assessment.score:.2f}"
+                        ),
+                    },
+                },
+                {
+                    "type": "actions",
+                    "elements": [
+                        {"type": "button", "text": {"type": "plain_text", "text": "Approve"}, "action_id": "approve"},
+                        {"type": "button", "text": {"type": "plain_text", "text": "Deny"}, "action_id": "deny"},
+                    ],
+                },
+            ],
+        )
+        # Wait for button click via Slack interactivity endpoint
+        return await self._wait_for_response(message["ts"])
+```
+
+<Tip>
+Custom renderers are the primary extension point for integrating Attesta into non-terminal environments. Web dashboards, mobile apps, Slack/Teams bots, and email-based approvals can all be implemented as custom renderers.
+</Tip>
+
+---
+
+## Renderer Selection Logic
+
+Attesta selects a renderer using this priority:
+
+1. **Explicit** — If you pass a `renderer` parameter, it is used
+2. **Rich available** — If Rich is installed and stdout is a TTY, `TerminalRenderer` is used
+3. **Fallback** — `PlainRenderer` is used in all other cases
+
+```python
+# Priority 1: Explicit renderer
+attesta = Attesta(renderer=SlackRenderer(...))
+
+# Priority 2: Rich auto-detection
+attesta = Attesta()  # TerminalRenderer if Rich is installed + TTY
+
+# Priority 3: Fallback
+# Automatically used in CI/CD or when Rich is not installed
+```
+
+---
+
+## Configuration via YAML
+
+```yaml attesta.yaml
+renderer:
+  type: terminal     # "terminal", "plain", or a dotted path to a custom class
+  theme:
+    low: green
+    medium: yellow
+    high: orange1
+    critical: red
+```
+
+<CardGroup cols={2}>
+  <Card title="Custom Renderer Guide" icon="paintbrush" href="/guides/custom-renderer">
+    Step-by-step guide to building a custom renderer
+  </Card>
+  <Card title="Challenge System" icon="lock" href="/concepts/challenges">
+    The challenges that renderers present to operators
+  </Card>
+</CardGroup>

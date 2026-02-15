@@ -1,0 +1,169 @@
+---
+title: "attesta init"
+description: "Generate an attesta.yaml configuration file with sensible defaults"
+icon: "wand-magic-sparkles"
+---
+
+The `attesta init` command creates an `attesta.yaml` configuration file in the current working directory. This file controls challenge policies, risk scoring, trust engine behavior, and audit settings for your project.
+
+## Usage
+
+```bash
+attesta init [--force]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--force` | Overwrite an existing `attesta.yaml` without prompting |
+
+## Example
+
+```bash
+$ attesta init
+Created /home/user/my-project/attesta.yaml
+Edit the file to customise policies, trust settings, and risk overrides.
+```
+
+If the file already exists:
+
+```bash
+$ attesta init
+error: attesta.yaml already exists in this directory. Use --force to overwrite.
+```
+
+Force overwrite:
+
+```bash
+$ attesta init --force
+Created /home/user/my-project/attesta.yaml
+Edit the file to customise policies, trust settings, and risk overrides.
+```
+
+## Generated Config Template
+
+The generated `attesta.yaml` contains all configurable sections with sensible defaults and inline documentation:
+
+```yaml attesta.yaml
+# attesta configuration
+# Docs: https://attesta.dev
+
+# Domain profile for industry-specific risk scoring.
+# Register custom profiles with register_preset(), then activate here.
+# domain: my-domain
+
+policy:
+  # How long a reviewer must spend (seconds) per risk level
+  minimum_review_seconds:
+    low: 0
+    medium: 3
+    high: 10
+    critical: 30
+
+  # Number of approvers required for each risk level
+  require_multi_party:
+    critical: 2
+
+  # What happens on timeout: deny | allow | escalate
+  fail_mode: deny
+  timeout_seconds: 300
+
+trust:
+  # Max risk reduction from high trust (0-1)
+  influence: 0.3
+  # Trust score ceiling
+  ceiling: 0.9
+  # Starting trust for unknown agents
+  initial_score: 0.3
+  # Trust decay per day of inactivity
+  decay_rate: 0.01
+
+risk:
+  # Map action names to explicit risk levels
+  overrides: {}
+  #   deploy_production: critical
+  #   restart_service: high
+
+  # Patterns that amplify risk
+  amplifiers: []
+  #   - pattern: ".*production.*"
+  #     boost: 0.3
+  #   - pattern: ".*delete.*"
+  #     boost: 0.2
+```
+
+<Note>
+All sections are optional. When omitted, Attesta uses safe defaults: actions are denied on timeout, CRITICAL operations require 2-party approval, and trust starts low at 0.3.
+</Note>
+
+## Typical Workflow
+
+<Steps>
+  <Step title="Initialize the config">
+    ```bash
+    cd my-ai-project
+    attesta init
+    ```
+  </Step>
+
+  <Step title="Activate a domain profile (optional)">
+    If you've registered a custom domain profile, uncomment and set the `domain` field:
+
+    ```yaml
+    domain: my-domain
+    ```
+
+    Register custom profiles with `register_preset()`. See the [domain profiles](/concepts/domain-profiles) guide.
+  </Step>
+
+  <Step title="Add risk overrides">
+    Pin specific actions to known risk levels:
+
+    ```yaml
+    risk:
+      overrides:
+        deploy_production: critical
+        read_config: low
+        restart_service: high
+    ```
+  </Step>
+
+  <Step title="Load in your application">
+    <CodeGroup>
+    ```python Python
+    from attesta import Attesta
+
+    attesta = Attesta.from_config("attesta.yaml")
+
+    @attesta.gate()
+    def deploy(service: str, version: str) -> str:
+        """Deploy a service to production."""
+        return f"Deployed {service} v{version}"
+    ```
+
+    ```typescript TypeScript
+    import { Attesta, gate } from "@attesta/core";
+
+    const attesta = new Attesta();
+
+    const deploy = gate(async (service: string, version: string) => {
+      return `Deployed ${service} v${version}`;
+    }, { attesta });
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+<Warning>
+Never set `fail_mode: allow` in production. This permits actions to proceed when challenges time out, bypassing the approval requirement entirely. Use it only for local development.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="attesta.yaml Reference" icon="file-code" href="/configuration/attesta-yaml">
+    Complete configuration reference with all options
+  </Card>
+  <Card title="Domain Profiles" icon="hospital" href="/domains/overview">
+    Activate industry-specific risk scoring
+  </Card>
+</CardGroup>

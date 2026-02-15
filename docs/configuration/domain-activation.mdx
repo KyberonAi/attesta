@@ -1,0 +1,174 @@
+---
+title: "Domain Activation"
+description: "Activate domain profiles for industry-specific compliance via attesta.yaml or programmatically"
+icon: "hospital"
+---
+
+The `domain` field in `attesta.yaml` activates one or more registered domain profiles. Domain profiles add industry-specific risk patterns, compliance rules, escalation policies, and challenge templates on top of the base Attesta configuration.
+
+<Note>
+Domain profiles must be registered as presets before they can be referenced in `attesta.yaml`. See [Custom Domains](/domains/custom-domains) for how to create and register profiles.
+</Note>
+
+## Quick Activation
+
+<Tabs>
+  <Tab title="Single Domain">
+    ```yaml attesta.yaml
+    domain: my-industry
+    ```
+  </Tab>
+  <Tab title="Multiple Domains">
+    ```yaml attesta.yaml
+    domain:
+      - my-industry
+      - another-domain
+    ```
+  </Tab>
+  <Tab title="Using Aliases">
+    ```yaml attesta.yaml
+    # Aliases are set when registering presets
+    domain: my-alias    # Resolves to the canonical profile name
+    ```
+  </Tab>
+</Tabs>
+
+## What Activation Does
+
+When you activate a domain profile, Attesta layers domain-specific behavior on top of the base configuration:
+
+### 1. Risk Patterns
+
+Domain-specific regex patterns are added to the risk scorer:
+
+```python
+# Example: a custom profile might add patterns like:
+# - "confidential|restricted|internal_only" → high risk contribution
+# - "delete_record|export_data" → elevated risk
+```
+
+### 2. Sensitive Terms
+
+A dictionary of domain-specific terms with risk weights is loaded into the scorer:
+
+```python
+# Example sensitive terms (term → weight):
+# "confidential": 0.8, "restricted": 0.9, "secret": 0.95
+```
+
+### 3. Critical and Safe Actions
+
+Actions that are always CRITICAL or always LOW are registered:
+
+```python
+# Critical actions (always CRITICAL): delete_records, export_all_data
+# Safe actions (always LOW): check_status, list_items
+```
+
+### 4. Escalation Rules
+
+Domain-specific escalation rules define when additional approvers or notifications are required.
+
+### 5. Review Time Overrides
+
+Domains can override the base `minimum_review_seconds` per risk level.
+
+### 6. Risk Floor and Production Multiplier
+
+Domains set a `base_risk_floor` (minimum risk for any action) and `production_multiplier` (applied when the environment is production).
+
+## Combining Multiple Domains
+
+When you activate multiple domains, Attesta merges them using the `DomainRegistry.merge()` method. The merge strategy is **conservative** -- it takes the highest (safest) value for scalar settings.
+
+### Merge Behavior
+
+| Field | Merge Strategy |
+|-------|---------------|
+| `risk_patterns` | Union of all patterns from both domains |
+| `sensitive_terms` | Union; if same term exists, take **highest** weight |
+| `critical_actions` | Union of both lists |
+| `safe_actions` | Union of both lists |
+| `escalation_rules` | Union of both lists |
+| `min_review_overrides` | Per-level max |
+| `base_risk_floor` | Take the **higher** floor |
+| `production_multiplier` | Take the **higher** multiplier |
+
+<Note>
+The conservative merge strategy means that combining domains always results in **stricter** policies, never weaker ones.
+</Note>
+
+## Programmatic Activation
+
+You can activate domains programmatically without a YAML file:
+
+```python
+from attesta.domains import DomainProfile, DomainRiskScorer
+from attesta import Attesta
+
+# Create a profile
+profile = DomainProfile(
+    name="my-industry",
+    display_name="My Industry",
+    description="Custom compliance profile.",
+    base_risk_floor=0.15,
+    production_multiplier=1.5,
+)
+
+# Wrap it in a DomainRiskScorer
+scorer = DomainRiskScorer(profile)
+
+# Pass to Attesta
+attesta = Attesta(risk_scorer=scorer)
+```
+
+## Strict Mode
+
+By default, Attesta fails fast if a domain profile name referenced in `attesta.yaml` has not been registered. Set `domain_strict: false` if you prefer a warning and fallback to non-domain scoring:
+
+```yaml attesta.yaml
+domain: my-industry
+domain_strict: false   # Warn and continue without domain scoring
+```
+
+Fail-fast is recommended for production deployments where a missing domain profile likely indicates a misconfiguration.
+
+## Domain + Config Interaction
+
+Domain settings and explicit `attesta.yaml` settings work together. Explicit config values take precedence for overlapping fields:
+
+```yaml attesta.yaml
+domain: my-industry
+
+policy:
+  # Overrides the domain's default review times
+  minimum_review_seconds:
+    critical: 90
+
+risk:
+  # Added on top of domain patterns
+  amplifiers:
+    - pattern: ".*production.*"
+      boost: 0.2
+
+  # Overrides domain risk levels for specific actions
+  overrides:
+    read_summary: low
+```
+
+The evaluation order is:
+
+1. Base Attesta defaults
+2. Domain profile settings are applied
+3. Explicit `attesta.yaml` `policy`, `risk`, and `trust` sections override domain defaults
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Domain Overview" icon="grid-2" href="/domains/overview">
+    Architecture and structure of domain profiles
+  </Card>
+  <Card title="Custom Domains" icon="puzzle-piece" href="/domains/custom-domains">
+    Build your own domain profile
+  </Card>
+</CardGroup>

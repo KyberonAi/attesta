@@ -1,0 +1,103 @@
+---
+title: "Installation"
+description: "Install Attesta for Python or TypeScript"
+icon: "download"
+---
+
+## Python
+
+<Tabs>
+  <Tab title="Core">
+    Install the core package with no optional dependencies:
+    ```bash
+    pip install attesta
+    ```
+  </Tab>
+  <Tab title="All extras">
+    Install with the rich terminal UI and YAML config support:
+    ```bash
+    pip install attesta[all]
+    ```
+  </Tab>
+  <Tab title="Specific extras">
+    Install only the integrations you need:
+    ```bash
+    # Rich terminal UI
+    pip install attesta[terminal]
+
+    # LangChain / LangGraph
+    pip install attesta[langchain]
+
+    # OpenAI Agents SDK
+    pip install attesta[openai]
+
+    # Anthropic Claude
+    pip install attesta[anthropic]
+
+    # CrewAI
+    pip install attesta[crewai]
+
+    # YAML config support
+    pip install attesta[yaml]
+
+    # Multiple extras
+    pip install attesta[langchain,openai,terminal]
+    ```
+  </Tab>
+</Tabs>
+
+### Requirements
+
+- Python 3.11 or later
+- No required dependencies for the core package
+- Optional: `rich` for the terminal UI, `pyyaml` for YAML config
+
+## TypeScript
+
+```bash
+npm install @attesta/core
+```
+
+Or with your preferred package manager:
+
+```bash
+# yarn
+yarn add @attesta/core
+
+# pnpm
+pnpm add @attesta/core
+```
+
+### Requirements
+
+- Node.js 18 or later
+- TypeScript 5.0+ (recommended)
+
+## No-Code Platforms
+
+For no-code platforms, install the platform-specific package:
+
+| Platform  | Installation                                  |
+|-----------|-----------------------------------------------|
+| n8n       | `npm install n8n-nodes-attesta`               |
+| Flowise   | `npm install flowise-nodes-attesta`           |
+| Langflow  | `pip install langflow-attesta`                |
+| Dify      | Install via Dify plugin marketplace           |
+
+## Verify Installation
+
+<CodeGroup>
+```python Python
+import attesta
+print(attesta.__version__)
+```
+
+```typescript TypeScript
+import { Attesta } from "@attesta/core";
+console.log("Attesta loaded successfully");
+```
+
+```bash CLI
+attesta version
+```
+</CodeGroup>

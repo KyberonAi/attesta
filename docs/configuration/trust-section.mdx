@@ -1,0 +1,249 @@
+---
+title: "Trust Section"
+description: "Configure the Bayesian trust engine — influence, ceiling, initial score, and decay rate"
+icon: "brain"
+---
+
+The `trust` section of `attesta.yaml` configures Attesta's Bayesian trust engine. The trust engine tracks each agent's history and uses it to reduce friction for consistently reliable agents, while maintaining hard safety limits that trust can never bypass.
+
+## Configuration
+
+```yaml attesta.yaml
+trust:
+  influence: 0.3        # Max risk reduction from trust
+  ceiling: 0.9          # Trust score hard cap
+  initial_score: 0.3    # Starting trust for new agents
+  decay_rate: 0.01      # Trust decay per day of inactivity
+```
+
+## How Trust Affects Risk
+
+The trust engine adjusts the risk score **downward** for agents with high trust. The adjustment formula is:
+
+```
+effective_risk = base_risk - (trust_score * influence)
+```
+
+For example, an agent with a trust score of `0.8` and default `influence: 0.3`:
+
+```
+effective_risk = 0.65 - (0.8 * 0.3) = 0.65 - 0.24 = 0.41
+```
+
+The base score of `0.65` (HIGH) is reduced to `0.41` (MEDIUM), changing the challenge from a quiz to a simple confirmation.
+
+<Warning>
+Trust **never** reduces CRITICAL actions. This is a hardcoded safety invariant (`critical_always_verify = True` on the Policy dataclass). If the base risk is CRITICAL (0.8+), trust adjustments are skipped entirely. This ensures that the most dangerous operations always receive full verification.
+</Warning>
+
+## Parameters
+
+### influence
+
+```yaml
+trust:
+  influence: 0.3  # default
+```
+
+The `influence` parameter sets the **maximum risk reduction** that trust can provide. It acts as a multiplier on the trust score:
+
+| Trust Score | Influence 0.3 | Influence 0.5 | Influence 0.1 |
+|-------------|---------------|---------------|---------------|
+| 0.0 (new) | -0.00 | -0.00 | -0.00 |
+| 0.3 (initial) | -0.09 | -0.15 | -0.03 |
+| 0.5 (moderate) | -0.15 | -0.25 | -0.05 |
+| 0.9 (ceiling) | -0.27 | -0.45 | -0.09 |
+
+<Tip>
+A higher influence value means trusted agents experience significantly less friction. Set it lower (e.g., `0.1`) in high-security environments where you want trust to have minimal impact. Set it higher (e.g., `0.5`) in development environments where trusted agents should move faster.
+</Tip>
+
+### ceiling
+
+```yaml
+trust:
+  ceiling: 0.9  # default
+```
+
+The `ceiling` parameter is a hard cap on the trust score. No agent can exceed this value, regardless of their approval history. This prevents any agent from reaching "fully trusted" status and eliminates the possibility of trust completely bypassing challenges.
+
+```python
+# Trust score progression (with ceiling 0.9)
+# After 10 approvals:   0.62
+# After 50 approvals:   0.84
+# After 200 approvals:  0.89
+# After 1000 approvals: 0.90  ← capped at ceiling
+```
+
+### initial_score
+
+```yaml
+trust:
+  initial_score: 0.3  # default
+```
+
+The `initial_score` parameter sets the starting trust level for agents with no history. This affects the first interaction:
+
+| Initial Score | Effect on First Action |
+|---------------|----------------------|
+| `0.0` | No trust benefit -- full risk scoring |
+| `0.3` (default) | Slight risk reduction (up to -0.09 with default influence) |
+| `0.5` | Moderate risk reduction (up to -0.15 with default influence) |
+| `0.7` | Significant risk reduction -- use only for pre-vetted agents |
+
+<Note>
+Setting `initial_score` higher than `0.5` means new, unproven agents receive meaningful risk reduction on their very first action. Use this only when agents are pre-vetted through an external process.
+</Note>
+
+### decay_rate
+
+```yaml
+trust:
+  decay_rate: 0.01  # default — per day of inactivity
+```
+
+The `decay_rate` parameter controls how quickly trust erodes when an agent is inactive. Trust decays linearly per day of inactivity:
+
+```
+trust_after_inactivity = trust_score - (days_inactive * decay_rate)
+```
+
+| Days Inactive | Trust (from 0.8) | Decay Rate 0.01 |
+|---------------|-------------------|-----------------|
+| 0 | 0.80 | No change |
+| 7 | 0.73 | -0.07 |
+| 30 | 0.50 | -0.30 |
+| 60 | 0.20 | -0.60 |
+| 80+ | 0.00 | Floored at 0.0 |
+
+This ensures that agents that have been idle for extended periods do not retain high trust. An agent that was trusted 3 months ago with a different codebase should not automatically receive trust benefits today.
+
+## Programmatic Configuration
+
+The `Policy` dataclass stores trust parameters and provides a convenience method to extract them:
+
+```python
+from attesta.config.loader import Policy
+
+policy = Policy(
+    trust_influence=0.3,
+    trust_ceiling=0.9,
+    trust_initial=0.3,
+    trust_decay_rate=0.01,
+)
+
+# Extract trust engine kwargs
+trust_kwargs = policy.to_trust_engine_kwargs()
+# Returns: {
+#   "influence": 0.3,
+#   "ceiling": 0.9,
+#   "initial_score": 0.3,
+#   "decay_rate": 0.01,
+# }
+```
+
+You can also configure the trust engine directly:
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+
+attesta = Attesta(
+    trust_influence=0.5,
+    trust_ceiling=0.85,
+    trust_initial=0.2,
+    trust_decay_rate=0.02,
+)
+
+@attesta.gate()
+def deploy(service: str) -> str:
+    """Deploy a service."""
+    return f"Deployed {service}"
+```
+
+```typescript TypeScript
+import { Attesta, gate } from "@attesta/core";
+
+const attesta = new Attesta({
+  trust: {
+    influence: 0.5,
+    ceiling: 0.85,
+    initialScore: 0.2,
+    decayRate: 0.02,
+  },
+});
+
+const deploy = gate(async (service: string) => {
+  return `Deployed ${service}`;
+}, { attesta });
+```
+</CodeGroup>
+
+## Security Profiles
+
+Here are recommended trust configurations for different security postures:
+
+<Tabs>
+  <Tab title="High Security">
+    For regulated environments (healthcare, finance, government):
+    ```yaml
+    trust:
+      influence: 0.1       # Trust has minimal impact
+      ceiling: 0.7         # Cap trust low
+      initial_score: 0.1   # Start with almost no trust
+      decay_rate: 0.03     # Rapid decay — trust must be actively maintained
+    ```
+  </Tab>
+  <Tab title="Standard (default)">
+    For production workloads with standard security requirements:
+    ```yaml
+    trust:
+      influence: 0.3
+      ceiling: 0.9
+      initial_score: 0.3
+      decay_rate: 0.01
+    ```
+  </Tab>
+  <Tab title="Development">
+    For development and testing environments:
+    ```yaml
+    trust:
+      influence: 0.5       # Trust has major impact
+      ceiling: 0.95        # Allow high trust
+      initial_score: 0.5   # Start with moderate trust
+      decay_rate: 0.005    # Slow decay
+    ```
+  </Tab>
+</Tabs>
+
+## Trust Feedback Loop
+
+The trust engine updates after every gated action:
+
+| Outcome | Trust Impact |
+|---------|-------------|
+| Action approved and executed | Trust increases (weighted by recency) |
+| Action denied by operator | Recorded but no trust increase |
+| Challenge failed (wrong quiz answer) | Recorded but no trust increase |
+| Security incident flagged | Penalty multiplier applied, trust drops rapidly |
+
+```python
+# Trust progression for a consistently approved agent
+# Action 1:  0.30 → 0.35  (initial + small increase)
+# Action 5:  0.35 → 0.48  (steady growth)
+# Action 20: 0.48 → 0.65  (approaching plateau)
+# Action 50: 0.65 → 0.78  (diminishing returns)
+# Incident:  0.78 → 0.31  (penalty multiplier)
+# Action 51: 0.31 → 0.34  (rebuilding from low)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Trust Engine" icon="brain" href="/concepts/trust-engine">
+    Deep dive into the Bayesian trust model
+  </Card>
+  <Card title="Domain Activation" icon="hospital" href="/configuration/domain-activation">
+    Activate domain profiles that adjust trust settings
+  </Card>
+</CardGroup>

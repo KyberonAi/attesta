@@ -1,0 +1,550 @@
+---
+title: "Production Deployment Guide"
+description: "Recommended configuration, audit persistence, trust tuning, performance, and monitoring for production Attesta deployments"
+icon: "server"
+---
+
+This guide covers everything you need to deploy Attesta in a production environment -- from YAML configuration to audit log persistence, trust engine tuning, performance optimization, and monitoring.
+
+## Recommended attesta.yaml
+
+Start with this production-ready configuration and adjust to your needs:
+
+```yaml attesta.yaml
+# ─────────────────────────────────────────────────────────
+# Attesta Production Configuration
+# ─────────────────────────────────────────────────────────
+
+policy:
+  # Deny actions when the approval system is unavailable
+  fail_mode: deny
+
+  # Minimum review times prevent rubber-stamping
+  minimum_review_seconds:
+    low: 0
+    medium: 3
+    high: 10
+    critical: 30
+
+  # Multi-party approval for critical actions
+  require_multi_party:
+    critical: 2
+
+  # Timeout for pending approvals (5 minutes)
+  timeout_seconds: 300
+
+  # Safety: CRITICAL actions are NEVER downgraded by trust
+  critical_always_verify: true
+
+# ─────────────────────────────────────────────────────────
+# Risk scoring
+# ─────────────────────────────────────────────────────────
+risk:
+  # Explicit overrides for known dangerous actions
+  overrides:
+    delete_production_database: critical
+    drop_table: critical
+    transfer_funds: critical
+    deploy_to_production: high
+    modify_permissions: high
+    send_bulk_email: high
+
+  # Patterns that amplify risk
+  amplifiers:
+    - pattern: "production"
+      target: "any"
+      boost: 0.3
+    - pattern: "pii|phi|ssn|credit_card"
+      target: "args"
+      boost: 0.4
+
+# ─────────────────────────────────────────────────────────
+# Trust engine
+# ─────────────────────────────────────────────────────────
+trust:
+  initial_score: 0.3
+  ceiling: 0.85
+  decay_rate: 0.01
+  influence: 0.25
+
+# ─────────────────────────────────────────────────────────
+# Audit trail
+# ─────────────────────────────────────────────────────────
+audit:
+  path: /var/log/attesta/audit.jsonl
+  signed: true
+  format: jsonl
+
+# ─────────────────────────────────────────────────────────
+# Domain profile (optional)
+# ─────────────────────────────────────────────────────────
+# domain: my-domain
+# domain:
+#   - profile-a
+#   - profile-b
+```
+
+<Note>
+Use `Attesta.from_config("attesta.yaml")` to load this configuration. The rich format (with `policy:`, `risk:`, `trust:` sections) automatically initializes the trust engine, domain scorer, audit logger, and terminal renderer.
+</Note>
+
+---
+
+## Fail Modes
+
+The `fail_mode` setting controls behavior when the approval system is unavailable (renderer crash, timeout, network failure):
+
+| Mode | Behavior | When to Use |
+|------|----------|-------------|
+| `deny` | Block the action and raise `AttestaDenied` | **Production default**. Safety-first. |
+| `allow` | Allow the action, log a warning | Low-risk development environments |
+| `escalate` | Escalate to a higher authority | Compliance-heavy environments |
+
+<Warning>
+Never use `fail_mode: allow` in production. If the approval system goes down, all actions would bypass human oversight.
+</Warning>
+
+---
+
+## Audit Log Persistence
+
+The built-in `AuditLogger` writes SHA-256 hash-chained entries to a JSONL file. For production, you need durable persistence.
+
+### Option 1: Local JSONL with Rotation
+
+The simplest approach -- write to a local file and rotate with `logrotate` or a similar tool.
+
+```yaml attesta.yaml
+audit:
+  path: /var/log/attesta/audit.jsonl
+```
+
+```bash logrotate config
+# /etc/logrotate.d/attesta
+/var/log/attesta/audit.jsonl {
+    daily
+    rotate 90
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+```
+
+<Note>
+When using `copytruncate`, the hash chain resumes correctly because `AuditLogger` reads the last entry's hash on startup. However, the chain integrity check (`verify_chain()`) should be run on each rotated file individually.
+</Note>
+
+### Option 2: PostgreSQL Audit Logger
+
+For queryable, durable audit storage, implement a database-backed logger:
+
+```python
+import uuid
+import asyncpg
+from attesta import AuditLogger, ActionContext, ApprovalResult
+from attesta.core.audit import build_entry
+
+class PostgresAuditLogger:
+    """Persists audit entries to PostgreSQL."""
+
+    def __init__(self, dsn: str):
+        self.dsn = dsn
+        self._pool = None
+
+    async def _get_pool(self):
+        if self._pool is None:
+            self._pool = await asyncpg.create_pool(self.dsn, min_size=2, max_size=10)
+        return self._pool
+
+    async def log(self, ctx: ActionContext, result: ApprovalResult) -> str:
+        entry = build_entry(ctx, result)
+        pool = await self._get_pool()
+
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO attesta_audit (
+                    entry_id, chain_hash, action_name, agent_id,
+                    risk_score, risk_level, challenge_type,
+                    challenge_passed, verdict, review_duration_seconds,
+                    environment, intercepted_at, decided_at, metadata
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                """,
+                entry.entry_id, entry.chain_hash,
+                entry.action_name, entry.agent_id,
+                entry.risk_score, entry.risk_level,
+                entry.challenge_type, entry.challenge_passed,
+                entry.verdict, entry.review_duration_seconds,
+                entry.environment, entry.intercepted_at,
+                entry.decided_at, entry.metadata,
+            )
+        return entry.entry_id
+```
+
+Database schema:
+
+```sql
+CREATE TABLE attesta_audit (
+    entry_id            TEXT PRIMARY KEY,
+    chain_hash          TEXT NOT NULL,
+    action_name         TEXT NOT NULL,
+    agent_id            TEXT DEFAULT '',
+    risk_score          REAL NOT NULL,
+    risk_level          TEXT NOT NULL,
+    challenge_type      TEXT DEFAULT '',
+    challenge_passed    BOOLEAN,
+    verdict             TEXT NOT NULL,
+    review_duration_seconds REAL DEFAULT 0,
+    environment         TEXT DEFAULT '',
+    intercepted_at      TIMESTAMPTZ,
+    decided_at          TIMESTAMPTZ,
+    metadata            JSONB DEFAULT '{}',
+    created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_agent ON attesta_audit(agent_id);
+CREATE INDEX idx_audit_verdict ON attesta_audit(verdict);
+CREATE INDEX idx_audit_risk_level ON attesta_audit(risk_level);
+CREATE INDEX idx_audit_created ON attesta_audit(created_at);
+```
+
+### Option 3: Cloud Storage (S3 / GCS)
+
+For compliance-heavy environments, write audit logs to immutable cloud storage:
+
+```python
+import json
+import uuid
+import aioboto3
+from attesta import AuditLogger, ActionContext, ApprovalResult
+from attesta.core.audit import build_entry
+
+class S3AuditLogger:
+    """Writes each audit entry as an individual S3 object."""
+
+    def __init__(self, bucket: str, prefix: str = "attesta/audit/"):
+        self.bucket = bucket
+        self.prefix = prefix
+
+    async def log(self, ctx: ActionContext, result: ApprovalResult) -> str:
+        entry = build_entry(ctx, result)
+        key = (
+            f"{self.prefix}"
+            f"{entry.intercepted_at[:10]}/"  # partition by date
+            f"{entry.entry_id}.json"
+        )
+
+        session = aioboto3.Session()
+        async with session.client("s3") as s3:
+            await s3.put_object(
+                Bucket=self.bucket,
+                Key=key,
+                Body=entry.to_json().encode("utf-8"),
+                ContentType="application/json",
+                ServerSideEncryption="aws:kms",
+            )
+        return entry.entry_id
+```
+
+<Tip>
+Enable S3 Object Lock in compliance mode to make audit entries truly immutable. This satisfies SOC-2, HIPAA, and PCI-DSS requirements for tamper-proof audit trails.
+</Tip>
+
+---
+
+## Trust Engine Tuning
+
+The trust engine adjusts effective risk scores based on agent history. Getting the parameters right is critical for balancing security with usability.
+
+### Parameter Reference
+
+| Parameter | Default | Range | Effect |
+|-----------|---------|-------|--------|
+| `initial_score` | 0.3 | 0.0 - 1.0 | Starting trust for new agents. Lower = more cautious. |
+| `ceiling` | 0.9 | 0.0 - 1.0 | Maximum achievable trust. Should never be 1.0. |
+| `decay_rate` | 0.01 | 0.0 - 0.1 | Trust decay per day of inactivity. |
+| `incident_penalty` | 0.7 | 0.0 - 1.0 | Multiplicative penalty per security incident. |
+| `influence` | 0.3 | 0.0 - 0.5 | Maximum risk reduction from trust. |
+
+### Tuning Strategies
+
+<Tabs>
+  <Tab title="Conservative">
+    For high-security environments (finance, healthcare):
+
+    ```yaml
+    trust:
+      initial_score: 0.2
+      ceiling: 0.75
+      decay_rate: 0.02
+      influence: 0.15
+    ```
+
+    Agents start with very low trust, the ceiling is restrictive, trust decays faster, and the maximum risk discount is small.
+  </Tab>
+
+  <Tab title="Balanced">
+    For general production use:
+
+    ```yaml
+    trust:
+      initial_score: 0.3
+      ceiling: 0.85
+      decay_rate: 0.01
+      influence: 0.25
+    ```
+
+    This is the recommended starting point. Agents gradually earn trust, and well-established agents get moderate risk reduction.
+  </Tab>
+
+  <Tab title="Permissive">
+    For development-heavy teams with high trust baselines:
+
+    ```yaml
+    trust:
+      initial_score: 0.5
+      ceiling: 0.9
+      decay_rate: 0.005
+      influence: 0.35
+    ```
+
+    Agents start with moderate trust and can earn significant risk reduction. Use only with strong audit controls.
+  </Tab>
+</Tabs>
+
+### Monitoring Trust
+
+Use the CLI to inspect trust scores:
+
+```bash
+# View trust profile for an agent
+attesta trust show --agent deploy-bot
+
+# List all agent trust profiles
+attesta trust list
+
+# Revoke trust after an incident
+attesta trust revoke --agent compromised-bot
+```
+
+Programmatically:
+
+```python
+from attesta.core.trust import TrustEngine
+from pathlib import Path
+
+engine = TrustEngine(storage_path=Path(".attesta/trust.json"))
+
+# Check trust
+score = engine.compute_trust("deploy-bot", domain="my-infra")
+print(f"Trust score: {score:.2f}")
+
+# Record an incident (drops trust significantly)
+engine.record_incident(
+    agent_id="deploy-bot",
+    action_name="unauthorized_access",
+    severity="high",
+)
+
+# Emergency revocation
+engine.revoke("compromised-bot")
+```
+
+<Warning>
+The trust engine has a critical safety invariant: CRITICAL-level actions are **never** downgraded by trust, regardless of how trusted the agent is. This ensures that the most dangerous actions always require full verification.
+</Warning>
+
+---
+
+## Performance Considerations
+
+### Scorer Performance
+
+The `DefaultRiskScorer` is fast (sub-millisecond) and suitable for high-throughput environments. Custom scorers that involve I/O (database lookups, ML model inference) add latency.
+
+| Scorer Type | Typical Latency | Recommendation |
+|-------------|----------------|----------------|
+| DefaultRiskScorer | < 1ms | No optimization needed |
+| Rule-based custom | 1-5ms | No optimization needed |
+| ML model inference | 10-100ms | Cache predictions, use `CompositeRiskScorer` as fallback |
+| External API scorer | 50-500ms | Add timeouts, cache results, use async I/O |
+
+### Audit Logger Performance
+
+The JSONL file logger is append-only and fast. For high-volume environments:
+
+```python
+# Use a buffered writer for high throughput
+import asyncio
+from attesta.core.audit import AuditLogger
+
+logger = AuditLogger(path="/var/log/attesta/audit.jsonl")
+
+# The built-in logger is already async and non-blocking
+# For extreme throughput, batch writes with an async queue:
+class BufferedAuditLogger:
+    def __init__(self, inner: AuditLogger, batch_size: int = 100):
+        self._inner = inner
+        self._queue = asyncio.Queue(maxsize=batch_size * 2)
+        self._task = None
+
+    async def log(self, ctx, result) -> str:
+        entry_id = await self._inner.log(ctx, result)
+        return entry_id
+```
+
+### Renderer Latency
+
+The renderer is the primary source of latency since it waits for human input. For non-blocking architectures:
+
+1. Use `Attesta.evaluate()` with an async renderer that returns immediately with a pending status
+2. Process the approval asynchronously and execute the action when approved
+3. Set `timeout_seconds` to prevent indefinite blocking
+
+---
+
+## Monitoring and Alerting
+
+### Key Metrics to Track
+
+| Metric | Description | Alert Threshold |
+|--------|-------------|-----------------|
+| Approval rate | % of actions approved | < 50% (too restrictive) or > 99% (too permissive) |
+| Rubber stamp rate | % of fast approvals on HIGH+ actions | > 10% |
+| Average review time | Mean time spent reviewing | < 2s for HIGH (too fast) |
+| Denial rate by agent | Per-agent denial frequency | > 20% for a single agent |
+| Audit chain integrity | Hash chain verification | Any broken links |
+| Trust score distribution | Agent trust score histogram | Any agent at 0.0 |
+
+### Rubber Stamp Detection
+
+The built-in audit logger provides a method to find suspiciously fast approvals:
+
+```python
+from attesta.core.audit import AuditLogger
+
+logger = AuditLogger(path="/var/log/attesta/audit.jsonl")
+
+# Find approvals that were too fast for their risk level
+stamps = logger.find_rubber_stamps(
+    max_review_seconds=5.0,
+    min_risk="high",
+)
+
+if stamps:
+    print(f"Found {len(stamps)} potential rubber stamps:")
+    for entry in stamps:
+        print(
+            f"  {entry.action_name} by {entry.agent_id} "
+            f"({entry.review_duration_seconds:.1f}s, "
+            f"risk={entry.risk_level})"
+        )
+```
+
+### Audit Chain Verification
+
+Run chain verification as a scheduled check:
+
+```python
+from attesta.core.audit import AuditLogger
+
+logger = AuditLogger(path="/var/log/attesta/audit.jsonl")
+intact, total, broken = logger.verify_chain()
+
+if not intact:
+    # ALERT: Audit trail has been tampered with
+    print(f"CRITICAL: {len(broken)} broken links in {total} entries")
+    print(f"Broken at indices: {broken}")
+else:
+    print(f"Audit chain intact: {total} entries verified")
+```
+
+### Prometheus Metrics Example
+
+```python
+from prometheus_client import Counter, Histogram, Gauge
+from attesta import AuditLogger, ActionContext, ApprovalResult
+
+# Define metrics
+approval_total = Counter(
+    "attesta_approvals_total",
+    "Total approval decisions",
+    ["verdict", "risk_level", "environment"],
+)
+review_duration = Histogram(
+    "attesta_review_duration_seconds",
+    "Time spent on human review",
+    ["risk_level"],
+)
+trust_score = Gauge(
+    "attesta_trust_score",
+    "Current trust score per agent",
+    ["agent_id"],
+)
+
+class MetricsAuditLogger:
+    """Wraps an audit logger and emits Prometheus metrics."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    async def log(self, ctx: ActionContext, result: ApprovalResult) -> str:
+        # Record metrics
+        approval_total.labels(
+            verdict=result.verdict.value,
+            risk_level=result.risk_assessment.level.value,
+            environment=ctx.environment,
+        ).inc()
+
+        review_duration.labels(
+            risk_level=result.risk_assessment.level.value,
+        ).observe(result.review_time_seconds)
+
+        # Delegate to the real logger
+        return await self._inner.log(ctx, result)
+```
+
+---
+
+## Deployment Checklist
+
+<Steps>
+  <Step title="Configure attesta.yaml">
+    Set `fail_mode: deny`, configure minimum review times, and set up risk overrides for your most dangerous actions.
+  </Step>
+
+  <Step title="Set Up Persistent Audit Logging">
+    Choose a durable storage backend (PostgreSQL, S3, or JSONL with rotation) and configure the audit logger.
+  </Step>
+
+  <Step title="Configure the Renderer">
+    Specify an explicit renderer. Do not rely on auto-detection in production containers.
+  </Step>
+
+  <Step title="Tune the Trust Engine">
+    Start with the balanced preset and adjust based on your organization's risk tolerance.
+  </Step>
+
+  <Step title="Set Up Monitoring">
+    Track approval rates, rubber stamp frequency, review times, and audit chain integrity.
+  </Step>
+
+  <Step title="Run Integration Tests">
+    Verify the full pipeline with your production configuration using mock renderers (see the [Testing Guide](/guides/testing)).
+  </Step>
+
+  <Step title="Schedule Audit Verification">
+    Run `verify_chain()` daily and alert on any broken links.
+  </Step>
+</Steps>
+
+<CardGroup cols={2}>
+  <Card title="attesta.yaml Reference" icon="file-code" href="/configuration/attesta-yaml">
+    Full configuration file reference
+  </Card>
+  <Card title="Testing Guide" icon="vial" href="/guides/testing">
+    Testing patterns for gated functions
+  </Card>
+</CardGroup>

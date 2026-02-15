@@ -1,0 +1,58 @@
+# ──────────────────────────────────────────────────────────────
+# Docs — Build & deploy to Mintlify
+# Deploys on push to main when docs/ changes.
+# Preview builds on PRs that touch docs/.
+# ──────────────────────────────────────────────────────────────
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "docs.json"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "docs.json"
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Validate docs build ─────────────────────────────────────
+  docs-lint:
+    name: Docs Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Mintlify CLI
+        run: npm install -g mintlify
+
+      - name: Validate docs
+        working-directory: docs/
+        run: mintlify broken-links
+
+  # ── Deploy to Mintlify (main branch only) ────────────────────
+  deploy:
+    name: Deploy Docs
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: docs-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Mintlify
+        uses: mintlify/action@v1
+        with:
+          mintlify-api-key: ${{ secrets.MINTLIFY_API_KEY }}
+          directory: docs/

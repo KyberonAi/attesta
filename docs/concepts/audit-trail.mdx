@@ -1,0 +1,275 @@
+---
+title: "Audit Trail"
+description: "Tamper-proof SHA-256 hash-chained audit log for every gated action, decision, and incident"
+icon: "file-shield"
+---
+
+Every decision made through Attesta — whether auto-approved, manually approved, or denied — is recorded in a **tamper-proof audit trail**. The log uses a SHA-256 hash chain where each entry's integrity depends on all previous entries, making it impossible to modify or delete records without detection.
+
+## Hash Chain Mechanism
+
+Each audit entry contains a `chain_hash` computed from the previous entry's hash and the current entry's canonical JSON:
+
+```
+chain_hash = SHA-256(previous_hash + canonical_json(entry))
+```
+
+The first entry in the chain uses a **genesis hash** of `"0" * 64` (64 zeros) as its `previous_hash`.
+
+```
+Entry 1: hash = SHA-256("0000...0000" + json_1)
+Entry 2: hash = SHA-256(hash_1 + json_2)
+Entry 3: hash = SHA-256(hash_2 + json_3)
+...
+```
+
+<Note>
+Canonical JSON means keys are sorted alphabetically, no extra whitespace, and consistent encoding. This ensures the same data always produces the same hash regardless of serialization order.
+</Note>
+
+---
+
+## Storage Format
+
+The audit trail is stored as **JSONL** (JSON Lines) — one JSON object per line, one line per entry. This format is:
+
+- **Append-only** — New entries are appended, never inserted
+- **Streamable** — Can be processed line-by-line without loading the entire file
+- **Grep-friendly** — Standard text tools work out of the box
+
+```jsonl
+{"entry_id":"e1a2b3c4","chain_hash":"a9f3...","previous_hash":"0000...","action_name":"get_users","risk_score":0.12,...}
+{"entry_id":"f5d6e7a8","chain_hash":"b4c7...","previous_hash":"a9f3...","action_name":"deploy_service","risk_score":0.65,...}
+{"entry_id":"c9b0a1d2","chain_hash":"e8f2...","previous_hash":"b4c7...","action_name":"drop_table","risk_score":0.91,...}
+```
+
+---
+
+## AuditEntry Fields
+
+Each entry in the audit trail contains these fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `entry_id` | string | Unique identifier for this entry |
+| `chain_hash` | string | SHA-256 hash of this entry (includes previous hash) |
+| `previous_hash` | string | Hash of the preceding entry (genesis: `"0" * 64`) |
+| `action_name` | string | Name of the gated function |
+| `action_description` | string | Human-readable description of the action |
+| `agent_id` | string | Identifier of the AI agent that initiated the action |
+| `risk_score` | float | Computed risk score (0.0–1.0) |
+| `risk_level` | string | Risk level: `low`, `medium`, `high`, `critical` |
+| `challenge_type` | string | Challenge presented: `confirm`, `quiz`, `teach_back`, `multi_party`, or `null` |
+| `challenge_passed` | boolean | Whether the challenge was passed |
+| `approver_ids` | list[string] | IDs of human approvers (empty for auto-approve) |
+| `verdict` | string | `approved`, `denied`, or `auto-approved` |
+| `review_duration_seconds` | float | Time between challenge presentation and response |
+| `min_review_met` | boolean | Whether the minimum review time was met |
+| `intercepted_at` | string | ISO 8601 timestamp when the action was intercepted |
+| `decided_at` | string | ISO 8601 timestamp when the decision was made |
+| `executed_at` | string | ISO 8601 timestamp when the action executed (null if denied) |
+| `session_id` | string | Session identifier for grouping related actions |
+| `environment` | string | Execution environment (`development`, `staging`, `production`) |
+| `metadata` | object | Arbitrary key-value pairs for custom data |
+
+---
+
+## Usage
+
+<CodeGroup>
+```python Python
+from attesta import AuditLogger
+
+# Initialize the audit logger
+audit = AuditLogger("./audit.jsonl")
+
+# Log an entry (typically called automatically by Attesta)
+audit.log(
+    action_name="deploy_service",
+    action_description="Deploy api-gateway v2.1.0 to production",
+    agent_id="deploy-bot",
+    risk_score=0.65,
+    risk_level="high",
+    challenge_type="quiz",
+    challenge_passed=True,
+    approver_ids=["alice@company.com"],
+    verdict="approved",
+    review_duration_seconds=14.2,
+    min_review_met=True,
+    session_id="sess_abc123",
+    environment="production",
+    metadata={"service": "api-gateway", "version": "2.1.0"},
+)
+
+# Verify the entire chain integrity
+is_valid = audit.verify_chain()
+print(f"Chain valid: {is_valid}")  # True if no tampering
+
+# Query entries
+entries = audit.query(
+    action_name="deploy_service",
+    agent_id="deploy-bot",
+    verdict="approved",
+)
+
+# Find rubber-stamped approvals (faster than min review time)
+stamps = audit.find_rubber_stamps()
+for entry in stamps:
+    print(f"{entry.action_name}: reviewed in {entry.review_duration_seconds}s")
+```
+
+```typescript TypeScript
+import { AuditLogger } from "@attesta/core";
+
+// Initialize the audit logger
+const audit = new AuditLogger("./audit.jsonl");
+
+// Log an entry (typically called automatically by Attesta)
+await audit.log({
+  actionName: "deploy_service",
+  actionDescription: "Deploy api-gateway v2.1.0 to production",
+  agentId: "deploy-bot",
+  riskScore: 0.65,
+  riskLevel: "high",
+  challengeType: "quiz",
+  challengePassed: true,
+  approverIds: ["alice@company.com"],
+  verdict: "approved",
+  reviewDurationSeconds: 14.2,
+  minReviewMet: true,
+  sessionId: "sess_abc123",
+  environment: "production",
+  metadata: { service: "api-gateway", version: "2.1.0" },
+});
+
+// Verify the entire chain integrity
+const isValid = await audit.verifyChain();
+console.log(`Chain valid: ${isValid}`);
+
+// Query entries
+const entries = await audit.query({
+  actionName: "deploy_service",
+  agentId: "deploy-bot",
+  verdict: "approved",
+});
+
+// Find rubber-stamped approvals
+const stamps = await audit.findRubberStamps();
+for (const entry of stamps) {
+  console.log(`${entry.actionName}: reviewed in ${entry.reviewDurationSeconds}s`);
+}
+```
+</CodeGroup>
+
+---
+
+## Chain Verification
+
+The `verify_chain()` method walks the entire log from the genesis entry and recomputes every hash. If any entry has been modified, inserted, deleted, or reordered, the verification fails.
+
+```python
+audit = AuditLogger("./audit.jsonl")
+
+if not audit.verify_chain():
+    print("ALERT: Audit trail has been tampered with!")
+    # Investigate immediately
+```
+
+### What Verification Catches
+
+| Tampering Type | Detection |
+|---|---|
+| Modified entry | Hash mismatch at the modified entry |
+| Deleted entry | Hash mismatch at the entry after the deleted one |
+| Inserted entry | Hash mismatch at the inserted entry |
+| Reordered entries | Hash mismatch at every reordered position |
+| Truncated tail | Entry count mismatch (if expected count is known) |
+
+<Warning>
+Chain verification is a **forward-only** operation — it can detect tampering but cannot recover the original data. For production use, consider replicating the audit log to an immutable store (S3 with Object Lock, append-only databases, etc.).
+</Warning>
+
+---
+
+## CLI Verification
+
+The Attesta CLI provides a convenient command for chain verification:
+
+```bash
+# Verify the audit trail
+attesta audit verify ./audit.jsonl
+
+# Output:
+# ✓ Chain integrity verified (1,247 entries)
+# ✓ No rubber stamps detected
+# ✓ All minimum review times met
+
+# Find rubber stamps
+attesta audit rubber-stamps ./audit.jsonl
+
+# Export entries for analysis
+attesta audit export --agent deploy-bot --verdict denied ./audit.jsonl
+```
+
+---
+
+## Rubber-Stamp Detection
+
+The `find_rubber_stamps()` method returns all entries where `min_review_met` is `false` — meaning the operator responded faster than the minimum review time for their challenge type.
+
+```python
+stamps = audit.find_rubber_stamps()
+print(f"Found {len(stamps)} rubber-stamped approvals")
+
+for entry in stamps:
+    print(
+        f"  {entry.action_name} by {entry.approver_ids}: "
+        f"{entry.review_duration_seconds:.1f}s "
+        f"(min required: {entry.challenge_type} threshold)"
+    )
+```
+
+<Tip>
+Set up automated monitoring that runs `find_rubber_stamps()` on a schedule. A high rubber-stamp rate may indicate that operators are fatigued, that minimum review times are too aggressive, or that the risk scorer is generating too many false positives at higher risk levels.
+</Tip>
+
+---
+
+## Example Audit Entry
+
+```json
+{
+  "entry_id": "aud_7f3a9b2c",
+  "chain_hash": "a9f3e7b2c4d6f8a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d3e5f7",
+  "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "action_name": "delete_user",
+  "action_description": "Permanently delete user account usr_12345",
+  "agent_id": "admin-bot",
+  "risk_score": 0.82,
+  "risk_level": "critical",
+  "challenge_type": "multi_party",
+  "challenge_passed": true,
+  "approver_ids": ["alice@company.com", "bob@company.com"],
+  "verdict": "approved",
+  "review_duration_seconds": 47.3,
+  "min_review_met": true,
+  "intercepted_at": "2025-01-15T14:30:00.000Z",
+  "decided_at": "2025-01-15T14:30:47.300Z",
+  "executed_at": "2025-01-15T14:30:47.450Z",
+  "session_id": "sess_abc123",
+  "environment": "production",
+  "metadata": {
+    "user_id": "usr_12345",
+    "reason": "GDPR right-to-erasure request"
+  }
+}
+```
+
+<CardGroup cols={2}>
+  <Card title="Challenge System" icon="lock" href="/concepts/challenges">
+    How challenges generate the audit data
+  </Card>
+  <Card title="CLI Audit Commands" icon="terminal" href="/cli/audit">
+    Verify and query audit trails from the command line
+  </Card>
+</CardGroup>

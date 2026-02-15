@@ -1,0 +1,221 @@
+---
+title: "Challenge System"
+description: "How Attesta selects and presents escalating human verification challenges based on risk level"
+icon: "lock"
+---
+
+After the [risk scorer](/concepts/risk-scoring) produces a score and the [risk level](/concepts/risk-levels) is determined, Attesta selects a **challenge** — a verification step the human operator must complete before the action proceeds. Challenges scale in difficulty with risk: low-risk actions pass through automatically, while critical actions require multiple independent approvers.
+
+## Default Challenge Map
+
+| Risk Level | Score Range | Challenge | Min Review Time |
+|---|---|---|---|
+| **LOW** | 0.0–0.3 | Auto-approve (no challenge) | — |
+| **MEDIUM** | 0.3–0.6 | [ConfirmChallenge](/concepts/challenge-confirm) | 3.0s |
+| **HIGH** | 0.6–0.8 | [QuizChallenge](/concepts/challenge-quiz) | 10.0s |
+| **CRITICAL** | 0.8–1.0 | [MultiPartyChallenge](/concepts/challenge-multi-party) | 30.0s |
+
+<Note>
+The minimum review time prevents "rubber-stamping" — approvals that happen too fast to indicate genuine review. If an operator responds before the minimum time elapses, the challenge is flagged in the [audit trail](/concepts/audit-trail).
+</Note>
+
+---
+
+## The Four Challenge Types
+
+<CardGroup cols={2}>
+  <Card title="Confirm" icon="check" href="/concepts/challenge-confirm">
+    Simple Y/N prompt with a mandatory pause. Suitable for state-changing but well-understood actions.
+  </Card>
+  <Card title="Quiz" icon="circle-question" href="/concepts/challenge-quiz">
+    Auto-generated comprehension questions from the action context. Forces the operator to read before approving.
+  </Card>
+  <Card title="Teach-Back" icon="chalkboard-user" href="/concepts/challenge-teach-back">
+    Free-text explanation of what the action will do. Validates understanding through keyword matching and pluggable validators.
+  </Card>
+  <Card title="Multi-Party" icon="users" href="/concepts/challenge-multi-party">
+    Requires 2+ independent approvers, each completing a different sub-challenge. The strongest verification for irreversible operations.
+  </Card>
+</CardGroup>
+
+---
+
+## How Challenge Selection Works
+
+The challenge pipeline follows this sequence:
+
+```
+1. Gated function called
+2. Risk scorer produces score (0.0–1.0)
+3. Trust engine adjusts effective risk (optional)
+4. RiskLevel.from_score() classifies the level
+5. Challenge map selects the challenge type
+6. Challenge is presented to the operator
+7. Result recorded in audit trail
+```
+
+<CodeGroup>
+```python Python
+from attesta import Attesta, RiskLevel
+from attesta.challenges import (
+    ConfirmChallenge,
+    QuizChallenge,
+    TeachBackChallenge,
+    MultiPartyChallenge,
+)
+
+# Default challenge map (built-in)
+attesta = Attesta()
+
+# Custom challenge map
+attesta = Attesta(
+    challenge_map={
+        RiskLevel.LOW: None,                     # auto-approve
+        RiskLevel.MEDIUM: ConfirmChallenge(),
+        RiskLevel.HIGH: QuizChallenge(max_questions=2),
+        RiskLevel.CRITICAL: MultiPartyChallenge(required_approvers=3),
+    }
+)
+```
+
+```typescript TypeScript
+import { Attesta, RiskLevel } from "@attesta/core";
+
+// Default challenge map (built-in)
+const attesta = new Attesta();
+
+// Custom challenge map
+const attesta = new Attesta({
+  challengeMap: {
+    [RiskLevel.LOW]: null,
+    [RiskLevel.MEDIUM]: { type: "confirm" },
+    [RiskLevel.HIGH]: { type: "quiz", maxQuestions: 2 },
+    [RiskLevel.CRITICAL]: { type: "multi_party", requiredApprovers: 3 },
+  },
+});
+```
+</CodeGroup>
+
+---
+
+## Challenge Flow Diagram
+
+<Steps>
+  <Step title="Gated function called">
+    The decorated function is intercepted before execution.
+  </Step>
+  <Step title="Risk scoring (5 factors)">
+    The risk scorer evaluates function name, arguments, hints, domain patterns, and amplifiers to produce a score from 0.0 to 1.0.
+  </Step>
+  <Step title="Trust adjustment (if enabled)">
+    The trust engine may lower the effective risk for agents with a proven track record.
+  </Step>
+  <Step title="Challenge selection by risk level">
+    | Risk Level | Score Range | Challenge |
+    |---|---|---|
+    | **LOW** | below 0.3 | Auto-approve |
+    | **MEDIUM** | 0.3 -- 0.6 | Confirm (Y/N) |
+    | **HIGH** | 0.6 -- 0.8 | Quiz (1--3 questions) |
+    | **CRITICAL** | 0.8 -- 1.0 | Multi-party (2+ approvers) |
+  </Step>
+  <Step title="Audit trail (hash chain)">
+    The result -- approved, denied, or timed out -- is recorded in a tamper-proof, hash-chained audit log.
+  </Step>
+</Steps>
+
+---
+
+## Minimum Review Times
+
+Every challenge type enforces a minimum review time. If the operator responds faster than this threshold, the approval is still accepted, but it is flagged as a potential "rubber stamp" in the audit trail.
+
+| Challenge | Default Min Review | Rationale |
+|---|---|---|
+| Confirm | **3.0 seconds** | Enough time to read the action summary |
+| Quiz | **10.0 seconds** | Enough time to read and answer questions |
+| Teach-Back | **30.0 seconds** | Enough time to compose a meaningful explanation |
+| Multi-Party | Inherited from sub-challenges | Each approver has their own minimum |
+
+### Customizing Review Times
+
+<CodeGroup>
+```python Python
+from attesta.challenges import QuizChallenge
+
+# Require at least 15 seconds of review for quiz challenges
+quiz = QuizChallenge(
+    max_questions=3,
+    min_correct=2,
+    min_review_seconds=15.0,
+)
+```
+
+```typescript TypeScript
+import { QuizChallenge } from "@attesta/core";
+
+const quiz = new QuizChallenge({
+  maxQuestions: 3,
+  minCorrect: 2,
+  minReviewSeconds: 15.0,
+});
+```
+</CodeGroup>
+
+---
+
+## Challenge Outcomes
+
+Every challenge produces one of three outcomes:
+
+| Outcome | Effect | Audit Field |
+|---|---|---|
+| **Passed** | Action is executed | `challenge_passed: true` |
+| **Failed** | `AttestaDenied` raised, action blocked | `challenge_passed: false` |
+| **Timed out** | Treated as failure, action blocked | `challenge_passed: false` |
+
+<Warning>
+When a challenge fails or is denied, the protected function is **never executed**. Attesta raises an `AttestaDenied` exception that the calling code must handle.
+</Warning>
+
+```python
+from attesta import AttestaDenied
+
+try:
+    result = delete_user("usr_12345")
+except AttestaDenied as e:
+    print(f"Action blocked: {e.reason}")
+    print(f"Risk score: {e.risk_score}")
+    print(f"Challenge type: {e.challenge_type}")
+```
+
+---
+
+## Configuration via YAML
+
+The challenge map and review times can be configured declaratively:
+
+```yaml attesta.yaml
+policy:
+  challenge_map:
+    low: auto
+    medium: confirm
+    high: quiz
+    critical: multi_party
+
+  min_review_seconds:
+    confirm: 5.0
+    quiz: 15.0
+    teach_back: 30.0
+
+  multi_party:
+    required_approvers: 2
+```
+
+<CardGroup cols={2}>
+  <Card title="ConfirmChallenge" icon="check" href="/concepts/challenge-confirm">
+    Simple approval with mandatory pause
+  </Card>
+  <Card title="QuizChallenge" icon="circle-question" href="/concepts/challenge-quiz">
+    Auto-generated comprehension questions
+  </Card>
+</CardGroup>

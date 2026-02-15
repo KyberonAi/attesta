@@ -1,0 +1,93 @@
+---
+title: "No-Code Platform Integrations"
+description: "Drop-in Attesta components for n8n, Flowise, Langflow, and Dify -- no code required"
+icon: "grid-2"
+---
+
+Attesta provides ready-made components for four popular no-code AI platforms. Each component acts as an approval gate that evaluates AI agent actions for risk before execution, using the same risk scoring, challenge system, and audit trail as the [code-based integrations](/integrations/overview).
+
+## Platform Comparison
+
+| Platform | Component | Type | Language | Package |
+|---|---|---|---|---|
+| [n8n](/no-code/n8n) | Attesta Approval | Workflow node | TypeScript | `n8n-nodes-attesta` |
+| [Flowise](/no-code/flowise) | Attesta Approval | Tool (DynamicTool) | TypeScript | `flowise-attesta` |
+| [Langflow](/no-code/langflow) | Attesta Approval | Pipeline component | Python | `langflow-attesta` |
+| [Dify](/no-code/dify) | Attesta Approval | Plugin tool | Python | `dify-attesta` |
+
+## Feature Matrix
+
+| Feature | n8n | Flowise | Langflow | Dify |
+|---|---|---|---|---|
+| Auto risk scoring | Yes | Yes | Yes | Yes |
+| Manual risk override | Yes | Yes | Yes | Yes |
+| Risk hints (JSON) | Yes | Yes | Yes (advanced) | Via credentials |
+| Denial handling | Error or Passthrough | JSON status string | `Data` object | JSON message (generator) |
+| Credentials support | `attestaApi` credential | -- | -- | Provider credential (`risk_threshold`) |
+| Audit trail | Yes | Yes | Yes | Yes |
+| Batch processing | Yes (per item) | Single invocation | Single invocation | Single invocation |
+| LLM-driven invocation | No (data pipeline) | Yes (agent calls tool) | No (component output) | Yes (LLM form parameters) |
+
+## How No-Code Differs from Code Integrations
+
+The [code-based integrations](/integrations/overview) wrap individual tool functions or intercept framework-specific hook points (e.g., LangChain tool `func`, OpenAI `approval_handler`). No-code integrations take a different approach:
+
+- **Visual placement** -- You drag the Attesta component onto a canvas and connect it to other nodes. No Python or TypeScript required.
+- **Data-driven context** -- Instead of wrapping a function, the component receives input data (JSON items, tool arguments, or form parameters) and builds an `ActionContext` from that data plus the configured function name.
+- **Platform-native output** -- Each component returns results in the format native to its platform: n8n adds `_attesta` metadata to output items, Flowise returns a JSON string the agent can parse, Langflow emits a `Data` object, and Dify yields a `ToolInvokeMessage`.
+
+Under the hood, every no-code component calls the same `Attesta.evaluate()` pipeline described in [How It Works](/how-it-works). The risk scoring, challenge selection, verification, and audit logging are identical.
+
+<Note>
+All no-code components use the `@attesta/core` TypeScript package or the `attesta` Python package under the hood. They provide the same risk scoring, challenge types, and audit capabilities as the code-based integrations.
+</Note>
+
+## How It Works
+
+Every no-code component follows the same four-step pattern:
+
+<Steps>
+  <Step title="Configure the Gate">
+    Set the **Function Name** (the action being gated), the **Risk Level** (auto or manual override), and any **Risk Hints** (JSON key-value pairs that influence scoring).
+  </Step>
+  <Step title="Connect to Your Workflow">
+    Place the Attesta component **before** the action node in your workflow. Data flows through the gate before reaching the action.
+  </Step>
+  <Step title="Evaluate at Runtime">
+    When the workflow runs, the gate component creates an `ActionContext`, evaluates it through the Attesta pipeline (risk scoring, challenge selection, verification), and either passes data through (approved) or stops the flow (denied).
+  </Step>
+  <Step title="Audit">
+    Every evaluation is recorded in the Attesta audit trail with the verdict, risk score, and metadata including the source platform (`n8n`, `flowise`, `langflow`, or `dify`).
+  </Step>
+</Steps>
+
+## Common Configuration
+
+Every component accepts these core parameters (the exact input names vary slightly by platform):
+
+| Parameter | Type | Description |
+|---|---|---|
+| **Function Name** | String | Name of the action being gated (e.g., `send_email`, `delete_record`). This is the primary input to the risk scorer. |
+| **Risk Level** | Select | Override the automatic risk score. Options: Auto, Low, Medium, High, Critical. |
+| **Risk Hints** / **Action Arguments** | JSON | Additional context for the risk scorer (e.g., `{"destructive": true, "pii": true}`). |
+
+<Tip>
+Use descriptive function names that include a verb. The risk scorer classifies verbs as destructive (`delete`, `remove`, `drop`), mutating (`send`, `update`, `deploy`), or read-only (`get`, `list`, `fetch`). A name like `delete_user_account` will score significantly higher than `process_data`.
+</Tip>
+
+## Getting Started
+
+<CardGroup cols={2}>
+  <Card title="n8n" icon="diagram-project" href="/no-code/n8n">
+    Workflow node with error/passthrough denial modes and batch processing
+  </Card>
+  <Card title="Flowise" icon="robot" href="/no-code/flowise">
+    LangChain DynamicTool component for agent chatflows
+  </Card>
+  <Card title="Langflow" icon="wind" href="/no-code/langflow">
+    Python component with structured Data output
+  </Card>
+  <Card title="Dify" icon="plug" href="/no-code/dify">
+    Plugin with provider credentials and LLM-driven parameters
+  </Card>
+</CardGroup>

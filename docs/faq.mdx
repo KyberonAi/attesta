@@ -1,0 +1,374 @@
+---
+title: "Frequently Asked Questions"
+description: "Common questions about Attesta's approval framework, security model, performance, and integrations"
+icon: "circle-question"
+---
+
+## General
+
+<AccordionGroup>
+  <Accordion title="What is Attesta?">
+    Attesta is a lightweight, framework-agnostic human-in-the-loop approval layer for AI agents. It intercepts risky tool calls made by AI agents, scores their risk on a 0-1 scale (LOW / MEDIUM / HIGH / CRITICAL), and presents verification challenges to human operators before allowing execution.
+
+    The core pipeline has four stages:
+    1. **Risk scoring** -- a multi-factor heuristic analyzes function name, arguments, docstring, caller hints, and novelty
+    2. **Challenge selection** -- the risk level determines the challenge type (auto-approve, confirm, quiz, teach-back, or multi-party)
+    3. **Verification** -- the human operator completes the challenge
+    4. **Audit** -- the decision is recorded in a SHA-256 hash-chained audit log
+  </Accordion>
+
+  <Accordion title="How is Attesta different from RBAC or permissions systems?">
+    Traditional RBAC (Role-Based Access Control) answers the question "is this user allowed to perform this action?" with a static yes/no based on assigned roles. Attesta answers a different question: **"does a human understand and approve this specific action right now?"**
+
+    Key differences:
+
+    | Aspect | RBAC | Attesta |
+    |--------|------|---------|
+    | Decision basis | Static role assignments | Dynamic risk scoring per invocation |
+    | Granularity | Action-level (can/cannot) | Invocation-level (these args, this context) |
+    | Human involvement | None at runtime | Human verifies each high-risk action |
+    | Adaptive | No | Yes -- trust engine learns from history |
+    | Audit | Access logs | Tamper-proof hash-chained decision trail |
+
+    Attesta complements RBAC. Use RBAC to control which agents can access which tools; use Attesta to ensure that high-risk invocations within those tools receive human review.
+  </Accordion>
+
+  <Accordion title="Which AI frameworks does Attesta support?">
+    Attesta is framework-agnostic and works with any AI agent framework that makes function or tool calls. Built-in integrations are available for:
+
+    - **LangChain** (Python and TypeScript)
+    - **OpenAI Agents SDK**
+    - **Anthropic Claude** (tool use)
+    - **CrewAI**
+    - **Vercel AI SDK** (TypeScript)
+    - **MCP** (Model Context Protocol) -- both custom servers and any existing server via the stdio proxy
+
+    No-code support is available for **n8n**, **Flowise**, **Langflow**, and **Dify**.
+
+    If your framework is not listed, you can use the `@gate` decorator on any function or the `evaluate()` method for direct pipeline access.
+  </Accordion>
+
+  <Accordion title="Is Attesta open source?">
+    Yes. Attesta is released under the MIT license. The Python SDK, TypeScript SDK, CLI, no-code nodes, and all documentation are open source.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Technical
+
+<AccordionGroup>
+  <Accordion title="What is the performance overhead of Attesta?">
+    The computational overhead of Attesta itself is negligible -- risk scoring takes less than 1ms for the default heuristic scorer. The real latency comes from **human review time**, which is the entire point of the framework.
+
+    For LOW-risk actions that are auto-approved, the overhead is under 5ms (risk scoring + audit logging). For actions that require human challenges, the latency equals the time the operator takes to respond.
+
+    The `min_review_seconds` setting adds intentional latency to prevent rubber-stamping. This is configurable per risk level.
+  </Accordion>
+
+  <Accordion title="Does Attesta support async operations?">
+    Yes. Both the Python and TypeScript SDKs are fully async.
+
+    **Python:** The `@gate` decorator supports both sync and async functions. When a sync function is decorated, Attesta bridges to async internally using `asyncio.run()` or by scheduling a task on an existing event loop (e.g., in Jupyter). The `evaluate()` method is always async.
+
+    **TypeScript:** All gated functions return Promises and must be awaited. The `gate()` wrapper and `Attesta.evaluate()` are all async. Use the constructor (`new Attesta()`) for synchronous initialization.
+
+    ```typescript
+    const result = await deleteUser("usr_12345");
+    ```
+  </Accordion>
+
+  <Accordion title="Can I write a custom risk scorer?">
+    Yes. Attesta uses structural typing (Python `Protocol` / TypeScript `interface`) for all pluggable components. Implement the `RiskScorer` interface with a `score(ctx)` method and a `name` property:
+
+    <CodeGroup>
+    ```python Python
+    from attesta import RiskScorer, ActionContext
+
+    class MyScorer:
+        @property
+        def name(self) -> str:
+            return "my-scorer"
+
+        def score(self, ctx: ActionContext) -> float:
+            if "production" in ctx.function_name:
+                return 0.9
+            return 0.2
+
+    # Use it
+    from attesta import gate
+
+    @gate(risk_scorer=MyScorer())
+    def deploy(service: str) -> str:
+        return f"Deployed {service}"
+    ```
+
+    ```typescript TypeScript
+    import { RiskScorer, ActionContext, gate } from "@attesta/core";
+
+    class MyScorer implements RiskScorer {
+      readonly name = "my-scorer";
+
+      score(ctx: ActionContext): number {
+        if (ctx.functionName.includes("production")) return 0.9;
+        return 0.2;
+      }
+    }
+
+    const deploy = gate(
+      { riskScorer: new MyScorer() },
+      async (service: string) => `Deployed ${service}`
+    );
+    ```
+    </CodeGroup>
+
+    You can also combine multiple scorers using `CompositeRiskScorer` (weighted average) or `MaxRiskScorer` (most conservative).
+  </Accordion>
+
+  <Accordion title="What happens if the operator does not respond to a challenge?">
+    The behavior is controlled by the `fail_mode` and `timeout_seconds` settings in `attesta.yaml`:
+
+    | `fail_mode` | Behavior on Timeout |
+    |-------------|---------------------|
+    | `deny` (default) | The action is blocked. `AttestaDenied` is raised with verdict `TIMED_OUT`. |
+    | `escalate` | The action is forwarded to a secondary approver or webhook. |
+    | `allow` | The action proceeds without approval. |
+
+    ```yaml
+    policy:
+      fail_mode: deny
+      timeout_seconds: 300  # 5 minutes
+    ```
+
+    The timeout is configurable. In production, always use `deny` or `escalate` -- never `allow`.
+  </Accordion>
+
+  <Accordion title="Can I override the risk level for specific functions?">
+    Yes, in two ways:
+
+    **1. In code** -- pass `risk="critical"` to the gate:
+    ```python
+    @gate(risk="critical")
+    def drop_database(name: str) -> str:
+        ...
+    ```
+
+    **2. In configuration** -- use the `risk.overrides` section in `attesta.yaml`:
+    ```yaml
+    risk:
+      overrides:
+        drop_database: critical
+        read_config: low
+        deploy_production: high
+    ```
+
+    Code-level overrides take precedence over configuration overrides. Both bypass the risk scorer entirely for the specified action.
+  </Accordion>
+
+  <Accordion title="How does the trust engine work?">
+    The trust engine maintains a per-agent Bayesian trust score between 0.0 and 1.0. It adjusts risk scores based on an agent's track record:
+
+    - **Approved actions** gradually increase trust (the agent is behaving well)
+    - **Denied actions** decrease trust (the agent attempted something the operator rejected)
+    - **Incidents** (e.g., a revoked approval) immediately drop trust to zero
+
+    A trusted agent's risk scores are reduced by up to `trust.influence` (default 0.3), meaning a HIGH-risk action might be downgraded to MEDIUM for a well-established agent. However, CRITICAL actions are **never** downgraded by the trust engine.
+
+    Trust decays over time (`trust.decay_rate` per day of inactivity) and is capped at `trust.ceiling` (default 0.9).
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Security
+
+<AccordionGroup>
+  <Accordion title="How does audit log integrity work?">
+    Every audit entry includes a SHA-256 hash of the previous entry, forming a tamper-evident hash chain. If any entry is modified, inserted, or deleted, the chain breaks at that point.
+
+    ```
+    Entry 1: hash = SHA-256(entry_1_data + "genesis")
+    Entry 2: hash = SHA-256(entry_2_data + entry_1_hash)
+    Entry 3: hash = SHA-256(entry_3_data + entry_2_hash)
+    ...
+    ```
+
+    Verify integrity at any time:
+
+    ```bash
+    attesta audit verify
+    ```
+
+    This walks the entire chain and reports the first broken link if tampering is detected. The command exits with code 1 on failure, making it suitable for CI pipelines.
+  </Accordion>
+
+  <Accordion title="What are the trust model assumptions?">
+    Attesta's security model assumes:
+
+    1. **The operator is trusted.** Attesta ensures that a human sees and approves high-risk actions. It does not verify the identity or competence of the operator beyond the challenge mechanism.
+    2. **The runtime environment is not compromised.** If an attacker has control of the process running Attesta, they can bypass gating. Attesta is a defense-in-depth layer, not a sandbox.
+    3. **The audit log file is protected by OS-level permissions.** Attesta provides tamper detection (hash chain) but not tamper prevention. An attacker with write access to the log file can rewrite the entire chain. Protect the `.attesta/` directory with appropriate file permissions.
+    4. **The AI agent cannot modify its own gating configuration.** If the agent has write access to `attesta.yaml` or the Attesta source code, it could weaken or disable gating.
+
+    For maximum security in production, combine Attesta with:
+    - Read-only mounting of `attesta.yaml` and the `.attesta/` directory
+    - External audit log shipping to an immutable store (e.g., S3 with Object Lock)
+    - Network-level isolation for the agent process
+  </Accordion>
+
+  <Accordion title="Can an AI agent bypass Attesta?">
+    If the agent runs in the same process as Attesta and has unrestricted code execution capabilities, it could theoretically import the underlying function directly, bypassing the gate wrapper. Attesta is designed as a **cooperative safety layer**, not a sandboxing mechanism.
+
+    To harden against bypass:
+    - Run the agent in a separate process or container with no direct access to the protected functions
+    - Use the MCP proxy pattern (`attesta mcp wrap`) where the proxy runs in a separate process
+    - Use `risk="critical"` with multi-party approval for the most sensitive operations
+    - Monitor the audit log for unusual patterns (e.g., functions executing without corresponding audit entries)
+  </Accordion>
+
+  <Accordion title="Does Attesta encrypt the audit log?">
+    No. The audit log (`.attesta/audit.jsonl`) is stored in plaintext JSONL. It provides **integrity** (tamper detection via hash chaining) but not **confidentiality** (encryption).
+
+    If your audit entries contain sensitive data (e.g., function arguments with PII), protect the log file with OS-level encryption (e.g., LUKS, FileVault, BitLocker) or ship entries to an encrypted external store.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Integration
+
+<AccordionGroup>
+  <Accordion title="Can I use Attesta with multiple AI frameworks in the same project?">
+    Yes. The `Attesta` class is framework-agnostic. You can create a single `Attesta` instance and use it with multiple frameworks simultaneously. All gates share the same risk scorer, trust engine, and audit log.
+
+    ```python
+    from attesta import Attesta
+
+    attesta = Attesta.from_config("attesta.yaml")
+
+    # LangChain tools
+    from attesta.integrations.langchain import AttestaToolWrapper
+    safe_tool = AttestaToolWrapper(attesta, my_langchain_tool)
+
+    # Direct gate for custom functions
+    @attesta.gate(risk_hints={"production": True})
+    def deploy(service: str) -> str:
+        return f"Deployed {service}"
+
+    # MCP proxy (separate process)
+    # attesta mcp wrap --config attesta.yaml -- npx my-mcp-server
+    ```
+
+    Audit entries from all frameworks are written to the same log, tagged with `metadata.source` to distinguish their origin.
+  </Accordion>
+
+  <Accordion title="Does Attesta work with no-code platforms?">
+    Yes. Attesta provides drop-in nodes for several no-code platforms:
+
+    | Platform | Package | Description |
+    |----------|---------|-------------|
+    | **n8n** | `n8n-nodes-attesta` | AttestaGate node for gating workflow steps |
+    | **Flowise** | `flowise-nodes-attesta` | Approval node for Flowise chatflow chains |
+    | **Langflow** | `langflow-attesta` | Component for Langflow visual pipelines |
+    | **Dify** | `dify-attesta` | Plugin for Dify agent workflows |
+
+    See the [No-Code Overview](/no-code/overview) for installation and configuration instructions.
+  </Accordion>
+
+  <Accordion title="How do I use Attesta with MCP servers I did not write?">
+    Use the `attesta mcp wrap` CLI command. It wraps any MCP server with a transparent stdio proxy that intercepts tool calls and evaluates them through Attesta. No modifications to the upstream server are needed.
+
+    ```bash
+    attesta mcp wrap -- npx @modelcontextprotocol/server-filesystem /home/user
+    ```
+
+    Configure your editor (VS Code, Cursor, Claude Desktop, etc.) to use `attesta` as the MCP server command instead of the upstream server directly. See the [attesta mcp wrap](/cli/mcp-wrap) reference for full configuration examples.
+  </Accordion>
+
+  <Accordion title="Can I use Attesta in a CI/CD pipeline or headless environment?">
+    Yes, but with important caveats. In a headless environment (no TTY), Attesta cannot present interactive challenges. The behavior depends on the renderer:
+
+    - **Default renderer** (auto-detected when no TTY): auto-approves all actions. This is intentional for CI environments where a human already reviewed the code via a pull request.
+    - **Custom renderer**: you can implement a renderer that sends approval requests to Slack, email, PagerDuty, or a webhook and waits for a response.
+
+    For CI pipelines, the CLI audit commands are useful for post-hoc verification:
+
+    ```bash
+    attesta audit verify              # Verify hash chain integrity
+    attesta audit stats               # Check approval statistics
+    attesta audit rubber-stamps       # Flag suspiciously fast approvals
+    ```
+  </Accordion>
+
+  <Accordion title="Does Attesta support the TypeScript MCP decorator?">
+    Not yet. The `attesta_tool_handler` decorator for custom MCP servers is currently Python-only. For TypeScript MCP servers, use the `attesta mcp wrap` CLI proxy, which works with any MCP server regardless of implementation language.
+
+    Alternatively, use the `evaluate()` method directly in your TypeScript MCP server's `call_tool` handler:
+
+    ```typescript
+    import { Attesta, ActionContext, Verdict } from "@attesta/core";
+
+    const attesta = new Attesta();
+
+    async function callTool(name: string, args: Record<string, unknown>) {
+      const ctx: ActionContext = {
+        functionName: name,
+        kwargs: args,
+        metadata: { source: "mcp" },
+      };
+
+      const result = await attesta.evaluate(ctx);
+      if (result.verdict !== Verdict.APPROVED) {
+        return { error: `Denied by Attesta: ${name}` };
+      }
+
+      // Execute the tool...
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Attesta auto-approves everything without prompting">
+    This usually means the `TerminalRenderer` is not active. Attesta auto-detects the renderer at startup:
+
+    - If `rich` is installed and stdin is a TTY (interactive terminal), the rich `TerminalRenderer` is used.
+    - Otherwise, the silent default renderer auto-approves everything.
+
+    **Fix:**
+    1. Install the rich terminal UI: `pip install attesta[terminal]`
+    2. Make sure you are running in an interactive terminal (not piped or backgrounded)
+    3. Or pass a custom renderer explicitly: `@gate(renderer=MyRenderer())`
+  </Accordion>
+
+  <Accordion title="attesta audit verify reports a broken chain">
+    A broken hash chain means one or more audit entries have been modified, inserted, or deleted externally. The `Broken at:` indices tell you which entries to examine.
+
+    Common causes:
+    - Manual editing of the `.attesta/audit.jsonl` file
+    - Concurrent writes from multiple processes without proper file locking
+    - File corruption (disk errors, interrupted writes)
+
+    If the corruption is limited to the tail of the log (e.g., a crash during write), you can truncate the log to the last intact entry and Attesta will continue appending correctly.
+  </Accordion>
+
+  <Accordion title="I get ImportError: No module named 'yaml' when using from_config()">
+    The `from_config()` method requires PyYAML for YAML files. Install it with:
+
+    ```bash
+    pip install pyyaml
+    ```
+
+    Or install Attesta with all extras:
+
+    ```bash
+    pip install attesta[all]
+    ```
+
+    Alternatively, use a JSON configuration file instead of YAML -- JSON parsing uses the standard library and requires no extra dependencies.
+  </Accordion>
+</AccordionGroup>

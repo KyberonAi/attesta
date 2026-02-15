@@ -1,0 +1,264 @@
+---
+title: "Trust Engine"
+description: "Adaptive Bayesian trust model that learns from past decisions to reduce friction for reliable agents"
+icon: "brain"
+---
+
+Attesta's `TrustEngine` maintains a per-agent trust score that evolves over time based on approval history. Agents that consistently make safe decisions earn higher trust, which reduces friction by lowering their effective risk. Agents involved in incidents have their trust immediately penalized.
+
+## Core Formula
+
+The trust score is computed as:
+
+```
+Trust = weighted_success_rate × recency_factor × incident_penalty
+```
+
+Where:
+
+| Component | Description |
+|---|---|
+| `weighted_success_rate` | Ratio of approved-to-total decisions, weighted by recency |
+| `recency_factor` | Exponential decay — recent decisions count more than old ones |
+| `incident_penalty` | Multiplicative penalty: `0.7` per recorded incident |
+
+---
+
+## Parameters
+
+| Parameter | Default | Description |
+|---|---|---|
+| `initial_score` | **0.3** | Trust score assigned to new agents |
+| `ceiling` | **0.9** | Maximum achievable trust score |
+| `decay_rate` | **0.01/day** | Rate at which trust decays without activity |
+| `incident_penalty` | **0.7** | Multiplicative factor per incident (1 incident = 0.7x, 2 = 0.49x) |
+| `influence` | **0.3** | How much trust can adjust effective risk |
+
+<Note>
+The trust ceiling of `0.9` is intentional — no agent should ever reach full trust. Even the most reliable agent maintains a residual uncertainty factor.
+</Note>
+
+---
+
+## Effective Risk Adjustment
+
+Trust modifies the raw risk score using the `influence` parameter:
+
+```
+effective_risk = raw_risk × (1.0 - (trust - 0.5) × influence)
+```
+
+### How This Works
+
+- When trust is **exactly 0.5** — no adjustment (multiplier is 1.0)
+- When trust is **above 0.5** — risk is reduced (multiplier < 1.0)
+- When trust is **below 0.5** — risk is increased (multiplier > 1.0)
+
+### Example Calculations
+
+| Raw Risk | Trust | Calculation | Effective Risk | Level Change |
+|---|---|---|---|---|
+| 0.55 | 0.8 | 0.55 × (1.0 - (0.8-0.5) × 0.3) = 0.55 × 0.91 | **0.50** | MEDIUM (unchanged) |
+| 0.55 | 0.9 | 0.55 × (1.0 - (0.9-0.5) × 0.3) = 0.55 × 0.88 | **0.48** | MEDIUM (unchanged) |
+| 0.35 | 0.9 | 0.35 × (1.0 - (0.9-0.5) × 0.3) = 0.35 × 0.88 | **0.31** | MEDIUM (unchanged) |
+| 0.32 | 0.9 | 0.32 × (1.0 - (0.9-0.5) × 0.3) = 0.32 × 0.88 | **0.28** | MEDIUM -> LOW |
+| 0.55 | 0.2 | 0.55 × (1.0 - (0.2-0.5) × 0.3) = 0.55 × 1.09 | **0.60** | MEDIUM -> HIGH |
+
+<Warning>
+**Safety Invariant: CRITICAL actions are never downgraded.** Regardless of trust score, any action with a raw risk score of 0.8 or above remains CRITICAL and requires [multi-party approval](/concepts/challenge-multi-party). This invariant is enforced in the Trust Engine code and cannot be overridden by configuration.
+</Warning>
+
+---
+
+## Usage
+
+<CodeGroup>
+```python Python
+from attesta.trust import TrustEngine
+
+# Create a trust engine with default parameters
+trust = TrustEngine()
+
+# Create with custom parameters
+trust = TrustEngine(
+    initial_score=0.3,
+    ceiling=0.9,
+    decay_rate=0.01,
+    incident_penalty=0.7,
+    influence=0.3,
+)
+
+# Compute trust for an agent
+score = trust.compute_trust(agent_id="deploy-bot")
+print(f"Trust score: {score:.2f}")  # 0.30 (initial)
+
+# Get the effective risk after trust adjustment
+effective = trust.effective_risk(
+    agent_id="deploy-bot",
+    raw_risk=0.55,
+)
+print(f"Effective risk: {effective:.2f}")
+
+# Record outcomes
+trust.record_success(agent_id="deploy-bot")   # +trust
+trust.record_denial(agent_id="deploy-bot")     # slight -trust
+trust.record_incident(agent_id="deploy-bot")   # 0.7x penalty
+trust.revoke(agent_id="deploy-bot")            # reset to 0.0
+```
+
+```typescript TypeScript
+import { TrustEngine } from "@attesta/core";
+
+// Create a trust engine with default parameters
+const trust = new TrustEngine();
+
+// Create with custom parameters
+const trust = new TrustEngine({
+  initialScore: 0.3,
+  ceiling: 0.9,
+  decayRate: 0.01,
+  incidentPenalty: 0.7,
+  influence: 0.3,
+});
+
+// Compute trust for an agent
+const score = trust.computeTrust("deploy-bot");
+console.log(`Trust score: ${score.toFixed(2)}`);  // 0.30 (initial)
+
+// Get the effective risk after trust adjustment
+const effective = trust.effectiveRisk("deploy-bot", 0.55);
+console.log(`Effective risk: ${effective.toFixed(2)}`);
+
+// Record outcomes
+trust.recordSuccess("deploy-bot");    // +trust
+trust.recordDenial("deploy-bot");     // slight -trust
+trust.recordIncident("deploy-bot");   // 0.7x penalty
+trust.revoke("deploy-bot");           // reset to 0.0
+```
+</CodeGroup>
+
+---
+
+## Trust Lifecycle
+
+A typical agent's trust evolves through these stages:
+
+```
+Trust
+0.9 ┤·································ceiling·····
+    │                          ╭──────────╮
+0.7 ┤                    ╭─────╯           │
+    │              ╭─────╯                 │ incident
+0.5 ┤        ╭─────╯                       ╰──╮
+    │  ╭─────╯                                 ╰───recovery──
+0.3 ┤──╯ initial
+    │
+0.0 ┼──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──
+    Day 1  5  10 15 20 25 30 35 40 45 50 55 60 65 70 75
+```
+
+### Phase 1: Ramp-up (Days 1–30)
+
+A new agent starts at `initial_score=0.3`. Each successful approval increases trust. The rate of increase slows as the agent approaches the ceiling.
+
+### Phase 2: Steady State (Days 30+)
+
+Trust stabilizes near the ceiling (0.9). The `decay_rate` ensures that inactive agents gradually lose trust — an agent that goes 30 days without activity loses approximately `1 - e^(-0.01 × 30) ≈ 26%` of its trust.
+
+### Phase 3: Incident (Any Time)
+
+When `record_incident()` is called, trust is multiplied by `incident_penalty=0.7`. Two incidents reduce trust to `0.49x` of its pre-incident value. This creates a sharp, immediate consequence for unsafe behavior.
+
+### Phase 4: Recovery
+
+After an incident, the agent can rebuild trust through consistent successful approvals. Recovery follows the same ramp-up curve but starts from the penalized level.
+
+---
+
+## Methods Reference
+
+| Method | Effect | Trust Impact |
+|---|---|---|
+| `compute_trust(agent_id)` | Returns current trust score | Read-only |
+| `effective_risk(agent_id, raw_risk)` | Returns trust-adjusted risk | Read-only |
+| `record_success(agent_id)` | Records a successful approval | Increases trust |
+| `record_denial(agent_id)` | Records a denied action | Slight decrease |
+| `record_incident(agent_id)` | Records a security incident | 0.7x penalty |
+| `revoke(agent_id)` | Immediately revokes all trust | Resets to 0.0 |
+
+---
+
+## Integration with Attesta
+
+The trust engine is automatically integrated when you use the `Attesta` class:
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+
+# Trust is enabled by default
+attesta = Attesta(agent_id="deploy-bot")
+
+# Disable trust adjustment
+attesta = Attesta(agent_id="deploy-bot", trust_enabled=False)
+
+# Custom trust parameters
+from attesta.trust import TrustEngine
+
+attesta = Attesta(
+    agent_id="deploy-bot",
+    trust_engine=TrustEngine(
+        initial_score=0.5,     # start with more trust
+        ceiling=0.85,          # lower ceiling
+        incident_penalty=0.5,  # harsher incidents
+    ),
+)
+```
+
+```typescript TypeScript
+import { Attesta, TrustEngine } from "@attesta/core";
+
+// Trust is enabled by default
+const attesta = new Attesta({ agentId: "deploy-bot" });
+
+// Disable trust adjustment
+const attesta = new Attesta({ agentId: "deploy-bot", trustEnabled: false });
+
+// Custom trust parameters
+const attesta = new Attesta({
+  agentId: "deploy-bot",
+  trustEngine: new TrustEngine({
+    initialScore: 0.5,
+    ceiling: 0.85,
+    incidentPenalty: 0.5,
+  }),
+});
+```
+</CodeGroup>
+
+---
+
+## Configuration via YAML
+
+```yaml attesta.yaml
+trust:
+  enabled: true
+  initial_score: 0.3
+  ceiling: 0.9
+  decay_rate: 0.01
+  incident_penalty: 0.7
+  influence: 0.3
+```
+
+<Tip>
+Start with the default `influence=0.3` and monitor the effect on approval rates. Increase to `0.5` for more aggressive trust-based reduction, or decrease to `0.1` for a more conservative approach where trust has minimal impact.
+</Tip>
+
+<CardGroup cols={2}>
+  <Card title="Risk Levels" icon="signal" href="/concepts/risk-levels">
+    How trust adjustment can shift risk levels
+  </Card>
+  <Card title="Audit Trail" icon="file-shield" href="/concepts/audit-trail">
+    All trust-related events are recorded in the audit log
+  </Card>
+</CardGroup>

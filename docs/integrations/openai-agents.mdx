@@ -1,0 +1,205 @@
+---
+title: "OpenAI Agents SDK"
+description: "Integrate Attesta with the OpenAI Agents SDK via approval handlers and tool guardrails"
+icon: "bolt"
+---
+
+Attesta provides two integration points for the OpenAI Agents SDK:
+
+1. **`attesta_approval_handler`** -- a Runner-level approval handler that gates all tool calls across the entire run.
+2. **`AttestaGuardrail`** -- an Agent-level tool guardrail that evaluates individual tool invocations.
+
+## Installation
+
+```bash
+pip install attesta[openai]
+```
+
+---
+
+## Approval Handler (Runner-level)
+
+`attesta_approval_handler()` returns an async handler that matches the `approval_handler` signature expected by `Runner.run()`. Every tool call during the run is evaluated through Attesta before execution.
+
+### API
+
+```python
+attesta_approval_handler(attesta) -> Callable
+```
+
+**Returned handler signature:**
+
+```python
+async def handler(tool_name: str, tool_args: dict, **kwargs) -> bool
+```
+
+- Returns `True` to allow the tool call
+- Returns `False` to deny (the SDK skips execution)
+
+### Full Example
+
+```python
+from openai.agents import Agent, Runner
+from attesta import Attesta
+from attesta.integrations.openai_sdk import attesta_approval_handler
+
+# Configure Attesta
+attesta = Attesta.from_config("attesta.yaml")
+
+# Define your agent with tools
+agent = Agent(
+    name="DevOps Assistant",
+    instructions="Help manage infrastructure deployments.",
+    tools=[deploy_tool, rollback_tool, status_tool],
+)
+
+# Run with Attesta as the approval handler
+result = await Runner.run(
+    agent,
+    input="Deploy api-gateway v2.1.0 to production",
+    approval_handler=attesta_approval_handler(attesta),
+)
+
+print(result.final_output)
+```
+
+When the agent calls `deploy_tool`, Attesta:
+1. Builds an `ActionContext` from the tool name and arguments
+2. Scores the risk (the word "deploy" + "production" arguments will score HIGH)
+3. Presents the appropriate challenge to the human operator
+4. Returns `True` (approved) or `False` (denied) to the SDK
+
+<Note>
+The `**kwargs` passed to the handler are forwarded as `hints` in the `ActionContext`. This means any extra metadata the SDK provides is available to the risk scorer.
+</Note>
+
+---
+
+## Tool Guardrail (Agent-level)
+
+`AttestaGuardrail` is a callable class that matches the `tool_guardrails` interface on the `Agent` class. It evaluates each tool invocation and returns `None` to allow or a `dict` with an `"error"` key to deny.
+
+### API
+
+```python
+AttestaGuardrail(attesta)
+```
+
+**Callable signature:**
+
+```python
+async def __call__(tool_name: str, tool_input: dict) -> dict | None
+```
+
+| Return | Meaning |
+|---|---|
+| `None` | Action is approved -- proceed with execution |
+| `{"error": "..."}` | Action is denied -- the SDK receives the error message |
+
+### Full Example
+
+```python
+from openai.agents import Agent
+from attesta import Attesta
+from attesta.integrations.openai_sdk import AttestaGuardrail
+
+attesta = Attesta.from_config("attesta.yaml")
+
+agent = Agent(
+    name="Data Pipeline Agent",
+    instructions="Manage ETL pipelines and data transformations.",
+    tools=[run_query_tool, export_data_tool, delete_records_tool],
+    tool_guardrails=[AttestaGuardrail(attesta)],
+)
+
+# When the agent tries to call delete_records_tool, the guardrail
+# evaluates the risk. If denied, the SDK receives:
+#   {"error": "Denied by Attesta (risk: high)"}
+```
+
+---
+
+## Combining Both
+
+You can use both integration points simultaneously. The approval handler provides a global gate, while guardrails provide per-agent control:
+
+```python
+from openai.agents import Agent, Runner
+from attesta import Attesta
+from attesta.integrations.openai_sdk import (
+    attesta_approval_handler,
+    AttestaGuardrail,
+)
+
+attesta = Attesta.from_config("attesta.yaml")
+
+# Agent-level guardrail for this specific agent's tools
+agent = Agent(
+    name="Finance Agent",
+    instructions="Process financial transactions.",
+    tools=[transfer_tool, audit_tool],
+    tool_guardrails=[AttestaGuardrail(attesta)],
+)
+
+# Runner-level approval for all agents in the run
+result = await Runner.run(
+    agent,
+    input="Transfer $50,000 to account ACC-789",
+    approval_handler=attesta_approval_handler(attesta),
+)
+```
+
+<Warning>
+When both are active, tool calls are evaluated **twice** -- once by the guardrail and once by the approval handler. For most use cases, choose one or the other. Use the approval handler for broad coverage across all tools, or guardrails for fine-grained per-agent control.
+</Warning>
+
+---
+
+## How Denial Works
+
+When a tool call is denied:
+
+- **Approval handler** returns `False`. The OpenAI Agents SDK skips the tool execution entirely. The agent does not receive any output for that tool call.
+- **Guardrail** returns `{"error": "Denied by Attesta (risk: <level>)"}`. The SDK passes this error back to the agent, which can then decide how to proceed (retry with different parameters, suggest alternatives, or inform the user).
+
+```python
+# Example denial from guardrail:
+{"error": "Denied by Attesta (risk: critical)"}
+```
+
+<Tip>
+Guardrails are generally preferred over approval handlers because they provide the agent with an explanation of why the action was denied. This allows the agent to suggest alternatives to the user rather than silently failing.
+</Tip>
+
+---
+
+## Custom Attesta Configuration
+
+Pass a fully configured Attesta instance to control risk scoring, challenge types, and trust behavior:
+
+```python
+from attesta import Attesta
+
+attesta = Attesta.from_config("attesta.yaml")
+
+# Or configure programmatically:
+from attesta.core.types import RiskLevel
+
+attesta = Attesta(
+    risk_hints={"production": True, "pci_scope": True},
+    challenge_map={
+        RiskLevel.MEDIUM: "confirm",
+        RiskLevel.HIGH: "quiz",
+        RiskLevel.CRITICAL: "multi_party",
+    },
+)
+```
+
+<CardGroup cols={2}>
+  <Card title="Anthropic Claude" icon="message-bot" href="/integrations/anthropic-claude">
+    Gate Claude tool_use blocks
+  </Card>
+  <Card title="LangChain" icon="link-horizontal" href="/integrations/langchain">
+    Wrap LangChain tools and LangGraph nodes
+  </Card>
+</CardGroup>

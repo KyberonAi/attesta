@@ -1,0 +1,214 @@
+---
+title: "CrewAI"
+description: "Gate CrewAI task outputs with AttestaHumanInput as a task callback"
+icon: "users"
+---
+
+Attesta integrates with CrewAI through `AttestaHumanInput`, a callable that replaces (or augments) CrewAI's built-in `human_input` mechanism. When a task completes, Attesta evaluates the output through the approval pipeline before the workflow continues.
+
+## Installation
+
+```bash
+pip install attesta[crewai]
+```
+
+---
+
+## API Reference
+
+### AttestaHumanInput
+
+```python
+AttestaHumanInput(attesta, default_risk=None)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `attesta` | `Attesta` | A configured Attesta instance |
+| `default_risk` | `str \| None` | Optional default risk level (e.g. `"high"`) applied when no other risk information is available |
+
+**Callable signature:**
+
+```python
+async def __call__(task_output) -> str
+```
+
+| Return Value | Meaning |
+|---|---|
+| `"approved"` | The task output passed the Attesta gate |
+| `"denied"` | The task output was denied |
+
+<Note>
+When `default_risk` is set, it is passed to the risk scorer as `hints["risk_override"]`. This is useful for tasks where the automated scorer cannot infer the true risk from the task output string alone.
+</Note>
+
+---
+
+## Full Example
+
+```python
+from crewai import Agent, Task, Crew
+from attesta import Attesta
+from attesta.integrations.crewai import AttestaHumanInput
+
+# Configure Attesta
+attesta = Attesta.from_config("attesta.yaml")
+gk_input = AttestaHumanInput(attesta, default_risk="high")
+
+# Define agents
+researcher = Agent(
+    role="Security Researcher",
+    goal="Identify vulnerabilities in the codebase",
+    backstory="You are an expert security auditor.",
+)
+
+deployer = Agent(
+    role="Deployment Engineer",
+    goal="Deploy approved patches to production",
+    backstory="You manage production deployments.",
+)
+
+# Define tasks with Attesta gating
+research_task = Task(
+    description="Scan the application for SQL injection vulnerabilities",
+    expected_output="A list of vulnerabilities with severity ratings",
+    agent=researcher,
+)
+
+deploy_task = Task(
+    description="Deploy the security patch to production servers",
+    expected_output="Deployment confirmation with rollback plan",
+    agent=deployer,
+    human_input=True,       # Enable human-in-the-loop
+    callback=gk_input,      # Use Attesta instead of raw input()
+)
+
+# Run the crew
+crew = Crew(
+    agents=[researcher, deployer],
+    tasks=[research_task, deploy_task],
+)
+
+result = crew.kickoff()
+```
+
+When `deploy_task` completes:
+1. The task output is stringified and sent to `AttestaHumanInput`
+2. An `ActionContext` is built with `function_name="crewai_task"`
+3. The output text (truncated to 200 characters) is used as the `function_doc`
+4. Attesta evaluates the risk and presents the appropriate challenge
+5. Returns `"approved"` or `"denied"` to CrewAI
+
+---
+
+## How the ActionContext Is Built
+
+For every task evaluation, `AttestaHumanInput` constructs the following context:
+
+```python
+ActionContext(
+    function_name="crewai_task",
+    kwargs={"output": "<stringified task output>"},
+    function_doc="<first 200 chars of task output>",
+    hints={"risk_override": "high"},  # if default_risk is set
+)
+```
+
+The risk scorer analyzes:
+- **Function name** -- `"crewai_task"` scores as a generic mutating verb
+- **Arguments** -- the full task output is scanned for sensitive patterns (credentials, SQL, shell commands, URLs)
+- **Docstring** -- the first 200 characters provide additional risk signals
+- **Hints** -- the `default_risk` override, if provided, forces a specific level
+
+<Tip>
+For tasks where the output is a deployment plan, database migration, or infrastructure change, set `default_risk="high"` or `default_risk="critical"` to ensure the appropriate challenge is presented regardless of the scorer's heuristic.
+</Tip>
+
+---
+
+## Per-Task Risk Levels
+
+You can create multiple `AttestaHumanInput` instances with different default risk levels for different task types:
+
+```python
+# Low-risk gate for research tasks
+research_gate = AttestaHumanInput(attesta, default_risk="medium")
+
+# High-risk gate for deployment tasks
+deploy_gate = AttestaHumanInput(attesta, default_risk="critical")
+
+research_task = Task(
+    description="Research best practices for API rate limiting",
+    agent=researcher,
+    human_input=True,
+    callback=research_gate,   # Medium risk -> confirm challenge
+)
+
+deploy_task = Task(
+    description="Apply rate limiting configuration to production",
+    agent=deployer,
+    human_input=True,
+    callback=deploy_gate,     # Critical risk -> multi-party approval
+)
+```
+
+---
+
+## Sequential Crew with Gating
+
+In a sequential crew, you can gate specific handoff points between agents:
+
+```python
+from crewai import Crew, Process
+
+crew = Crew(
+    agents=[analyst, reviewer, executor],
+    tasks=[
+        analysis_task,                    # No gate -- auto-proceeds
+        review_task,                      # No gate -- auto-proceeds
+        Task(
+            description="Execute the approved plan",
+            agent=executor,
+            human_input=True,
+            callback=AttestaHumanInput(attesta, default_risk="critical"),
+        ),
+    ],
+    process=Process.sequential,
+)
+```
+
+Only the final execution step requires human approval. The analysis and review tasks run without interruption.
+
+---
+
+## Handling Denials
+
+When a task output is denied, `AttestaHumanInput` returns the string `"denied"`. CrewAI's behavior on receiving this response depends on how you configure the task and crew:
+
+```python
+# The callback returns "denied" -- CrewAI treats this as the
+# human input response. The task's agent receives this feedback
+# and can be instructed to revise its output.
+
+deployer = Agent(
+    role="Deployment Engineer",
+    goal="Deploy approved patches to production",
+    backstory=(
+        "You manage production deployments. If a deployment plan is denied, "
+        "revise it to address the concerns and try again."
+    ),
+)
+```
+
+<Warning>
+The `callback` mechanism in CrewAI passes the return value back to the agent as feedback. Make sure your agent's backstory or instructions explain how to handle a `"denied"` response, otherwise the agent may not know how to proceed.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="MCP Integration" icon="server" href="/integrations/mcp">
+    Gate any MCP server with zero code changes
+  </Card>
+  <Card title="LangChain" icon="link-horizontal" href="/integrations/langchain">
+    Wrap LangChain tools and LangGraph nodes
+  </Card>
+</CardGroup>

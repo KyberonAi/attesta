@@ -1,0 +1,481 @@
+---
+title: "Protocols"
+description: "Structural interfaces for risk scoring, rendering, auditing, and challenge presentation"
+icon: "plug"
+---
+
+Attesta uses Python `Protocol` classes (structural sub-typing) to define the interfaces for its pluggable components. Any class that implements the required methods is accepted -- no inheritance or registration needed.
+
+All protocols are decorated with `@runtime_checkable`, so you can use `isinstance()` checks at runtime.
+
+## RiskScorer
+
+Assigns a continuous risk score in `[0.0, 1.0]` to an action.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import RiskScorer
+```
+
+```typescript TypeScript
+import { RiskScorer } from "@attesta/core";
+```
+</CodeGroup>
+
+### Required Methods
+
+| Method/Property | Signature | Description |
+|-----------------|-----------|-------------|
+| `score` | `score(ctx: ActionContext) -> float` | Evaluate the action and return a risk score between 0.0 and 1.0. |
+| `name` | `@property name -> str` | A human-readable identifier for the scorer (used in `RiskAssessment.scorer_name`). |
+
+### Implementing a Custom Scorer
+
+<CodeGroup>
+```python Python
+from attesta import RiskScorer, ActionContext
+
+class KeywordRiskScorer:
+    """Scores risk based on keyword presence in function names."""
+
+    DANGEROUS_KEYWORDS = {"delete", "drop", "destroy", "purge", "truncate"}
+
+    @property
+    def name(self) -> str:
+        return "keyword"
+
+    def score(self, ctx: ActionContext) -> float:
+        tokens = ctx.function_name.lower().split("_")
+        if any(t in self.DANGEROUS_KEYWORDS for t in tokens):
+            return 0.85
+        return 0.15
+
+# Verify it satisfies the protocol
+assert isinstance(KeywordRiskScorer(), RiskScorer)
+
+# Use it
+from attesta import gate
+
+@gate(risk_scorer=KeywordRiskScorer())
+def delete_user(user_id: str) -> str:
+    return f"Deleted {user_id}"
+```
+
+```typescript TypeScript
+import { RiskScorer, ActionContext } from "@attesta/core";
+
+class KeywordRiskScorer implements RiskScorer {
+  readonly name = "keyword";
+
+  private dangerousKeywords = new Set([
+    "delete", "drop", "destroy", "purge", "truncate",
+  ]);
+
+  score(ctx: ActionContext): number {
+    const tokens = ctx.functionName.toLowerCase().split("_");
+    if (tokens.some((t) => this.dangerousKeywords.has(t))) {
+      return 0.85;
+    }
+    return 0.15;
+  }
+}
+```
+</CodeGroup>
+
+### Built-in Scorers
+
+Attesta ships with several ready-to-use scorers in `attesta.core.risk`:
+
+| Scorer | Description |
+|--------|-------------|
+| `DefaultRiskScorer` | 5-factor heuristic scorer (function name, arguments, docstring, hints, novelty). |
+| `CompositeRiskScorer` | Weighted average of multiple scorers. Weights are auto-normalized. |
+| `MaxRiskScorer` | Takes the maximum score from multiple scorers (most conservative). |
+| `FixedRiskScorer` | Always returns a constant score. Useful for testing or as a floor/ceiling. |
+
+```python Python
+from attesta.core.risk import DefaultRiskScorer, CompositeRiskScorer, FixedRiskScorer
+
+# Compose multiple scorers
+scorer = CompositeRiskScorer([
+    (DefaultRiskScorer(), 0.7),
+    (KeywordRiskScorer(), 0.2),
+    (FixedRiskScorer(0.3), 0.1),   # risk floor
+])
+```
+
+---
+
+## Renderer
+
+The UI/UX layer that presents gates, challenges, and status messages to the human operator. All methods are `async`.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import Renderer
+```
+
+```typescript TypeScript
+import { Renderer } from "@attesta/core";
+```
+</CodeGroup>
+
+### Required Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `render_approval` | `async render_approval(ctx: ActionContext, risk: RiskAssessment) -> Verdict` | Present a simple approval prompt and return the operator's verdict. |
+| `render_challenge` | `async render_challenge(ctx: ActionContext, risk: RiskAssessment, challenge_type: ChallengeType) -> ChallengeResult` | Present a verification challenge (confirm, quiz, teach-back, multi-party) and return the result. |
+| `render_info` | `async render_info(message: str) -> None` | Display an informational message to the operator. |
+| `render_auto_approved` | `async render_auto_approved(ctx: ActionContext, risk: RiskAssessment) -> None` | Notify the operator that an action was auto-approved (LOW risk). Can be a no-op for silent auto-approval. |
+
+### Implementing a Custom Renderer
+
+<CodeGroup>
+```python Python
+from attesta import (
+    Renderer, ActionContext, RiskAssessment,
+    ChallengeType, ChallengeResult, Verdict,
+)
+
+class SlackRenderer:
+    """Sends approval requests to a Slack channel."""
+
+    def __init__(self, webhook_url: str, channel: str):
+        self.webhook_url = webhook_url
+        self.channel = channel
+
+    async def render_approval(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> Verdict:
+        # Send a Slack message with approve/deny buttons
+        # Wait for button click response
+        response = await self._send_and_wait(ctx, risk)
+        return Verdict.APPROVED if response == "approve" else Verdict.DENIED
+
+    async def render_challenge(
+        self, ctx: ActionContext, risk: RiskAssessment, challenge_type: ChallengeType
+    ) -> ChallengeResult:
+        # For Slack, present a simplified confirm challenge
+        response = await self._send_and_wait(ctx, risk)
+        return ChallengeResult(
+            passed=(response == "approve"),
+            challenge_type=challenge_type,
+            responder=self.channel,
+        )
+
+    async def render_info(self, message: str) -> None:
+        await self._post_message(message)
+
+    async def render_auto_approved(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> None:
+        # Optionally notify on auto-approvals
+        pass
+
+    async def _send_and_wait(self, ctx, risk):
+        # Implementation details...
+        pass
+
+    async def _post_message(self, message):
+        # Implementation details...
+        pass
+
+# Verify protocol compliance
+assert isinstance(SlackRenderer("https://...", "#approvals"), Renderer)
+```
+
+```typescript TypeScript
+import {
+  Renderer, ActionContext, RiskAssessment,
+  ChallengeType, ChallengeResult, Verdict,
+} from "@attesta/core";
+
+class SlackRenderer implements Renderer {
+  constructor(
+    private webhookUrl: string,
+    private channel: string,
+  ) {}
+
+  async renderApproval(
+    ctx: ActionContext,
+    risk: RiskAssessment,
+  ): Promise<Verdict> {
+    const response = await this.sendAndWait(ctx, risk);
+    return response === "approve" ? Verdict.APPROVED : Verdict.DENIED;
+  }
+
+  async renderChallenge(
+    ctx: ActionContext,
+    risk: RiskAssessment,
+    challengeType: ChallengeType,
+  ): Promise<ChallengeResult> {
+    const response = await this.sendAndWait(ctx, risk);
+    return {
+      passed: response === "approve",
+      challengeType,
+      responder: this.channel,
+    };
+  }
+
+  async renderInfo(message: string): Promise<void> {
+    await this.postMessage(message);
+  }
+
+  async renderAutoApproved(
+    ctx: ActionContext,
+    risk: RiskAssessment,
+  ): Promise<void> {
+    // Optional notification
+  }
+
+  private async sendAndWait(ctx: ActionContext, risk: RiskAssessment) {
+    // Implementation...
+  }
+
+  private async postMessage(message: string) {
+    // Implementation...
+  }
+}
+```
+</CodeGroup>
+
+### Built-in Renderers
+
+| Renderer | Module | Description |
+|----------|--------|-------------|
+| `TerminalRenderer` | `attesta.renderers.terminal` | Rich terminal UI with color-coded risk panels, animated prompts, and quiz formatting. Requires `pip install attesta[terminal]`. |
+| `_DefaultRenderer` | `attesta.core.gate` (internal) | Auto-approves everything. Used in CI/headless environments when `rich` is not installed or stdin is not a TTY. |
+
+<Note>
+Attesta auto-detects the best renderer at runtime. If `rich` is installed and stdin is a TTY (interactive session), the `TerminalRenderer` is used. Otherwise, the silent `_DefaultRenderer` auto-approves all actions. You can override this by passing a `renderer=` parameter to `@gate` or the `Attesta` constructor.
+</Note>
+
+---
+
+## AuditLogger
+
+Persists approval records for compliance and forensic analysis.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import AuditLogger
+```
+
+```typescript TypeScript
+import { AuditLogger } from "@attesta/core";
+```
+</CodeGroup>
+
+### Required Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `log` | `async log(ctx: ActionContext, result: ApprovalResult) -> str` | Persist the approval record and return a unique audit entry ID. |
+
+### Implementing a Custom Audit Logger
+
+<CodeGroup>
+```python Python
+import json
+import uuid
+from attesta import AuditLogger, ActionContext, ApprovalResult
+
+class PostgresAuditLogger:
+    """Persists audit entries to a PostgreSQL table."""
+
+    def __init__(self, connection_string: str):
+        self.connection_string = connection_string
+
+    async def log(self, ctx: ActionContext, result: ApprovalResult) -> str:
+        entry_id = uuid.uuid4().hex
+        await self._insert(
+            entry_id=entry_id,
+            action_name=ctx.function_name,
+            action_description=ctx.description,
+            verdict=result.verdict.value,
+            risk_score=result.risk_assessment.score,
+            risk_level=result.risk_assessment.level.value,
+            agent_id=ctx.agent_id or "",
+            environment=ctx.environment,
+            review_seconds=result.review_time_seconds,
+        )
+        return entry_id
+
+    async def _insert(self, **kwargs):
+        # Database insertion logic...
+        pass
+
+# Verify protocol compliance
+assert isinstance(PostgresAuditLogger("postgres://..."), AuditLogger)
+```
+
+```typescript TypeScript
+import { AuditLogger, ActionContext, ApprovalResult } from "@attesta/core";
+import { v4 as uuidv4 } from "uuid";
+
+class PostgresAuditLogger implements AuditLogger {
+  constructor(private connectionString: string) {}
+
+  async log(ctx: ActionContext, result: ApprovalResult): Promise<string> {
+    const entryId = uuidv4();
+    await this.insert({
+      entryId,
+      actionName: ctx.functionName,
+      verdict: result.verdict,
+      riskScore: result.riskAssessment.score,
+      environment: ctx.environment,
+    });
+    return entryId;
+  }
+
+  private async insert(data: Record<string, unknown>) {
+    // Database insertion logic...
+  }
+}
+```
+</CodeGroup>
+
+### Built-in Audit Logger
+
+The built-in `AuditLogger` in `attesta.core.audit` writes SHA-256 hash-chained entries to a JSONL file. See the [Audit Trail](/concepts/audit-trail) concept page for details on the hash chain and verification.
+
+```python Python
+from attesta.core.audit import AuditLogger
+
+logger = AuditLogger(path=".attesta/audit.jsonl")
+
+# Verify chain integrity at any time
+intact, total, broken = logger.verify_chain()
+print(f"Chain intact: {intact}, entries: {total}, broken links: {broken}")
+```
+
+---
+
+## ChallengeProtocol
+
+Defines a verification challenge that can be presented to an operator. This protocol is used internally by challenge implementations and is less commonly implemented by end users.
+
+### Import
+
+<CodeGroup>
+```python Python
+from attesta import ChallengeProtocol
+```
+
+```typescript TypeScript
+import { ChallengeProtocol } from "@attesta/core";
+```
+</CodeGroup>
+
+### Required Methods
+
+| Method/Property | Signature | Description |
+|-----------------|-----------|-------------|
+| `present` | `async present(ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult` | Present the challenge to the operator and return the outcome. |
+| `challenge_type` | `@property challenge_type -> ChallengeType` | The type of challenge this implementation provides. |
+
+### Implementing a Custom Challenge
+
+<CodeGroup>
+```python Python
+from attesta import (
+    ChallengeProtocol, ActionContext, RiskAssessment,
+    ChallengeResult, ChallengeType,
+)
+import time
+
+class TimedConfirmChallenge:
+    """A confirmation challenge that requires the operator to wait
+    a minimum amount of time before confirming."""
+
+    def __init__(self, min_wait_seconds: float = 10.0):
+        self.min_wait_seconds = min_wait_seconds
+
+    @property
+    def challenge_type(self) -> ChallengeType:
+        return ChallengeType.CONFIRM
+
+    async def present(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> ChallengeResult:
+        start = time.monotonic()
+        # Present information to the user...
+        response = input(f"Approve '{ctx.description}'? (y/n): ")
+        elapsed = time.monotonic() - start
+
+        if elapsed < self.min_wait_seconds:
+            # Too fast -- reject as rubber-stamping
+            return ChallengeResult(
+                passed=False,
+                challenge_type=ChallengeType.CONFIRM,
+                response_time_seconds=elapsed,
+                details={"reason": "responded too quickly"},
+            )
+
+        return ChallengeResult(
+            passed=(response.lower() == "y"),
+            challenge_type=ChallengeType.CONFIRM,
+            response_time_seconds=elapsed,
+        )
+
+assert isinstance(TimedConfirmChallenge(), ChallengeProtocol)
+```
+
+```typescript TypeScript
+import {
+  ChallengeProtocol, ActionContext, RiskAssessment,
+  ChallengeResult, ChallengeType,
+} from "@attesta/core";
+
+class TimedConfirmChallenge implements ChallengeProtocol {
+  readonly challengeType = ChallengeType.CONFIRM;
+
+  constructor(private minWaitSeconds: number = 10.0) {}
+
+  async present(
+    ctx: ActionContext,
+    risk: RiskAssessment,
+  ): Promise<ChallengeResult> {
+    const start = Date.now();
+    // Present information to the user...
+    const response = await promptUser(`Approve '${ctx.description}'?`);
+    const elapsed = (Date.now() - start) / 1000;
+
+    return {
+      passed: response === "y" && elapsed >= this.minWaitSeconds,
+      challengeType: ChallengeType.CONFIRM,
+      responseTimeSeconds: elapsed,
+    };
+  }
+}
+```
+</CodeGroup>
+
+<Warning>
+The `ChallengeProtocol.present()` method is `async`. Even if your challenge implementation is synchronous, you must declare it as an async method (or wrap it) to satisfy the protocol.
+</Warning>
+
+## Protocol Compliance Checking
+
+All Attesta protocols are `@runtime_checkable`, so you can verify compliance at runtime:
+
+```python Python
+from attesta import RiskScorer, Renderer, AuditLogger, ChallengeProtocol
+
+# These return True if the object has the required methods
+isinstance(my_scorer, RiskScorer)           # True/False
+isinstance(my_renderer, Renderer)           # True/False
+isinstance(my_logger, AuditLogger)          # True/False
+isinstance(my_challenge, ChallengeProtocol) # True/False
+```
+
+<Note>
+Runtime `isinstance()` checks with `@runtime_checkable` protocols only verify that the required methods and properties **exist** on the object. They do not validate signatures, return types, or the `async` nature of methods. Use a type checker like `mypy` or `pyright` for full static verification.
+</Note>

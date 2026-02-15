@@ -1,0 +1,417 @@
+---
+title: "Custom Domain Profiles"
+description: "Build, register, and deploy custom domain profiles for industry-specific compliance and risk scoring"
+icon: "puzzle-piece"
+---
+
+Attesta's domain profile framework lets you build custom profiles for any industry -- healthcare, finance, education, government, defense, energy, telecommunications, and more. Each profile encodes your specific compliance requirements and risk patterns.
+
+## Building a Custom Profile
+
+A custom domain profile is an instance of the `DomainProfile` dataclass with your domain-specific configuration.
+
+### Minimal Example
+
+```python
+from attesta.domains import DomainProfile, DomainRegistry
+
+education_profile = DomainProfile(
+    name="education",
+    display_name="Education (FERPA)",
+    description="FERPA compliance profile for educational AI agents",
+    risk_patterns=[],
+    sensitive_terms={},
+    critical_actions=[],
+    safe_actions=[],
+    compliance_frameworks=["FERPA", "COPPA"],
+    escalation_rules=[],
+    challenge_templates=[],
+    min_review_overrides={},
+    base_risk_floor=0.10,
+    production_multiplier=1.4,
+    required_vocabulary=[],
+)
+
+# Register the profile
+registry = DomainRegistry()
+registry.register(education_profile)
+```
+
+### Full Example: Education (FERPA)
+
+```python
+from attesta.domains import (
+    DomainProfile,
+    DomainRegistry,
+    RiskPattern,
+    EscalationRule,
+    DomainChallengeTemplate,
+)
+
+education_profile = DomainProfile(
+    name="education",
+    display_name="Education (FERPA)",
+    description="FERPA/COPPA compliance profile for educational AI agents",
+
+    # ── Risk Patterns ──────────────────────────────────────────
+    risk_patterns=[
+        RiskPattern(
+            pattern=r"student_id|student_record|transcript|gpa",
+            target="args",
+            risk_contribution=0.8,
+            name="student_identifiers",
+            description="Student PII in function arguments",
+            compliance_refs=["FERPA §99.3"],
+        ),
+        RiskPattern(
+            pattern=r"access_student_record|modify_grade|update_transcript",
+            target="function_name",
+            risk_contribution=0.85,
+            name="student_record_operations",
+            description="Operations on education records",
+            compliance_refs=["FERPA §99.10"],
+        ),
+        RiskPattern(
+            pattern=r"parent_consent|guardian_approval",
+            target="any",
+            risk_contribution=0.7,
+            name="consent_operations",
+            description="Parental consent for minors",
+            compliance_refs=["COPPA §312.5"],
+        ),
+        RiskPattern(
+            pattern=r"share_with_third_party|directory_information",
+            target="function_name",
+            risk_contribution=0.75,
+            name="third_party_disclosure",
+            description="Sharing education records externally",
+            compliance_refs=["FERPA §99.31"],
+        ),
+        RiskPattern(
+            pattern=r"disciplinary|behavioral|special_education|iep",
+            target="any",
+            risk_contribution=0.85,
+            name="sensitive_education_records",
+            description="Sensitive student records",
+            compliance_refs=["FERPA §99.31", "IDEA"],
+        ),
+        RiskPattern(
+            pattern=r"child_under_13|minor|age_verification",
+            target="any",
+            risk_contribution=0.9,
+            name="minor_data",
+            description="Data involving minors under 13",
+            compliance_refs=["COPPA §312.3"],
+        ),
+    ],
+
+    # ── Sensitive Terms ────────────────────────────────────────
+    sensitive_terms={
+        "student": 0.80,
+        "transcript": 0.85,
+        "grade": 0.75,
+        "ferpa": 0.90,
+        "minor": 0.90,
+        "guardian": 0.70,
+        "enrollment": 0.60,
+        "discipline": 0.80,
+        "iep": 0.85,
+    },
+
+    # ── Critical Actions ───────────────────────────────────────
+    critical_actions=[
+        "delete_student_record",
+        "export_student_data",
+        "share_records_externally",
+        "modify_grade_permanent",
+        "override_consent_requirement",
+        "bulk_student_export",
+    ],
+
+    # ── Safe Actions ───────────────────────────────────────────
+    safe_actions=[
+        "get_enrollment_count",
+        "list_course_catalog",
+        "check_system_status",
+    ],
+
+    # ── Compliance Frameworks ──────────────────────────────────
+    compliance_frameworks=["FERPA", "COPPA", "IDEA", "Title IX"],
+
+    # ── Escalation Rules ───────────────────────────────────────
+    escalation_rules=[
+        EscalationRule(
+            condition="bulk_student_export",
+            action="multi_party",
+            required_approvers=3,
+            notify_roles=["registrar", "ferpa_officer"],
+            description="Bulk student data export requires 3-party approval",
+        ),
+        EscalationRule(
+            condition="minor_data_processing",
+            action="teach_back",
+            required_approvers=2,
+            notify_roles=["privacy_officer", "school_admin"],
+            description="Processing data of minors under 13 requires teach-back",
+        ),
+        EscalationRule(
+            condition="grade_modification",
+            action="multi_party",
+            required_approvers=2,
+            notify_roles=["department_chair", "registrar"],
+            description="Grade changes require dual approval",
+        ),
+    ],
+
+    # ── Challenge Templates ────────────────────────────────────
+    challenge_templates=[
+        DomainChallengeTemplate(
+            question_template="Under FERPA, what must be obtained before disclosing {record_type} to a third party?",
+            answer_hints=["written consent", "parent", "eligible student", "directory"],
+            context_vars=["record_type"],
+            challenge_type="teach_back",
+            min_risk_level="high",
+        ),
+        DomainChallengeTemplate(
+            question_template="What age threshold triggers COPPA requirements for this operation?",
+            answer_hints=["13", "under 13", "minor", "parental consent"],
+            context_vars=[],
+            challenge_type="teach_back",
+            min_risk_level="high",
+        ),
+    ],
+
+    # ── Review Time Overrides ──────────────────────────────────
+    min_review_overrides={
+        "critical": 45,
+        "high": 15,
+    },
+
+    # ── Risk Floor and Production Multiplier ───────────────────
+    base_risk_floor=0.12,
+    production_multiplier=1.5,
+
+    # ── Required Vocabulary ────────────────────────────────────
+    required_vocabulary=[
+        "FERPA", "education records", "directory information",
+        "legitimate educational interest", "eligible student",
+    ],
+)
+```
+
+## Registering Custom Profiles
+
+### Runtime Registration
+
+Register your profile at application startup:
+
+<CodeGroup>
+```python Python
+from attesta.domains import registry
+from attesta.domains.presets import register_preset
+
+# Register globally
+registry.register(education_profile)
+
+# Or register as a preset (enables attesta.yaml activation)
+register_preset(education_profile, aliases=["ferpa", "edu"])
+
+# Now you can activate it via YAML: domain: education
+# Or programmatically:
+from attesta.domains import DomainRiskScorer
+scorer = DomainRiskScorer(education_profile)
+```
+</CodeGroup>
+
+### Replacing Existing Profiles
+
+If you need to update a previously registered profile, use `replace()`:
+
+```python
+from attesta.domains import DomainRegistry, DomainProfile
+
+registry = DomainRegistry()
+
+# Replace a previously registered profile with an updated version
+updated_profile = DomainProfile(
+    name="education",  # Same name as the existing profile
+    display_name="Education (Updated)",
+    description="Updated education compliance profile",
+    # ... all fields ...
+)
+
+registry.replace(updated_profile)
+```
+
+<Warning>
+Using `replace()` completely overwrites the existing profile. Make sure to preserve all existing patterns, actions, and rules unless you intentionally want to remove them.
+</Warning>
+
+## Merging Multiple Profiles
+
+You can combine multiple profiles using the merge functionality:
+
+```yaml attesta.yaml
+domain:
+  - education
+  - my-other-profile
+```
+
+```python
+from attesta.domains import DomainRegistry
+
+registry = DomainRegistry()
+registry.register(education_profile)
+registry.register(other_profile)
+
+# Merge multiple profiles
+merged = registry.merge(education_profile, other_profile)
+# Result: union of all risk patterns, max of scalar values, etc.
+```
+
+The merge follows the [conservative merge strategy](/domains/overview#merge-strategy) -- lists are unioned, scalars take the higher (stricter) value.
+
+## Design Guidelines
+
+### Risk Patterns
+
+<Tabs>
+  <Tab title="Good Patterns">
+    ```python
+    # Specific, targeted patterns with clear compliance rationale
+    RiskPattern(
+        pattern=r"student_id|student_record|transcript",
+        target="args",
+        risk_contribution=0.8,
+        name="student_pii",
+        description="Student PII identifiers in arguments",
+        compliance_refs=["FERPA §99.3"],
+    )
+    ```
+    - Target a specific action context (`args`, `function_name`)
+    - Include compliance references
+    - Use descriptive names
+    - Set proportional risk contributions
+  </Tab>
+  <Tab title="Bad Patterns">
+    ```python
+    # Overly broad pattern that matches everything
+    RiskPattern(
+        pattern=r".*",
+        target="any",
+        risk_contribution=0.9,
+        name="catch_all",
+        description="Catch everything",
+        compliance_refs=[],
+    )
+    ```
+    - Avoid `.*` catch-all patterns
+    - Avoid `target="any"` when a specific target is more appropriate
+    - Avoid missing compliance references
+    - Avoid disproportionate risk contributions
+  </Tab>
+</Tabs>
+
+### Risk Contribution Scale
+
+Use this scale as a guideline for setting `risk_contribution` values:
+
+| Range | Usage |
+|-------|-------|
+| 0.5 - 0.6 | Informational / low-sensitivity operations |
+| 0.6 - 0.7 | Moderate-sensitivity operations (reversible state changes) |
+| 0.7 - 0.8 | High-sensitivity operations (personal data access) |
+| 0.8 - 0.9 | Critical operations (data modification, exports) |
+| 0.9 - 1.0 | Safety-critical operations (overrides, bypasses, destructive) |
+
+### Critical Actions
+
+Only designate actions as critical when they meet **at least one** of these criteria:
+
+1. **Irreversible** -- the action cannot be undone (e.g., `delete_student_record`)
+2. **Regulatory mandate** -- compliance requires multi-party approval (e.g., `bulk_student_export`)
+3. **Safety bypass** -- the action circumvents a safety control (e.g., `override_consent_requirement`)
+
+### Challenge Templates
+
+Write challenge templates that test **comprehension**, not just knowledge:
+
+```python
+# Good: tests understanding of the specific action
+DomainChallengeTemplate(
+    question_template="Why does disclosing {record_type} to {recipient} require written consent under FERPA?",
+    answer_hints=["not directory information", "education record", "consent", "eligible student"],
+    context_vars=["record_type", "recipient"],
+    challenge_type="teach_back",
+    min_risk_level="high",
+)
+
+# Bad: tests rote knowledge, not comprehension
+DomainChallengeTemplate(
+    question_template="What year was FERPA enacted?",
+    answer_hints=["1974"],
+    context_vars=[],
+    challenge_type="teach_back",
+    min_risk_level="high",
+)
+```
+
+## Testing Custom Profiles
+
+Validate your custom profile before deploying:
+
+```python
+from attesta import Attesta
+from attesta.domains import DomainRegistry
+
+# Register the custom profile
+registry = DomainRegistry()
+registry.register(education_profile)
+
+# Create an Attesta instance with the custom domain
+attesta = Attesta(domain="education")
+
+# Test risk scoring for domain-specific actions
+@attesta.gate()
+def access_student_record(student_id: str) -> dict:
+    """Access a student's education record."""
+    return {"student_id": student_id}
+
+@attesta.gate()
+def export_student_data(query: str) -> str:
+    """Export student data matching the query."""
+    return f"Exported: {query}"
+
+@attesta.gate()
+def get_enrollment_count() -> int:
+    """Get the total enrollment count."""
+    return 5000
+
+# Verify risk levels (using the risk scorer directly)
+scorer = attesta.policy.build_risk_scorer()
+
+# access_student_record should be HIGH (student_id pattern)
+# export_student_data should be CRITICAL (critical action)
+# get_enrollment_count should be LOW (safe action)
+```
+
+<Tip>
+Write integration tests that verify your custom profile produces the expected risk levels for representative actions. This catches regressions when you update patterns or risk contributions.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Domain Overview" icon="grid-2" href="/domains/overview">
+    Architecture and merge strategy for domain profiles
+  </Card>
+  <Card title="Domain Activation" icon="hospital" href="/configuration/domain-activation">
+    Activate custom domains via attesta.yaml
+  </Card>
+  <Card title="Custom Risk Scorer" icon="sliders" href="/guides/custom-risk-scorer">
+    Build a fully custom risk scorer beyond domain profiles
+  </Card>
+  <Card title="Testing Guide" icon="flask-vial" href="/guides/testing">
+    Test your Attesta configuration end-to-end
+  </Card>
+</CardGroup>

@@ -1,0 +1,576 @@
+---
+title: "Migration Guide"
+description: "Migrate from manual approval flows to Attesta, upgrade between versions, and update domain profiles"
+icon: "arrow-right-arrow-left"
+---
+
+This guide covers three migration scenarios: adopting Attesta for the first time (replacing manual approval flows), upgrading between Attesta versions, and updating domain profiles.
+
+## Migrating from Manual Approval Flows
+
+If your codebase already has ad-hoc approval logic -- `input()` prompts, Slack confirmation bots, or custom approval middleware -- Attesta can replace them with a unified, auditable framework.
+
+### Before: Manual Approval Patterns
+
+<Tabs>
+  <Tab title="Inline input()">
+    ```python
+    # Before: scattered input() calls
+    def delete_user(user_id: str) -> str:
+        confirm = input(f"Delete user {user_id}? [y/N] ")
+        if confirm.lower() != "y":
+            raise RuntimeError("Aborted")
+        # ... delete logic
+        return f"Deleted {user_id}"
+    ```
+  </Tab>
+  <Tab title="Custom Decorator">
+    ```python
+    # Before: homegrown approval decorator
+    def require_approval(func):
+        def wrapper(*args, **kwargs):
+            print(f"Action: {func.__name__}({args}, {kwargs})")
+            if input("Approve? [y/N] ").lower() != "y":
+                raise RuntimeError("Denied")
+            return func(*args, **kwargs)
+        return wrapper
+
+    @require_approval
+    def deploy(service: str, version: str) -> str:
+        return f"Deployed {service} v{version}"
+    ```
+  </Tab>
+  <Tab title="Slack Bot">
+    ```python
+    # Before: custom Slack approval flow
+    async def deploy_with_approval(service, version):
+        request_id = await slack.post_approval_request(
+            channel="#approvals",
+            message=f"Deploy {service} v{version}?",
+        )
+        response = await slack.wait_for_response(request_id, timeout=300)
+        if response != "approved":
+            raise RuntimeError("Deployment denied")
+        return do_deploy(service, version)
+    ```
+  </Tab>
+</Tabs>
+
+### After: Attesta
+
+<Steps>
+  <Step title="Install Attesta">
+    ```bash
+    pip install attesta
+    ```
+  </Step>
+
+  <Step title="Replace Inline Prompts">
+    Replace manual `input()` calls with the `@gate` decorator:
+
+    <CodeGroup>
+    ```python Before
+    def delete_user(user_id: str) -> str:
+        confirm = input(f"Delete user {user_id}? [y/N] ")
+        if confirm.lower() != "y":
+            raise RuntimeError("Aborted")
+        return db.delete(user_id)
+    ```
+
+    ```python After
+    from attesta import gate
+
+    @gate(risk_hints={"destructive": True})
+    def delete_user(user_id: str) -> str:
+        """Permanently delete a user and all associated data."""
+        return db.delete(user_id)
+    ```
+    </CodeGroup>
+
+    Attesta now handles the approval prompt, risk scoring, minimum review time enforcement, and audit logging -- all automatically.
+  </Step>
+
+  <Step title="Replace Custom Decorators">
+    If you had a homegrown approval decorator, replace it with `@gate`:
+
+    <CodeGroup>
+    ```python Before
+    @require_approval
+    def deploy(service: str, version: str) -> str:
+        return f"Deployed {service} v{version}"
+    ```
+
+    ```python After
+    from attesta import gate
+
+    @gate(
+        risk_hints={"production": True},
+        environment="production",
+    )
+    def deploy(service: str, version: str) -> str:
+        """Deploy a service to production."""
+        return f"Deployed {service} v{version}"
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Replace Slack Bots">
+    If you had a custom Slack approval bot, replace it with an Attesta `SlackRenderer`:
+
+    <CodeGroup>
+    ```python Before
+    async def deploy_with_approval(service, version):
+        request_id = await slack.post_approval_request(...)
+        response = await slack.wait_for_response(request_id)
+        if response != "approved":
+            raise RuntimeError("Denied")
+        return do_deploy(service, version)
+    ```
+
+    ```python After
+    from attesta import Attesta
+
+    attesta = Attesta(renderer=SlackRenderer(
+        webhook_url="https://hooks.slack.com/...",
+        channel="#approvals",
+        callback_url="https://your-api.example.com/attesta",
+    ))
+
+    @attesta.gate(
+        risk_hints={"production": True},
+        environment="production",
+    )
+    async def deploy(service: str, version: str) -> str:
+        """Deploy a service to production."""
+        return do_deploy(service, version)
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Handle AttestaDenied">
+    Replace your custom error handling with `AttestaDenied`:
+
+    <CodeGroup>
+    ```python Before
+    try:
+        deploy("api", "2.0")
+    except RuntimeError as e:
+        if "Denied" in str(e) or "Aborted" in str(e):
+            log.info("Deployment cancelled by operator")
+        else:
+            raise
+    ```
+
+    ```python After
+    from attesta import AttestaDenied
+
+    try:
+        deploy("api", "2.0")
+    except AttestaDenied as e:
+        log.info(f"Deployment denied: {e}")
+        log.info(f"Risk score: {e.result.risk_assessment.score}")
+        log.info(f"Challenge type: {e.result.challenge_result.challenge_type}")
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add Configuration">
+    Create an `attesta.yaml` to centralize your policy:
+
+    ```yaml attesta.yaml
+    policy:
+      fail_mode: deny
+      minimum_review_seconds:
+        medium: 3
+        high: 10
+        critical: 30
+
+    risk:
+      overrides:
+        delete_user: critical
+        deploy: high
+        transfer_funds: critical
+
+    trust:
+      initial_score: 0.3
+      ceiling: 0.85
+      influence: 0.25
+
+    audit:
+      path: .attesta/audit.jsonl
+    ```
+
+    Then load it:
+
+    ```python
+    from attesta import Attesta
+
+    attesta = Attesta.from_config("attesta.yaml")
+
+    @attesta.gate
+    def delete_user(user_id: str) -> str:
+        ...
+    ```
+  </Step>
+</Steps>
+
+### Migration Checklist
+
+| Manual Pattern | Attesta Replacement |
+|----------------|---------------------|
+| `input("Approve?")` | `@gate` decorator |
+| Custom approval decorator | `@gate` or `@attesta.gate` |
+| Slack approval bot | `SlackRenderer` |
+| Custom audit logging | `AuditLogger` or custom `AuditLogger` protocol |
+| Risk classification logic | `RiskScorer` (default or custom) |
+| Per-action risk levels | `risk_hints={}` or YAML `overrides:` |
+| Environment checks | `environment="production"` parameter |
+
+<Warning>
+When migrating, do not remove your old approval logic until you have verified that Attesta is working correctly in your environment. Run both systems in parallel during the transition period, with the old system as a fallback.
+</Warning>
+
+---
+
+## Migrating Between Attesta Versions
+
+### v0.x to v1.0 (Current)
+
+Attesta follows semantic versioning. The v0.x series is the initial release; v1.0 will be the first stable API.
+
+#### Breaking Changes to Watch For
+
+<Tabs>
+  <Tab title="Import Paths">
+    Imports were consolidated in v0.1.0. If you are upgrading from an earlier pre-release:
+
+    <CodeGroup>
+    ```python Before (pre-release)
+    from gatekeeper import gate
+    from gatekeeper.core import RiskScorer
+    ```
+
+    ```python After (v0.1.0+)
+    from attesta import gate
+    from attesta import RiskScorer
+    ```
+    </CodeGroup>
+
+    The package was renamed from `gatekeeper-ai` to `attesta`. Update all imports.
+  </Tab>
+
+  <Tab title="Configuration Format">
+    The YAML configuration was restructured to use sections:
+
+    <CodeGroup>
+    ```yaml Before (flat format)
+    default_environment: production
+    min_review_seconds: 2.0
+    challenge_map:
+      low: auto_approve
+      medium: confirm
+      high: quiz
+      critical: multi_party
+    ```
+
+    ```yaml After (rich format)
+    policy:
+      minimum_review_seconds:
+        medium: 3
+        high: 10
+        critical: 30
+      fail_mode: deny
+
+    risk:
+      overrides:
+        deploy_production: critical
+
+    trust:
+      initial_score: 0.3
+      ceiling: 0.9
+    ```
+    </CodeGroup>
+
+    Both formats are supported. The flat format is treated as legacy and will be deprecated in a future version.
+  </Tab>
+
+  <Tab title="Challenge Map Keys">
+    Challenge type values were standardized:
+
+    | Before | After |
+    |--------|-------|
+    | `auto` | `auto_approve` |
+    | `challenge` | `quiz` |
+    | `multi` | `multi_party` |
+    | `teachback` | `teach_back` |
+
+    Update your `attesta.yaml` challenge map if you used the older names.
+  </Tab>
+</Tabs>
+
+### Upgrade Procedure
+
+<Steps>
+  <Step title="Update the Package">
+    ```bash
+    pip install --upgrade attesta
+    ```
+  </Step>
+
+  <Step title="Check for Deprecation Warnings">
+    Run your test suite with warnings enabled:
+
+    ```bash
+    python -W all -m pytest tests/
+    ```
+
+    Attesta emits `DeprecationWarning` for legacy features that will be removed in a future version.
+  </Step>
+
+  <Step title="Update Configuration Format">
+    If you are still using the flat YAML format, migrate to the rich format. Use `from_config()` -- it auto-detects both formats, so you can migrate incrementally.
+
+    ```python
+    from attesta import Attesta
+
+    # Both formats work -- no code changes needed
+    attesta = Attesta.from_config("attesta.yaml")
+    ```
+  </Step>
+
+  <Step title="Verify Audit Chain Continuity">
+    After upgrading, verify that the existing audit chain is still intact:
+
+    ```python
+    from attesta.core.audit import AuditLogger
+
+    logger = AuditLogger(path=".attesta/audit.jsonl")
+    intact, total, broken = logger.verify_chain()
+
+    assert intact, f"Broken links at indices: {broken}"
+    print(f"Audit chain verified: {total} entries intact")
+    ```
+  </Step>
+
+  <Step title="Update Trust Engine Storage">
+    If you are using persistent trust storage, the TrustEngine will load existing data automatically. No manual migration is needed for trust profiles.
+
+    ```python
+    from attesta.core.trust import TrustEngine
+    from pathlib import Path
+
+    engine = TrustEngine(storage_path=Path(".attesta/trust.json"))
+    # Existing profiles are loaded automatically
+    ```
+  </Step>
+
+  <Step title="Run the Full Test Suite">
+    ```bash
+    pytest tests/ -v
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Upgrading Domain Profiles
+
+Domain profiles encode industry-specific risk patterns, sensitive terms, and compliance references. When regulations change or your domain knowledge evolves, you need to update them.
+
+### Updating a Custom Profile
+
+Custom profiles registered with `register_preset()` are loaded at runtime. Update your profile definitions and re-register to apply changes. To upgrade:
+
+```bash
+pip install --upgrade attesta
+```
+
+Custom profiles take effect immediately when loaded via configuration:
+
+```yaml attesta.yaml
+domain: my-domain
+```
+
+### Overriding Profile Fields
+
+If you need to customize a registered profile, load the preset and modify specific fields:
+
+```python
+from attesta.domains.presets import load_preset
+from attesta.domains.profile import RiskPattern, EscalationRule
+
+# Load a registered profile
+profile = load_preset("my-domain")
+
+# Add a custom risk pattern
+profile.risk_patterns.append(
+    RiskPattern(
+        pattern=r"sensitive|restricted",
+        target="any",
+        risk_contribution=0.9,
+        name="sensitive_data",
+        description="Access to sensitive/restricted data.",
+    )
+)
+
+# Add a custom critical action
+profile.critical_actions.append("export_genetic_data")
+
+# Add custom vocabulary for teach-back challenges
+profile.required_vocabulary.extend(["GINA", "genetic", "consent"])
+```
+
+### Creating a Custom Profile
+
+For complete control, create a profile from scratch:
+
+```python
+from attesta.domains.profile import (
+    DomainProfile, RiskPattern, EscalationRule,
+    DomainChallengeTemplate, registry,
+)
+
+my_profile = DomainProfile(
+    name="my-company",
+    display_name="My Company Internal",
+    description="Risk profile for internal tools and services.",
+    risk_patterns=[
+        RiskPattern(
+            pattern=r"customer_data|user_pii",
+            target="any",
+            risk_contribution=0.8,
+            name="customer_pii",
+            description="Access to customer personal data.",
+            compliance_refs=["GDPR Art. 6", "CCPA"],
+        ),
+        RiskPattern(
+            pattern=r"billing|invoice|payment",
+            target="function_name",
+            risk_contribution=0.7,
+            name="financial_ops",
+            description="Financial operations.",
+            compliance_refs=["SOX", "PCI-DSS"],
+        ),
+    ],
+    sensitive_terms={
+        "ssn": 0.95,
+        "credit_card": 0.9,
+        "password": 0.85,
+        "api_key": 0.8,
+    },
+    critical_actions=[
+        "delete_customer",
+        "process_refund",
+        "modify_billing",
+        "export_all_users",
+    ],
+    safe_actions=[
+        "get_status",
+        "list_products",
+        "search_docs",
+    ],
+    compliance_frameworks=["GDPR", "SOX", "PCI-DSS"],
+    escalation_rules=[
+        EscalationRule(
+            condition="risk_score > 0.9",
+            action="require_multi_party",
+            required_approvers=2,
+            notify_roles=["security-team", "compliance"],
+            description="Very high risk requires dual approval.",
+        ),
+    ],
+    challenge_templates=[
+        DomainChallengeTemplate(
+            question_template=(
+                "What customer data will {action} access "
+                "and what is the business justification?"
+            ),
+            answer_hints=["customer", "data", "justification", "ticket"],
+            context_vars=["action"],
+            challenge_type="teach_back",
+            min_risk_level="high",
+        ),
+    ],
+    base_risk_floor=0.15,
+    production_multiplier=1.5,
+)
+
+# Register for use
+registry.register(my_profile)
+```
+
+### Merging Profiles
+
+When your organization spans multiple regulatory domains, merge profiles:
+
+```python
+from attesta.domains.presets import load_preset
+from attesta.domains.profile import DomainRegistry
+
+profile_a = load_preset("profile-a")
+profile_b = load_preset("profile-b")
+
+reg = DomainRegistry()
+reg.register(profile_a)
+reg.register(profile_b)
+
+# Merge produces a composite with the most conservative settings
+merged = reg.merge(profile_a, profile_b)
+print(f"Merged profile: {merged.display_name}")
+print(f"Compliance frameworks: {merged.compliance_frameworks}")
+```
+
+Or via YAML:
+
+```yaml attesta.yaml
+domain:
+  - profile-a
+  - profile-b
+```
+
+<Tip>
+When merging profiles, conflicting scalar values (like `base_risk_floor`) resolve to the most conservative (highest) value. Sensitive term weights resolve to the maximum across profiles. This ensures that merged profiles are at least as strict as any individual profile.
+</Tip>
+
+### Profile Version Tracking
+
+Track profile versions in your configuration for reproducibility:
+
+```yaml attesta.yaml
+# Activate a registered domain profile
+domain: my-domain
+```
+
+To check the current profile contents:
+
+```python
+from attesta.domains.presets import load_preset
+
+profile = load_preset("my-domain")
+print(f"Profile: {profile.display_name}")
+print(f"Risk patterns: {len(profile.risk_patterns)}")
+print(f"Critical actions: {profile.critical_actions}")
+print(f"Compliance: {profile.compliance_frameworks}")
+```
+
+---
+
+## Migration Support Matrix
+
+| From | To | Complexity | Notes |
+|------|----|-----------|-------|
+| `input()` prompts | `@gate` | Low | Direct replacement |
+| Custom decorator | `@gate` / `@attesta.gate` | Low | Map parameters to Attesta equivalents |
+| Slack approval bot | `SlackRenderer` | Medium | Reimplement webhook handling |
+| Custom risk logic | `RiskScorer` protocol | Medium | Wrap existing logic in `score()` method |
+| Flat YAML config | Rich YAML config | Low | Both formats supported |
+| gatekeeper-ai package | attesta package | Low | Rename imports |
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get started with Attesta from scratch
+  </Card>
+  <Card title="Configuration" icon="file-code" href="/configuration/attesta-yaml">
+    Full YAML configuration reference
+  </Card>
+</CardGroup>

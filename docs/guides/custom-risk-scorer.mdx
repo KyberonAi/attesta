@@ -1,0 +1,501 @@
+---
+title: "Building a Custom Risk Scorer"
+description: "Implement the RiskScorer protocol to create domain-specific, ML-based, or rule-based risk scoring strategies"
+icon: "gauge-high"
+---
+
+Attesta's risk scoring system is fully pluggable. Any class that implements the `RiskScorer` protocol -- a `score(ctx)` method and a `name` property -- can be used wherever a scorer is expected. No inheritance or registration is required.
+
+This guide walks through building custom scorers from scratch, testing them, and wiring them into your Attesta configuration.
+
+## The RiskScorer Protocol
+
+Every scorer must satisfy two requirements:
+
+| Member | Signature | Description |
+|--------|-----------|-------------|
+| `score` | `score(ctx: ActionContext) -> float` | Return a risk score in `[0.0, 1.0]` |
+| `name` | `@property name -> str` | Human-readable identifier for audit trails |
+
+<CodeGroup>
+```python Python
+from attesta import RiskScorer, ActionContext
+
+class MyScorer:
+    @property
+    def name(self) -> str:
+        return "my-scorer"
+
+    def score(self, ctx: ActionContext) -> float:
+        return 0.5
+
+# Verify at runtime
+assert isinstance(MyScorer(), RiskScorer)
+```
+
+```typescript TypeScript
+import { RiskScorer, ActionContext } from "@attesta/core";
+
+class MyScorer implements RiskScorer {
+  readonly name = "my-scorer";
+
+  score(ctx: ActionContext): number {
+    return 0.5;
+  }
+}
+```
+</CodeGroup>
+
+---
+
+## Step-by-Step: Rule-Based Scorer
+
+A rule-based scorer evaluates the `ActionContext` against a set of predefined rules. This is the most common approach for organizations with well-defined security policies.
+
+<Steps>
+  <Step title="Define Your Rules">
+    Start by mapping your organization's security policies to scoring rules. Each rule inspects a specific aspect of the action context and contributes to the total score.
+
+    ```python
+    from dataclasses import dataclass
+
+    @dataclass
+    class ScoringRule:
+        """A single rule that contributes to the risk score."""
+        name: str
+        weight: float  # 0.0 - 1.0
+        description: str
+
+        def evaluate(self, ctx) -> float:
+            """Return a raw score in [0.0, 1.0] for this rule."""
+            raise NotImplementedError
+    ```
+  </Step>
+
+  <Step title="Implement Rule Logic">
+    Create concrete rule classes for each security concern.
+
+    ```python
+    from attesta import ActionContext
+
+    class EnvironmentRule(ScoringRule):
+        """Production actions are inherently riskier."""
+        def evaluate(self, ctx: ActionContext) -> float:
+            if ctx.environment == "production":
+                return 0.8
+            if ctx.environment == "staging":
+                return 0.4
+            return 0.1
+
+    class DataClassificationRule(ScoringRule):
+        """Score based on data sensitivity hints."""
+        def evaluate(self, ctx: ActionContext) -> float:
+            classification = ctx.hints.get("data_classification", "public")
+            scores = {
+                "public": 0.1,
+                "internal": 0.3,
+                "confidential": 0.6,
+                "restricted": 0.9,
+            }
+            return scores.get(classification, 0.5)
+
+    class BlastRadiusRule(ScoringRule):
+        """Score based on how many systems are affected."""
+        def evaluate(self, ctx: ActionContext) -> float:
+            affected = ctx.hints.get("affected_systems", 1)
+            if affected >= 10:
+                return 0.9
+            if affected >= 5:
+                return 0.6
+            if affected >= 2:
+                return 0.3
+            return 0.1
+    ```
+  </Step>
+
+  <Step title="Assemble the Scorer">
+    Combine the rules into a scorer that satisfies the `RiskScorer` protocol.
+
+    ```python
+    class PolicyRiskScorer:
+        """Rule-based scorer driven by organizational security policies."""
+
+        def __init__(self):
+            self.rules = [
+                EnvironmentRule(
+                    name="environment",
+                    weight=0.3,
+                    description="Production environment risk",
+                ),
+                DataClassificationRule(
+                    name="data_classification",
+                    weight=0.4,
+                    description="Data sensitivity classification",
+                ),
+                BlastRadiusRule(
+                    name="blast_radius",
+                    weight=0.3,
+                    description="Number of affected systems",
+                ),
+            ]
+
+        @property
+        def name(self) -> str:
+            return "policy"
+
+        def score(self, ctx) -> float:
+            total_weight = sum(r.weight for r in self.rules)
+            weighted_sum = sum(
+                r.evaluate(ctx) * r.weight for r in self.rules
+            )
+            return max(0.0, min(1.0, weighted_sum / total_weight))
+    ```
+  </Step>
+
+  <Step title="Register and Use">
+    Pass the scorer to `@gate` or the `Attesta` constructor.
+
+    <CodeGroup>
+    ```python Per-Gate
+    from attesta import gate
+
+    scorer = PolicyRiskScorer()
+
+    @gate(risk_scorer=scorer)
+    def deploy_service(service: str, version: str) -> str:
+        return f"Deployed {service} v{version}"
+    ```
+
+    ```python Instance-Wide
+    from attesta import Attesta
+
+    attesta = Attesta(risk_scorer=PolicyRiskScorer())
+
+    @attesta.gate(risk_hints={"data_classification": "confidential"})
+    def update_customer_record(customer_id: str, data: dict) -> None:
+        ...
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+---
+
+## Step-by-Step: ML-Based Scorer
+
+For organizations with historical approval data, a machine-learning scorer can learn risk patterns from past decisions.
+
+<Steps>
+  <Step title="Prepare the Feature Extractor">
+    Extract features from the `ActionContext` that your model can consume.
+
+    ```python
+    import hashlib
+    from attesta import ActionContext
+
+    def extract_features(ctx: ActionContext) -> dict:
+        """Extract ML features from an action context."""
+        fn_tokens = ctx.function_name.lower().split("_")
+        arg_str = " ".join(str(a) for a in ctx.args)
+
+        return {
+            "has_destructive_verb": any(
+                t in {"delete", "drop", "destroy", "purge"} for t in fn_tokens
+            ),
+            "has_mutating_verb": any(
+                t in {"write", "update", "create", "send", "deploy"} for t in fn_tokens
+            ),
+            "is_production": ctx.environment == "production",
+            "arg_length": len(arg_str),
+            "has_pii_hint": bool(ctx.hints.get("pii")),
+            "has_financial_hint": bool(ctx.hints.get("financial")),
+            "function_name_hash": int(
+                hashlib.md5(ctx.function_name.encode()).hexdigest()[:8], 16
+            ),
+        }
+    ```
+  </Step>
+
+  <Step title="Build the Scorer Class">
+    Wrap your trained model in a class that satisfies the `RiskScorer` protocol.
+
+    ```python
+    import pickle
+    from pathlib import Path
+    from attesta import ActionContext
+
+    class MLRiskScorer:
+        """Risk scorer backed by a trained scikit-learn model."""
+
+        def __init__(self, model_path: str | Path):
+            with open(model_path, "rb") as f:
+                self._model = pickle.load(f)
+            self._feature_names = [
+                "has_destructive_verb",
+                "has_mutating_verb",
+                "is_production",
+                "arg_length",
+                "has_pii_hint",
+                "has_financial_hint",
+                "function_name_hash",
+            ]
+
+        @property
+        def name(self) -> str:
+            return "ml-classifier"
+
+        def score(self, ctx: ActionContext) -> float:
+            features = extract_features(ctx)
+            feature_vector = [
+                [features[name] for name in self._feature_names]
+            ]
+
+            # predict_proba returns [[p_low, p_high]]
+            proba = self._model.predict_proba(feature_vector)[0]
+            risk_score = proba[1]  # probability of "high risk" class
+
+            return max(0.0, min(1.0, risk_score))
+    ```
+  </Step>
+
+  <Step title="Add a Fallback">
+    ML models can fail. Wrap the scorer with a fallback for robustness.
+
+    ```python
+    from attesta.core.risk import DefaultRiskScorer
+
+    class RobustMLScorer:
+        """ML scorer with automatic fallback to the default heuristic."""
+
+        def __init__(self, model_path: str):
+            self._ml = MLRiskScorer(model_path)
+            self._fallback = DefaultRiskScorer()
+
+        @property
+        def name(self) -> str:
+            return "ml-with-fallback"
+
+        def score(self, ctx) -> float:
+            try:
+                return self._ml.score(ctx)
+            except Exception:
+                # Log the error in production
+                return self._fallback.score(ctx)
+    ```
+  </Step>
+
+  <Step title="Use with CompositeRiskScorer">
+    Blend ML predictions with heuristic scores for defense in depth.
+
+    ```python
+    from attesta.core.risk import CompositeRiskScorer, DefaultRiskScorer
+
+    scorer = CompositeRiskScorer(
+        scorers=[
+            (RobustMLScorer("models/risk_v2.pkl"), 0.6),
+            (DefaultRiskScorer(), 0.4),
+        ]
+    )
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+Never deploy an ML scorer without a fallback. If the model fails to load or predict, the fallback ensures that actions are still scored rather than silently passing through.
+</Warning>
+
+---
+
+## Example: API Cost Scorer
+
+A practical scorer that estimates financial risk based on API call costs.
+
+<CodeGroup>
+```python Python
+from attesta import ActionContext
+
+class APICostScorer:
+    """Scores risk based on estimated cost of the API call."""
+
+    COST_MAP = {
+        "send_email": 0.001,
+        "run_query": 0.01,
+        "generate_report": 0.50,
+        "train_model": 50.00,
+        "deploy_infrastructure": 500.00,
+    }
+
+    def __init__(self, high_cost_threshold: float = 100.0):
+        self.threshold = high_cost_threshold
+
+    @property
+    def name(self) -> str:
+        return "api-cost"
+
+    def score(self, ctx: ActionContext) -> float:
+        # Check for explicit cost hint
+        cost = ctx.hints.get("estimated_cost_usd")
+        if cost is None:
+            cost = self.COST_MAP.get(ctx.function_name, 0.0)
+
+        if cost <= 0:
+            return 0.05
+        if cost >= self.threshold:
+            return 0.9
+
+        # Linear scale between 0.1 and 0.85
+        normalized = cost / self.threshold
+        return 0.1 + (normalized * 0.75)
+```
+
+```typescript TypeScript
+import { RiskScorer, ActionContext } from "@attesta/core";
+
+class APICostScorer implements RiskScorer {
+  readonly name = "api-cost";
+
+  private costMap: Record<string, number> = {
+    send_email: 0.001,
+    run_query: 0.01,
+    generate_report: 0.5,
+    train_model: 50.0,
+    deploy_infrastructure: 500.0,
+  };
+
+  constructor(private highCostThreshold: number = 100.0) {}
+
+  score(ctx: ActionContext): number {
+    const cost =
+      ctx.hints?.estimatedCostUsd ??
+      this.costMap[ctx.functionName] ??
+      0;
+
+    if (cost <= 0) return 0.05;
+    if (cost >= this.highCostThreshold) return 0.9;
+
+    const normalized = cost / this.highCostThreshold;
+    return 0.1 + normalized * 0.75;
+  }
+}
+```
+</CodeGroup>
+
+---
+
+## Composing Custom Scorers
+
+Once you have custom scorers, you can compose them with built-in scorers using `CompositeRiskScorer` or `MaxRiskScorer`.
+
+```python
+from attesta import Attesta
+from attesta.core.risk import (
+    DefaultRiskScorer,
+    CompositeRiskScorer,
+    MaxRiskScorer,
+    FixedRiskScorer,
+)
+
+# Strategy 1: Weighted blend
+blended = CompositeRiskScorer(
+    scorers=[
+        (DefaultRiskScorer(), 2.0),
+        (PolicyRiskScorer(), 2.0),
+        (APICostScorer(), 1.0),
+    ]
+)
+
+# Strategy 2: Most conservative wins
+conservative = MaxRiskScorer(
+    scorers=[DefaultRiskScorer(), PolicyRiskScorer()]
+)
+
+# Strategy 3: Blend + floor
+with_floor = MaxRiskScorer(
+    scorers=[blended, FixedRiskScorer(0.15)]
+)
+
+attesta = Attesta(risk_scorer=with_floor)
+```
+
+---
+
+## Testing Your Scorer
+
+Always test custom scorers in isolation before deploying them.
+
+```python
+import pytest
+from attesta import ActionContext, RiskScorer
+
+def test_policy_scorer_protocol():
+    """Verify the scorer satisfies the RiskScorer protocol."""
+    scorer = PolicyRiskScorer()
+    assert isinstance(scorer, RiskScorer)
+    assert scorer.name == "policy"
+
+def test_production_scores_higher():
+    scorer = PolicyRiskScorer()
+    dev_ctx = ActionContext(
+        function_name="deploy",
+        environment="development",
+    )
+    prod_ctx = ActionContext(
+        function_name="deploy",
+        environment="production",
+    )
+    assert scorer.score(prod_ctx) > scorer.score(dev_ctx)
+
+def test_score_is_bounded():
+    """Scores must always be in [0.0, 1.0]."""
+    scorer = PolicyRiskScorer()
+    ctx = ActionContext(
+        function_name="extreme_action",
+        environment="production",
+        hints={
+            "data_classification": "restricted",
+            "affected_systems": 100,
+        },
+    )
+    score = scorer.score(ctx)
+    assert 0.0 <= score <= 1.0
+
+def test_ml_scorer_fallback():
+    """ML scorer should fall back to heuristic on failure."""
+    scorer = RobustMLScorer("nonexistent_model.pkl")
+    ctx = ActionContext(function_name="deploy")
+    # Should not raise, should return a valid score
+    score = scorer.score(ctx)
+    assert 0.0 <= score <= 1.0
+```
+
+<Tip>
+Use `DefaultRiskScorer.reset_novelty()` in tests to clear the internal call counter between test cases. The novelty factor is stateful and can cause score drift if not reset.
+</Tip>
+
+---
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Bound Scores" icon="shield">
+    Ensure `score()` always returns a value in `[0.0, 1.0]`. Use `max(0.0, min(1.0, raw))` as a safety clamp.
+  </Card>
+  <Card title="Name Your Scorer" icon="tag">
+    The `name` property appears in `RiskAssessment.scorer_name` and audit trails. Use descriptive, stable names.
+  </Card>
+  <Card title="Test Edge Cases" icon="vial">
+    Test with empty arguments, missing hints, unknown function names, and extreme values.
+  </Card>
+  <Card title="Use Composition" icon="layer-group">
+    Prefer `CompositeRiskScorer` or `MaxRiskScorer` over monolithic scorers. It is easier to adjust weights than rewrite logic.
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Risk Scorers" icon="sliders" href="/concepts/risk-scorers">
+    Built-in scorer types and composition strategies
+  </Card>
+  <Card title="Protocols" icon="plug" href="/api/protocols">
+    Full protocol reference for RiskScorer and other interfaces
+  </Card>
+</CardGroup>
