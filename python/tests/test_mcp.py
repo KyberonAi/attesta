@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY
 from attesta.core.types import (
     ActionContext,
     ApprovalResult,
@@ -325,7 +326,10 @@ class TestMCPProxyEvaluate:
         assert ctx.hints.get("risk_override") == "critical"
         assert ctx.function_name == "dangerous_tool"
         assert ctx.kwargs == {"arg": "val"}
-        assert ctx.metadata == {"source": "mcp_proxy"}
+        assert ctx.metadata["source"] == "mcp_proxy"
+        assert (
+            ctx.metadata.get(TRUSTED_RISK_OVERRIDE_METADATA_KEY) == "critical"
+        )
 
     def test_denial_preserves_request_id(self):
         """The denial response must carry the same id as the request."""

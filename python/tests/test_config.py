@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 
 from attesta.config.loader import Policy, _parse_config, load_config
-from attesta.core.types import ChallengeType, RiskLevel
+from attesta.core.risk import DefaultRiskScorer
+from attesta.core.types import ActionContext, ChallengeType, RiskLevel
 
 
 # ---------------------------------------------------------------------------
@@ -264,3 +265,40 @@ class TestDomainScorerStrictness:
         )
         scorer = policy.build_risk_scorer()
         assert scorer is None
+
+
+class TestRiskConfigScorerLayers:
+    def test_overrides_build_scorer_without_domain(self):
+        policy = Policy(risk_overrides={"read_config": "critical"})
+        scorer = policy.build_risk_scorer()
+        assert scorer is not None
+
+        ctx = ActionContext(function_name="read_config")
+        score = scorer.score(ctx)
+        assert score == pytest.approx(0.90)
+        assert RiskLevel.from_score(score) == RiskLevel.CRITICAL
+
+    def test_amplifiers_build_scorer_without_domain(self):
+        policy = Policy(
+            risk_amplifiers=[{"pattern": r"^read_.*", "boost": 0.25}],
+        )
+        scorer = policy.build_risk_scorer()
+        assert scorer is not None
+
+        ctx = ActionContext(function_name="read_config")
+        base = DefaultRiskScorer().score(ctx)
+        boosted = scorer.score(ctx)
+        assert boosted == pytest.approx(min(1.0, base + 0.25))
+
+    def test_missing_domain_with_risk_layers_still_returns_scorer(self):
+        policy = Policy(
+            domain="nonexistent_domain_xyz_123",
+            domain_strict=False,
+            risk_overrides={"read_config": "high"},
+        )
+        scorer = policy.build_risk_scorer()
+        assert scorer is not None
+
+        ctx = ActionContext(function_name="read_config")
+        score = scorer.score(ctx)
+        assert RiskLevel.from_score(score) == RiskLevel.HIGH

@@ -141,6 +141,7 @@ class ApprovalResult:
     audit_entry_id: str | None = None
     timestamp: datetime = field(default_factory=datetime.now)
     modification: str | None = None  # populated when verdict is MODIFIED
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------

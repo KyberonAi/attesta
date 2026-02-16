@@ -288,7 +288,8 @@ icon: "circle-question"
   <Accordion title="Can I use Attesta in a CI/CD pipeline or headless environment?">
     Yes, but with important caveats. In a headless environment (no TTY), Attesta cannot present interactive challenges. The behavior depends on the renderer:
 
-    - **Default renderer** (auto-detected when no TTY): auto-approves all actions. This is intentional for CI environments where a human already reviewed the code via a pull request.
+    - **Python default renderer** (auto-detected when no TTY): auto-approves all actions. This is intentional for CI environments where a human already reviewed the code via a pull request.
+    - **TypeScript default renderer** (no TTY): denies by default for safety unless you provide an explicit renderer.
     - **Custom renderer**: you can implement a renderer that sends approval requests to Slack, email, PagerDuty, or a webhook and waits for a response.
 
     For CI pipelines, the CLI audit commands are useful for post-hoc verification:
@@ -337,7 +338,8 @@ icon: "circle-question"
     This usually means the `TerminalRenderer` is not active. Attesta auto-detects the renderer at startup:
 
     - If `rich` is installed and stdin is a TTY (interactive terminal), the rich `TerminalRenderer` is used.
-    - Otherwise, the silent default renderer auto-approves everything.
+    - In Python, otherwise the silent default renderer auto-approves.
+    - In TypeScript, otherwise the default behavior is deny unless you provide a renderer.
 
     **Fix:**
     1. Install the rich terminal UI: `pip install attesta[terminal]`

@@ -15,7 +15,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from attesta.core.types import ActionContext
+from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY
+from attesta.core.types import ActionContext, Verdict
 
 if TYPE_CHECKING:
     from attesta import Attesta
@@ -77,19 +78,22 @@ class AttestaHumanInput:
         """
         description = str(task_output) if task_output else "CrewAI task output"
         hints: dict[str, Any] = {}
+        metadata: dict[str, Any] = {"source": "crewai"}
         if self.default_risk is not None:
             hints["risk_override"] = self.default_risk
+            metadata[TRUSTED_RISK_OVERRIDE_METADATA_KEY] = self.default_risk
 
         ctx = ActionContext(
             function_name="crewai_task",
             kwargs={"output": description},
             function_doc=description[:_MAX_DOC_LENGTH],
             hints=hints,
+            metadata=metadata,
         )
 
         result = await self.gk.evaluate(ctx)
 
-        if result.verdict.value in ("approved", "modified"):
+        if result.verdict in (Verdict.APPROVED, Verdict.MODIFIED):
             logger.debug("CrewAI task output approved (risk=%s)", result.risk_assessment.level.value)
             return "approved"
 

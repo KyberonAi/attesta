@@ -48,13 +48,15 @@ const attesta = new Attesta({
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `riskScorer` | `RiskScorer` | `DefaultRiskScorer` | Risk scorer for evaluating actions. |
-| `renderer` | `Renderer` | `DefaultRenderer` | Renderer for presenting challenges. |
-| `auditLogger` | `AuditLoggerProtocol` | No-op logger | Audit logger for recording decisions. |
+| `renderer` | `Renderer` | Auto-detected | Uses terminal renderer when TTY is available; otherwise deny-by-default fallback unless you pass a renderer. |
+| `auditLogger` | `AuditLoggerProtocol` | Console audit logger | Audit logger for recording decisions. |
 | `challengeMap` | `Partial<Record<RiskLevel, ChallengeType>>` | Default map | Override risk-level-to-challenge mapping. |
 | `minReviewSeconds` | `number` | `0` | Minimum review time in seconds. |
 | `riskOverride` | `RiskLevel` | — | Explicitly override the risk level. |
 | `riskHints` | `Record<string, unknown>` | `{}` | Extra hints for the risk scorer. |
 | `eventBus` | `EventBus` | — | Event bus for lifecycle notifications. |
+| `trustEngine` | `TrustEngine` | — | Adaptive trust engine for risk adjustment and trust history updates. |
+| `trustInfluence` | `number` | `0.3` | How strongly trust affects risk (0-1). |
 
 ### Recognized Policy Keys
 
@@ -63,7 +65,7 @@ const attesta = new Attesta({
 | `default_environment` | `str` | Default environment tag applied to all gates (e.g., `"production"`). |
 | `min_review_seconds` | `float` | Minimum wall-clock review time before approval is accepted. |
 | `challenge_map` | `dict[str, str]` | Mapping from risk level names to challenge type names. |
-| `challenges` | `dict[str, str]` | Alias for `challenge_map` (both are supported). |
+| `challenges` | `dict[str, str]` | Deprecated alias for `challenge_map`. Prefer `challenge_map` in new code. |
 
 ## from_config()
 

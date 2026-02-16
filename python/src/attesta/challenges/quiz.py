@@ -329,6 +329,12 @@ class QuizChallenge:
         questions = self.generate_questions(ctx, risk)
         correct_count = 0
 
+        def _read_input(prompt: str) -> str:
+            try:
+                return input(prompt).strip()
+            except (EOFError, KeyboardInterrupt):
+                return ""
+
         for idx, question in enumerate(questions, start=1):
             print(f"\n  Question {idx}/{len(questions)}: {question.text}")
 
@@ -337,7 +343,7 @@ class QuizChallenge:
                     letter = chr(ord("A") + letter_idx)
                     print(f"    {letter}) {option}")
                 raw = await loop.run_in_executor(
-                    None, lambda: input("  Your answer (letter or value): ").strip()
+                    None, lambda: _read_input("  Your answer (letter or value): ")
                 )
                 # Accept either the letter label or the literal value
                 answer = raw
@@ -347,7 +353,7 @@ class QuizChallenge:
                         answer = question.options[choice_idx]
             else:
                 raw = await loop.run_in_executor(
-                    None, lambda: input("  Your answer: ").strip()
+                    None, lambda: _read_input("  Your answer: ")
                 )
                 answer = raw
 

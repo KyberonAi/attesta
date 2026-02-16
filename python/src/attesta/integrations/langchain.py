@@ -15,11 +15,15 @@ Both require ``langchain-core`` at runtime.  Install with::
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
+import copy
 import functools
 import logging
+import threading
 from typing import TYPE_CHECKING, Any
 
-from attesta.core.types import ActionContext, RiskLevel
+from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY
+from attesta.core.types import ActionContext, RiskLevel, Verdict
 
 if TYPE_CHECKING:
     from attesta import Attesta
@@ -27,6 +31,31 @@ if TYPE_CHECKING:
 __all__ = ["AttestaToolWrapper", "attesta_node"]
 
 logger = logging.getLogger("attesta.integrations.langchain")
+
+
+def _run_coroutine_in_worker_thread(
+    coro_factory: Any,
+    *,
+    timeout: float | None = None,
+) -> Any:
+    """Run a coroutine in a dedicated thread to avoid loop-thread deadlocks."""
+    result_future: concurrent.futures.Future[Any] = concurrent.futures.Future()
+
+    def _runner() -> None:
+        try:
+            result = asyncio.run(coro_factory())
+        except Exception as exc:
+            result_future.set_exception(exc)
+        else:
+            result_future.set_result(result)
+
+    thread = threading.Thread(
+        target=_runner,
+        name="attesta-langchain-sync-bridge",
+        daemon=True,
+    )
+    thread.start()
+    return result_future.result(timeout=timeout)
 
 
 # ---------------------------------------------------------------------------
@@ -65,15 +94,15 @@ class AttestaToolWrapper:
     def wrap_tools(self, tools: list[Any]) -> list[Any]:
         """Wrap a list of LangChain tools with attesta approval.
 
-        Returns a **new** list; the original tool objects are mutated in-place
-        (their ``func`` / ``coroutine`` attributes are replaced).
+        Returns a **new** list of copied tools.  The original tool objects
+        are **not** mutated.
         """
         return [self._wrap_tool(tool) for tool in tools]
 
     # -- internal ----------------------------------------------------------
 
     def _wrap_tool(self, tool: Any) -> Any:
-        """Wrap a single LangChain tool."""
+        """Wrap a single LangChain tool, returning a new copy."""
         try:
             from langchain_core.tools import BaseTool  # noqa: F401
         except ImportError as exc:
@@ -81,6 +110,8 @@ class AttestaToolWrapper:
                 "langchain-core is required for the LangChain integration. "
                 "Install with: pip install attesta[langchain]"
             ) from exc
+
+        wrapped = copy.copy(tool)
 
         original_func = tool.func if hasattr(tool, "func") else tool._run
         original_afunc: Any | None = (
@@ -100,22 +131,12 @@ class AttestaToolWrapper:
                 loop = None
 
             if loop is not None and loop.is_running():
-                # Already inside an event loop (e.g. Jupyter / LangServe).
-                import concurrent.futures
-
-                future: concurrent.futures.Future[Any] = (
-                    concurrent.futures.Future()
+                # Already inside an event loop thread; avoid create_task()+result()
+                # deadlock by running on a dedicated worker thread.
+                result = _run_coroutine_in_worker_thread(
+                    lambda: gk.evaluate(ctx),
+                    timeout=300,
                 )
-
-                async def _run() -> None:
-                    try:
-                        res = await gk.evaluate(ctx)
-                        future.set_result(res)
-                    except Exception as exc:
-                        future.set_exception(exc)
-
-                loop.create_task(_run())
-                result = future.result(timeout=300)
             else:
                 result = asyncio.run(gk.evaluate(ctx))
 
@@ -125,7 +146,7 @@ class AttestaToolWrapper:
             ctx = _build_tool_context(tool, args, kwargs, risk_override)
             result = await gk.evaluate(ctx)
 
-            if result.verdict.value in ("approved", "modified"):
+            if result.verdict in (Verdict.APPROVED, Verdict.MODIFIED):
                 if original_afunc is not None:
                     return await original_afunc(*args, **kwargs)
                 return original_func(*args, **kwargs)
@@ -139,11 +160,11 @@ class AttestaToolWrapper:
                 f"(risk: {risk_label})"
             )
 
-        tool.func = gated_func
+        wrapped.func = gated_func
         if original_afunc is not None:
-            tool.coroutine = gated_afunc
+            wrapped.coroutine = gated_afunc
 
-        return tool
+        return wrapped
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +216,7 @@ def attesta_node(attesta: Attesta):
                 kwargs=call.get("args", {}),
             )
             result = await attesta.evaluate(ctx)
-            if result.verdict.value in ("approved", "modified"):
+            if result.verdict in (Verdict.APPROVED, Verdict.MODIFIED):
                 approved_calls.append(call)
             else:
                 logger.info(
@@ -226,14 +247,17 @@ def _build_tool_context(
 ) -> ActionContext:
     """Build an :class:`ActionContext` from a LangChain tool invocation."""
     hints: dict[str, Any] = {}
+    metadata: dict[str, Any] = {"source": "langchain"}
     if risk_override is not None:
         hints["risk_override"] = risk_override
+        metadata[TRUSTED_RISK_OVERRIDE_METADATA_KEY] = risk_override
     return ActionContext(
         function_name=tool.name,
         args=args,
         kwargs=kwargs,
         function_doc=getattr(tool, "description", None),
         hints=hints,
+        metadata=metadata,
     )
 
 
@@ -245,7 +269,7 @@ def _handle_result(
     kwargs: dict[str, Any],
 ) -> Any:
     """Dispatch based on the approval verdict."""
-    if result.verdict.value in ("approved", "modified"):
+    if result.verdict in (Verdict.APPROVED, Verdict.MODIFIED):
         return original_func(*args, **kwargs)
 
     risk_label = result.risk_assessment.level.value

@@ -1,0 +1,161 @@
+---
+title: "Exporters"
+description: "Export audit trail entries to CSV and JSON formats using the CSVExporter and JSONExporter classes"
+icon: "file-export"
+---
+
+Attesta provides two built-in exporters for converting audit trail entries into standard formats: `CSVExporter` for spreadsheet-compatible output and `JSONExporter` for structured data interchange. Both implement the `AuditExporter` protocol and can be used interchangeably.
+
+## AuditExporter Protocol
+
+The base protocol that all exporters implement.
+
+### Import
+
+```python
+from attesta.exporters import AuditExporter
+```
+
+### Signature
+
+```python
+@runtime_checkable
+class AuditExporter(Protocol):
+    def export(self, entries: list[AuditEntry], output: IO[str]) -> None: ...
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `entries` | `list[AuditEntry]` | List of audit entries to export. |
+| `output` | `IO[str]` | A writable file-like object (e.g., `open()` result, `StringIO`). |
+
+---
+
+## CSVExporter
+
+Export audit entries as CSV. Nested dict fields (like `metadata`) are JSON-serialized.
+
+### Import
+
+```python
+from attesta.exporters import CSVExporter
+```
+
+### Constructor
+
+```python
+exporter = CSVExporter(columns=None)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `columns` | `list[str] \| None` | `None` | List of field names to include as columns. Defaults to `DEFAULT_COLUMNS`. |
+
+### Default Columns
+
+When no custom columns are provided, the following fields are exported:
+
+| Column | Description |
+|--------|-------------|
+| `entry_id` | Unique identifier for the audit entry. |
+| `intercepted_at` | Timestamp when the action was intercepted. |
+| `action_name` | Name of the gated function. |
+| `risk_score` | Numeric risk score (0.0 - 1.0). |
+| `risk_level` | Discrete risk level (low, medium, high, critical). |
+| `challenge_type` | Type of challenge presented. |
+| `verdict` | Approval outcome (approved, denied, etc.). |
+| `agent_id` | Identifier of the AI agent. |
+| `review_duration_seconds` | Time the operator spent reviewing. |
+| `chain_hash` | SHA-256 hash for tamper detection. |
+
+### Example
+
+```python
+from attesta.core.audit import AuditLogger
+from attesta.exporters import CSVExporter
+
+audit = AuditLogger(path=".attesta/audit.jsonl")
+entries = audit.query(verdict="approved")
+
+# Export to file
+with open("report.csv", "w") as f:
+    CSVExporter().export(entries, f)
+
+# Export with custom columns
+with open("summary.csv", "w") as f:
+    CSVExporter(columns=["entry_id", "action_name", "verdict"]).export(entries, f)
+```
+
+---
+
+## JSONExporter
+
+Export audit entries as a JSON array. Supports pretty-printing with configurable indentation.
+
+### Import
+
+```python
+from attesta.exporters import JSONExporter
+```
+
+### Constructor
+
+```python
+exporter = JSONExporter(indent=2)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `indent` | `int \| None` | `2` | Number of spaces for pretty-printing. `None` for compact single-line output. |
+
+### Example
+
+```python
+from attesta.core.audit import AuditLogger
+from attesta.exporters import JSONExporter
+
+audit = AuditLogger(path=".attesta/audit.jsonl")
+entries = audit.query(risk_level="critical")
+
+# Pretty-printed JSON
+with open("critical-actions.json", "w") as f:
+    JSONExporter().export(entries, f)
+
+# Compact JSON (no indentation)
+with open("compact.json", "w") as f:
+    JSONExporter(indent=None).export(entries, f)
+```
+
+---
+
+## Custom Exporters
+
+You can implement the `AuditExporter` protocol to create custom exporters:
+
+```python
+from attesta.exporters import AuditExporter
+from attesta.core.audit import AuditEntry
+from typing import IO
+
+class MarkdownExporter:
+    """Export audit entries as a Markdown table."""
+
+    def export(self, entries: list[AuditEntry], output: IO[str]) -> None:
+        output.write("| Action | Risk | Verdict |\n")
+        output.write("|--------|------|---------|\n")
+        for entry in entries:
+            d = entry.to_dict()
+            output.write(f"| {d['action_name']} | {d['risk_level']} | {d['verdict']} |\n")
+
+# Duck typing -- no inheritance required
+assert isinstance(MarkdownExporter(), AuditExporter)
+```
+
+<CardGroup cols={2}>
+  <Card title="Audit Trail" icon="file-shield" href="/concepts/audit-trail">
+    How audit entries are created and stored
+  </Card>
+  <Card title="CLI Audit" icon="terminal" href="/cli/audit">
+    Export and verify audit logs from the command line
+  </Card>
+</CardGroup>

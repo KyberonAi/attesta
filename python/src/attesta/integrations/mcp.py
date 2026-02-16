@@ -56,6 +56,7 @@ import sys
 import threading
 from typing import Any, Callable, TYPE_CHECKING
 
+from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY
 from attesta.core.types import ActionContext, Verdict
 
 if TYPE_CHECKING:
@@ -101,14 +102,17 @@ def attesta_tool_handler(
             arguments = arguments or {}
 
             hints: dict[str, Any] = {}
+            metadata: dict[str, Any] = {"source": "mcp"}
             if name in overrides:
-                hints["risk_override"] = overrides[name]
+                override = overrides[name]
+                hints["risk_override"] = override
+                metadata[TRUSTED_RISK_OVERRIDE_METADATA_KEY] = override
 
             ctx = ActionContext(
                 function_name=name,
                 kwargs=arguments,
                 hints=hints,
-                metadata={"source": "mcp"},
+                metadata=metadata,
             )
 
             result = await attesta.evaluate(ctx)
@@ -270,14 +274,17 @@ class MCPProxy:
         Returns ``(should_forward, denial_response_or_none)``.
         """
         hints: dict[str, Any] = {}
+        metadata: dict[str, Any] = {"source": "mcp_proxy"}
         if tool_name in self.risk_overrides:
-            hints["risk_override"] = self.risk_overrides[tool_name]
+            override = self.risk_overrides[tool_name]
+            hints["risk_override"] = override
+            metadata[TRUSTED_RISK_OVERRIDE_METADATA_KEY] = override
 
         ctx = ActionContext(
             function_name=tool_name,
             kwargs=arguments,
             hints=hints,
-            metadata={"source": "mcp_proxy"},
+            metadata=metadata,
         )
 
         # Run the async evaluate in a one-shot event loop.

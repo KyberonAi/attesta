@@ -21,16 +21,18 @@ trust:
 The trust engine adjusts the risk score **downward** for agents with high trust. The adjustment formula is:
 
 ```
-effective_risk = base_risk - (trust_score * influence)
+effective_risk = raw_risk × (1.0 - (trust_score - 0.5) × influence)
 ```
 
 For example, an agent with a trust score of `0.8` and default `influence: 0.3`:
 
 ```
-effective_risk = 0.65 - (0.8 * 0.3) = 0.65 - 0.24 = 0.41
+effective_risk = 0.65 × (1.0 - (0.8 - 0.5) × 0.3)
+               = 0.65 × 0.91
+               = 0.5915
 ```
 
-The base score of `0.65` (HIGH) is reduced to `0.41` (MEDIUM), changing the challenge from a quiz to a simple confirmation.
+The base score of `0.65` (HIGH) is reduced to `0.59` (still HIGH). Trust nudges risk rather than replacing primary risk signals.
 
 <Warning>
 Trust **never** reduces CRITICAL actions. This is a hardcoded safety invariant (`critical_always_verify = True` on the Policy dataclass). If the base risk is CRITICAL (0.8+), trust adjustments are skipped entirely. This ensures that the most dangerous operations always receive full verification.
@@ -45,14 +47,13 @@ trust:
   influence: 0.3  # default
 ```
 
-The `influence` parameter sets the **maximum risk reduction** that trust can provide. It acts as a multiplier on the trust score:
+The `influence` parameter scales how strongly trust can move risk up or down around the neutral trust point (`0.5`):
 
-| Trust Score | Influence 0.3 | Influence 0.5 | Influence 0.1 |
-|-------------|---------------|---------------|---------------|
-| 0.0 (new) | -0.00 | -0.00 | -0.00 |
-| 0.3 (initial) | -0.09 | -0.15 | -0.03 |
-| 0.5 (moderate) | -0.15 | -0.25 | -0.05 |
-| 0.9 (ceiling) | -0.27 | -0.45 | -0.09 |
+| Trust Score | Influence 0.3 (multiplier) | Influence 0.5 (multiplier) | Influence 0.1 (multiplier) |
+|-------------|-----------------------------|-----------------------------|-----------------------------|
+| 0.3 | 1.06 (risk increases) | 1.10 (risk increases) | 1.02 (risk increases) |
+| 0.5 | 1.00 (neutral) | 1.00 (neutral) | 1.00 (neutral) |
+| 0.9 | 0.88 (risk decreases) | 0.80 (risk decreases) | 0.96 (risk decreases) |
 
 <Tip>
 A higher influence value means trusted agents experience significantly less friction. Set it lower (e.g., `0.1`) in high-security environments where you want trust to have minimal impact. Set it higher (e.g., `0.5`) in development environments where trusted agents should move faster.
@@ -102,19 +103,19 @@ trust:
   decay_rate: 0.01  # default — per day of inactivity
 ```
 
-The `decay_rate` parameter controls how quickly trust erodes when an agent is inactive. Trust decays linearly per day of inactivity:
+The `decay_rate` parameter controls how quickly trust erodes when an agent is inactive. Trust decay is exponential:
 
 ```
-trust_after_inactivity = trust_score - (days_inactive * decay_rate)
+trust_after_inactivity = trust_score × e^(-decay_rate × days_inactive)
 ```
 
 | Days Inactive | Trust (from 0.8) | Decay Rate 0.01 |
 |---------------|-------------------|-----------------|
 | 0 | 0.80 | No change |
-| 7 | 0.73 | -0.07 |
-| 30 | 0.50 | -0.30 |
-| 60 | 0.20 | -0.60 |
-| 80+ | 0.00 | Floored at 0.0 |
+| 7 | 0.75 | ~6.8% decrease |
+| 30 | 0.59 | ~25.9% decrease |
+| 60 | 0.44 | ~45.1% decrease |
+| 90 | 0.33 | ~59.3% decrease |
 
 This ensures that agents that have been idle for extended periods do not retain high trust. An agent that was trusted 3 months ago with a different codebase should not automatically receive trust benefits today.
 
@@ -147,13 +148,16 @@ You can also configure the trust engine directly:
 <CodeGroup>
 ```python Python
 from attesta import Attesta
+from attesta.core.trust import TrustEngine
 
-attesta = Attesta(
-    trust_influence=0.5,
-    trust_ceiling=0.85,
-    trust_initial=0.2,
-    trust_decay_rate=0.02,
+trust_engine = TrustEngine(
+    influence=0.5,
+    ceiling=0.85,
+    initial_score=0.2,
+    decay_rate=0.02,
 )
+
+attesta = Attesta(trust_engine=trust_engine)
 
 @attesta.gate()
 def deploy(service: str) -> str:
@@ -162,20 +166,27 @@ def deploy(service: str) -> str:
 ```
 
 ```typescript TypeScript
-import { Attesta, gate } from "@attesta/core";
+import { Attesta, TrustEngine, gate } from "@attesta/core";
 
 const attesta = new Attesta({
-  trust: {
+  trustEngine: new TrustEngine({
     influence: 0.5,
     ceiling: 0.85,
     initialScore: 0.2,
     decayRate: 0.02,
-  },
+  }),
+  trustInfluence: 0.5,
 });
 
-const deploy = gate(async (service: string) => {
-  return `Deployed ${service}`;
-}, { attesta });
+const deploy = gate(
+  {
+    attesta,
+    agentId: "deploy-bot",
+  },
+  async (service: string) => {
+    return `Deployed ${service}`;
+  }
+);
 ```
 </CodeGroup>
 

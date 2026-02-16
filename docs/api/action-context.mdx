@@ -190,7 +190,7 @@ The `hints` dict is a flexible mechanism for caller-supplied risk metadata. The 
 | `production` | `bool` | When `True`, adds +0.30 to the hints factor score |
 | `destructive` | `bool` | When `True`, adds +0.30 to the hints factor score |
 | `pii` | `bool` | When `True`, adds +0.30 to the hints factor score |
-| `risk_override` | `str \| RiskLevel` | Bypasses the scorer entirely and uses this risk level |
+| `risk_override` | `str \| RiskLevel` | Runtime override hint. Honored only when `allow_hint_override=True` or when used through trusted integration override paths. |
 | *(any boolean)* | `bool` | When `True`, adds +0.30 per hint |
 | *(any numeric)* | `int \| float` | Contributes `min(value / 10000, 1.0) * 0.8` to the hints factor |
 

@@ -74,7 +74,7 @@ effective_risk = raw_risk × (1.0 - (trust - 0.5) × influence)
 
 <CodeGroup>
 ```python Python
-from attesta.trust import TrustEngine
+from attesta.core.trust import TrustEngine
 
 # Create a trust engine with default parameters
 trust = TrustEngine()
@@ -100,9 +100,9 @@ effective = trust.effective_risk(
 print(f"Effective risk: {effective:.2f}")
 
 # Record outcomes
-trust.record_success(agent_id="deploy-bot")   # +trust
-trust.record_denial(agent_id="deploy-bot")     # slight -trust
-trust.record_incident(agent_id="deploy-bot")   # 0.7x penalty
+trust.record_success(agent_id="deploy-bot", action_name="deploy", risk_score=0.55)   # +trust
+trust.record_denial(agent_id="deploy-bot", action_name="delete_user", risk_score=0.85)
+trust.record_incident(agent_id="deploy-bot", action_name="override_policy")
 trust.revoke(agent_id="deploy-bot")            # reset to 0.0
 ```
 
@@ -130,10 +130,21 @@ const effective = trust.effectiveRisk("deploy-bot", 0.55);
 console.log(`Effective risk: ${effective.toFixed(2)}`);
 
 // Record outcomes
-trust.recordSuccess("deploy-bot");    // +trust
-trust.recordDenial("deploy-bot");     // slight -trust
-trust.recordIncident("deploy-bot");   // 0.7x penalty
-trust.revoke("deploy-bot");           // reset to 0.0
+trust.recordSuccess({
+  agentId: "deploy-bot",
+  actionName: "deploy",
+  riskScore: 0.55,
+});
+trust.recordDenial({
+  agentId: "deploy-bot",
+  actionName: "delete_user",
+  riskScore: 0.85,
+});
+trust.recordIncident({
+  agentId: "deploy-bot",
+  actionName: "override_policy",
+});
+trust.revoke("deploy-bot");
 ```
 </CodeGroup>
 
@@ -180,58 +191,47 @@ After an incident, the agent can rebuild trust through consistent successful app
 | Method | Effect | Trust Impact |
 |---|---|---|
 | `compute_trust(agent_id)` | Returns current trust score | Read-only |
-| `effective_risk(agent_id, raw_risk)` | Returns trust-adjusted risk | Read-only |
-| `record_success(agent_id)` | Records a successful approval | Increases trust |
-| `record_denial(agent_id)` | Records a denied action | Slight decrease |
-| `record_incident(agent_id)` | Records a security incident | 0.7x penalty |
+| `effective_risk(raw_risk, agent_id, domain=None)` | Returns trust-adjusted risk | Read-only |
+| `record_success(agent_id, action_name, domain="general", risk_score=0.5)` | Records a successful approval | Increases trust |
+| `record_denial(agent_id, action_name, domain="general", risk_score=0.5)` | Records a denied action | Slight decrease |
+| `record_incident(agent_id, action_name="", domain="general", severity="medium")` | Records a security incident | 0.7x penalty |
 | `revoke(agent_id)` | Immediately revokes all trust | Resets to 0.0 |
 
 ---
 
 ## Integration with Attesta
 
-The trust engine is automatically integrated when you use the `Attesta` class:
+The trust engine is integrated when you pass a `TrustEngine` to `Attesta`.
+Trust adjustments apply when each action includes an `agent_id` / `agentId`.
 
 <CodeGroup>
 ```python Python
 from attesta import Attesta
-
-# Trust is enabled by default
-attesta = Attesta(agent_id="deploy-bot")
-
-# Disable trust adjustment
-attesta = Attesta(agent_id="deploy-bot", trust_enabled=False)
-
-# Custom trust parameters
-from attesta.trust import TrustEngine
+from attesta.core.trust import TrustEngine
 
 attesta = Attesta(
-    agent_id="deploy-bot",
     trust_engine=TrustEngine(
-        initial_score=0.5,     # start with more trust
-        ceiling=0.85,          # lower ceiling
-        incident_penalty=0.5,  # harsher incidents
+        initial_score=0.5,
+        ceiling=0.85,
+        incident_penalty=0.5,
     ),
 )
+
+@attesta.gate(agent_id="deploy-bot")
+def deploy(service: str) -> str:
+    return f"Deployed {service}"
 ```
 
 ```typescript TypeScript
 import { Attesta, TrustEngine } from "@attesta/core";
 
-// Trust is enabled by default
-const attesta = new Attesta({ agentId: "deploy-bot" });
-
-// Disable trust adjustment
-const attesta = new Attesta({ agentId: "deploy-bot", trustEnabled: false });
-
-// Custom trust parameters
 const attesta = new Attesta({
-  agentId: "deploy-bot",
   trustEngine: new TrustEngine({
     initialScore: 0.5,
     ceiling: 0.85,
     incidentPenalty: 0.5,
   }),
+  trustInfluence: 0.3,
 });
 ```
 </CodeGroup>
@@ -242,11 +242,9 @@ const attesta = new Attesta({
 
 ```yaml attesta.yaml
 trust:
-  enabled: true
   initial_score: 0.3
   ceiling: 0.9
   decay_rate: 0.01
-  incident_penalty: 0.7
   influence: 0.3
 ```
 

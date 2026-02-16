@@ -14,7 +14,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from attesta.core.types import ActionContext, ApprovalResult
+from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY
+from attesta.core.types import ActionContext, ApprovalResult, Verdict
 
 if TYPE_CHECKING:
     from attesta import Attesta
@@ -97,18 +98,22 @@ class AttestaToolGate:
         )
 
         hints: dict[str, Any] = {}
+        metadata: dict[str, Any] = {"source": "anthropic"}
         if tool_name in self.risk_overrides:
-            hints["risk_override"] = self.risk_overrides[tool_name]
+            override = self.risk_overrides[tool_name]
+            hints["risk_override"] = override
+            metadata[TRUSTED_RISK_OVERRIDE_METADATA_KEY] = override
 
         ctx = ActionContext(
             function_name=tool_name,
             kwargs=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
             hints=hints,
             agent_id="claude",
+            metadata=metadata,
         )
 
         result = await self.gk.evaluate(ctx)
-        approved = result.verdict.value in ("approved", "modified")
+        approved = result.verdict in (Verdict.APPROVED, Verdict.MODIFIED)
 
         if not approved:
             logger.info(

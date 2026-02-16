@@ -8,9 +8,11 @@ full risk-scoring -> challenge-selection -> verification -> audit pipeline.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import functools
 import inspect
 import logging
+import threading
 import textwrap
 import time
 import uuid
@@ -33,6 +35,11 @@ from attesta.core.types import (
 __all__ = ["Attesta", "AttestaDenied", "gate"]
 
 logger = logging.getLogger("attesta")
+
+# Internal ActionContext.metadata key used by first-party integrations for
+# trusted, static risk overrides (for example MCP tool maps). This bypasses
+# hint-based overrides without reopening user-controlled hint injection.
+TRUSTED_RISK_OVERRIDE_METADATA_KEY = "_attesta_trusted_risk_override"
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -196,6 +203,8 @@ class Attesta:
         never downgraded by trust (safety invariant).
     """
 
+    _VALID_MODES: frozenset[str] = frozenset({"enforce", "shadow", "audit_only"})
+
     def __init__(
         self,
         *,
@@ -208,7 +217,16 @@ class Attesta:
         risk_hints: dict[str, Any] | None = None,
         trust_engine: Any | None = None,
         event_bus: Any | None = None,
+        allow_hint_override: bool = False,
+        mode: str = "enforce",
+        approval_timeout_seconds: float = 600.0,
     ) -> None:
+        if mode not in self._VALID_MODES:
+            raise ValueError(
+                f"Invalid mode '{mode}'. Must be one of "
+                f"{sorted(self._VALID_MODES)}"
+            )
+
         self._scorer: RiskScorer = risk_scorer or _get_default_risk_scorer()
         self._renderer: Renderer = renderer or _detect_renderer()
         self._audit: AuditLogger = audit_logger or _DefaultAuditLogger()
@@ -217,6 +235,9 @@ class Attesta:
         self._risk_hints = risk_hints or {}
         self._trust_engine = trust_engine
         self._event_bus = event_bus
+        self._allow_hint_override = allow_hint_override
+        self._mode = mode
+        self._approval_timeout = approval_timeout_seconds
 
         # Normalise risk_override to a RiskLevel or None.
         if isinstance(risk_override, str):
@@ -312,26 +333,106 @@ class Attesta:
         # 3. Select challenge.
         challenge_type = _select_challenge(risk, self._challenge_map)
 
-        # 4. Present challenge / collect verdict.
-        challenge_result: ChallengeResult | None = None
-        if challenge_type == ChallengeType.AUTO_APPROVE:
+        # 3a. Mode handling -- audit_only and shadow modes alter the
+        #     challenge / verdict flow while preserving the audit trail.
+        mode_metadata: dict[str, Any] = {"mode": self._mode}
+
+        if self._mode == "audit_only":
+            # Skip the challenge entirely; auto-approve and record.
             verdict = Verdict.APPROVED
-            await self._renderer.render_auto_approved(ctx, risk)
-        else:
-            await self._emit("challenge_issued", {
-                "action_name": ctx.function_name,
-                "challenge_type": challenge_type.value,
-                "risk_level": risk.level.value,
-            })
-            challenge_result = await self._renderer.render_challenge(
-                ctx, risk, challenge_type
+            challenge_result: ChallengeResult | None = None
+            mode_metadata["skipped_challenge"] = challenge_type.value
+            logger.info(
+                "[audit_only] Auto-approved %s (risk=%.2f, level=%s, "
+                "would_challenge=%s)",
+                ctx.function_name,
+                risk.score,
+                risk.level.value,
+                challenge_type.value,
             )
-            verdict = Verdict.APPROVED if challenge_result.passed else Verdict.DENIED
-            await self._emit("challenge_completed", {
-                "action_name": ctx.function_name,
-                "challenge_type": challenge_type.value,
-                "passed": challenge_result.passed,
-            })
+
+        elif self._mode == "shadow":
+            # Run the full challenge but always approve, logging what
+            # would have happened under enforce mode.
+            challenge_result = None
+            if challenge_type == ChallengeType.AUTO_APPROVE:
+                enforce_verdict = Verdict.APPROVED
+                await self._renderer.render_auto_approved(ctx, risk)
+            else:
+                await self._emit("challenge_issued", {
+                    "action_name": ctx.function_name,
+                    "challenge_type": challenge_type.value,
+                    "risk_level": risk.level.value,
+                })
+                challenge_result = await self._renderer.render_challenge(
+                    ctx, risk, challenge_type
+                )
+                enforce_verdict = (
+                    Verdict.APPROVED if challenge_result.passed
+                    else Verdict.DENIED
+                )
+                await self._emit("challenge_completed", {
+                    "action_name": ctx.function_name,
+                    "challenge_type": challenge_type.value,
+                    "passed": challenge_result.passed,
+                })
+
+            # Always approve in shadow mode, but log the enforce outcome.
+            verdict = Verdict.APPROVED
+            mode_metadata["enforce_verdict"] = enforce_verdict.value
+            mode_metadata["challenge_type"] = challenge_type.value
+            if challenge_result is not None:
+                mode_metadata["challenge_passed"] = challenge_result.passed
+            logger.info(
+                "[shadow] %s -> approved (enforce would have: %s, "
+                "risk=%.2f, level=%s)",
+                ctx.function_name,
+                enforce_verdict.value,
+                risk.score,
+                risk.level.value,
+            )
+
+        else:
+            # 4. Present challenge / collect verdict (enforce mode).
+            challenge_result = None
+            if challenge_type == ChallengeType.AUTO_APPROVE:
+                verdict = Verdict.APPROVED
+                await self._renderer.render_auto_approved(ctx, risk)
+            else:
+                await self._emit("challenge_issued", {
+                    "action_name": ctx.function_name,
+                    "challenge_type": challenge_type.value,
+                    "risk_level": risk.level.value,
+                })
+                try:
+                    challenge_result = await asyncio.wait_for(
+                        self._renderer.render_challenge(
+                            ctx, risk, challenge_type
+                        ),
+                        timeout=self._approval_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "Approval timed out after %.0fs for %s",
+                        self._approval_timeout,
+                        ctx.function_name,
+                    )
+                    verdict = Verdict.TIMED_OUT
+                    challenge_result = ChallengeResult(
+                        passed=False,
+                        challenge_type=challenge_type,
+                        details={
+                            "reason": f"Approval timed out after "
+                                      f"{self._approval_timeout:.0f}s",
+                        },
+                    )
+                else:
+                    verdict = Verdict.APPROVED if challenge_result.passed else Verdict.DENIED
+                await self._emit("challenge_completed", {
+                    "action_name": ctx.function_name,
+                    "challenge_type": challenge_type.value,
+                    "passed": challenge_result.passed if challenge_result else False,
+                })
 
         # 5. Enforce minimum review time.
         elapsed = time.monotonic() - review_start
@@ -347,6 +448,7 @@ class Attesta:
             risk_assessment=risk,
             challenge_result=challenge_result,
             review_time_seconds=round(review_time, 3),
+            metadata=mode_metadata,
         )
 
         # 6b. Emit verdict event.
@@ -403,20 +505,60 @@ class Attesta:
 
         Override priority:
         1. ``self._risk_override`` (constructor parameter, e.g. ``@gate(risk="high")``)
-        2. ``ctx.hints["risk_override"]`` (runtime hint from integrations)
-        3. Fall through to the risk scorer.
+        2. ``ctx.metadata[TRUSTED_RISK_OVERRIDE_METADATA_KEY]`` (trusted integration path)
+        3. ``ctx.hints["risk_override"]`` (runtime hint from integrations,
+           only if ``allow_hint_override=True``)
+        4. Fall through to the risk scorer.
         """
         override = self._risk_override
 
+        # First-party integrations can set a trusted metadata override. This
+        # path is for static server-side mappings (e.g. tool-name policies),
+        # not model-controlled runtime input.
+        if override is None:
+            trusted_override = ctx.metadata.get(TRUSTED_RISK_OVERRIDE_METADATA_KEY)
+            if trusted_override is not None:
+                try:
+                    if isinstance(trusted_override, RiskLevel):
+                        override = trusted_override
+                    elif isinstance(trusted_override, str):
+                        override = RiskLevel(trusted_override)
+                    else:
+                        raise TypeError(
+                            f"Unsupported trusted override type: {type(trusted_override).__name__}"
+                        )
+                except (ValueError, TypeError):
+                    logger.warning(
+                        "Ignoring invalid trusted risk override for %s: %r",
+                        ctx.function_name,
+                        trusted_override,
+                    )
+
         # Allow integrations (MCP, LangChain, etc.) to set a runtime
         # risk override via the ActionContext hints dict.
-        if override is None:
+        if override is None and self._allow_hint_override:
             hint_override = ctx.hints.get("risk_override")
             if hint_override is not None:
-                if isinstance(hint_override, RiskLevel):
-                    override = hint_override
-                elif isinstance(hint_override, str):
-                    override = RiskLevel(hint_override)
+                try:
+                    if isinstance(hint_override, RiskLevel):
+                        override = hint_override
+                    elif isinstance(hint_override, str):
+                        override = RiskLevel(hint_override)
+                    else:
+                        raise TypeError(
+                            f"Unsupported hint override type: {type(hint_override).__name__}"
+                        )
+                except (ValueError, TypeError):
+                    logger.warning(
+                        "Ignoring invalid hint risk_override for %s: %r",
+                        ctx.function_name,
+                        hint_override,
+                    )
+        elif override is None and ctx.hints.get("risk_override") is not None:
+            logger.warning(
+                "risk_override hint ignored (allow_hint_override=False). "
+                "Set allow_hint_override=True to enable runtime overrides."
+            )
 
         if override is not None:
             # Map level back to a representative score.
@@ -500,6 +642,40 @@ def _ensure_loop() -> asyncio.AbstractEventLoop:
         return asyncio.new_event_loop()
 
 
+TResult = TypeVar("TResult")
+
+
+def _run_coroutine_in_worker_thread(
+    coro_factory: Callable[[], Coroutine[Any, Any, TResult]],
+    *,
+    timeout: float | None = None,
+) -> TResult:
+    """Run a coroutine on a dedicated thread with its own event loop.
+
+    This avoids deadlocks when a synchronous ``@gate`` wrapper is invoked
+    from inside an already-running event loop (for example in notebooks).
+    """
+    result_future: concurrent.futures.Future[TResult] = (
+        concurrent.futures.Future()
+    )
+
+    def _runner() -> None:
+        try:
+            result = asyncio.run(coro_factory())
+        except Exception as exc:
+            result_future.set_exception(exc)
+        else:
+            result_future.set_result(result)
+
+    thread = threading.Thread(
+        target=_runner,
+        name="attesta-sync-bridge",
+        daemon=True,
+    )
+    thread.start()
+    return result_future.result(timeout=timeout)
+
+
 # Overloads let type-checkers understand each calling convention.
 
 @overload
@@ -523,6 +699,9 @@ def gate(
     trust_engine: Any | None = ...,
     event_bus: Any | None = ...,
     sync_timeout: float = ...,
+    allow_hint_override: bool = ...,
+    mode: str = ...,
+    approval_timeout_seconds: float = ...,
 ) -> Callable[[F], F]: ...  # @gate() or @gate(risk="high")
 
 
@@ -544,6 +723,9 @@ def gate(
     trust_engine: Any | None = None,
     event_bus: Any | None = None,
     sync_timeout: float = 300.0,
+    allow_hint_override: bool = False,
+    mode: str = "enforce",
+    approval_timeout_seconds: float = 600.0,
 ) -> F | Callable[[F], F]:
     """Decorator that wraps a function with attesta approval.
 
@@ -575,6 +757,19 @@ def gate(
         Maximum seconds to wait when bridging async evaluation from a
         synchronous context inside an already-running event loop (e.g.
         Jupyter).  Defaults to 300.  Set to ``0`` to wait indefinitely.
+    mode:
+        Execution mode for the gate.  One of:
+
+        * ``"enforce"`` (default) -- full challenge flow; denied actions
+          raise :class:`AttestaDenied`.
+        * ``"shadow"`` -- run the full challenge but always approve.
+          The result metadata records what enforcement would have done.
+        * ``"audit_only"`` -- skip challenges entirely, auto-approve
+          every action, and log the risk assessment for analysis.
+    approval_timeout_seconds:
+        Maximum seconds to wait for a human response before auto-denying.
+        Defaults to 600 (10 minutes).  If no response is received within
+        this window, the action is denied with ``Verdict.TIMED_OUT``.
     """
 
     def decorator(func: F) -> F:
@@ -588,6 +783,9 @@ def gate(
             risk_hints=risk_hints,
             trust_engine=trust_engine,
             event_bus=event_bus,
+            approval_timeout_seconds=approval_timeout_seconds,
+            allow_hint_override=allow_hint_override,
+            mode=mode,
         )
 
         if asyncio.iscoroutinefunction(func):
@@ -647,24 +845,11 @@ def gate(
                     loop = None
 
                 if loop is not None and loop.is_running():
-                    # We are inside an already-running loop (e.g. Jupyter).
-                    # Schedule the coroutine as a task so we don't deadlock.
-                    import concurrent.futures
-
-                    future: concurrent.futures.Future[ApprovalResult] = (
-                        concurrent.futures.Future()
-                    )
-
-                    async def _run() -> None:
-                        try:
-                            res = await gate_instance.evaluate(ctx)
-                            future.set_result(res)
-                        except Exception as exc:
-                            future.set_exception(exc)
-
-                    loop.create_task(_run())
-                    result = future.result(
-                        timeout=sync_timeout if sync_timeout > 0 else None
+                    # Running sync code inside an active event loop thread.
+                    # Evaluate on a dedicated worker thread to avoid deadlock.
+                    result = _run_coroutine_in_worker_thread(
+                        lambda: gate_instance.evaluate(ctx),
+                        timeout=sync_timeout if sync_timeout > 0 else None,
                     )
                 else:
                     result = asyncio.run(gate_instance.evaluate(ctx))

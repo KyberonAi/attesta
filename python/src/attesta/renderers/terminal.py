@@ -98,9 +98,21 @@ def _format_call(ctx: ActionContext, max_len: int = 60) -> str:
 
 
 async def _async_input(prompt: str = "") -> str:
-    """Non-blocking ``input()`` that plays nicely with asyncio."""
+    """Non-blocking ``input()`` that plays nicely with asyncio.
+
+    Returns an empty string on ``EOFError`` or ``KeyboardInterrupt``
+    so callers in non-interactive environments (Docker, CI, piped input)
+    degrade gracefully instead of crashing.
+    """
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: input(prompt))
+
+    def _read() -> str:
+        try:
+            return input(prompt)
+        except (EOFError, KeyboardInterrupt):
+            return ""
+
+    return await loop.run_in_executor(None, _read)
 
 
 async def _countdown(seconds: float, label: str = "Minimum review") -> None:
@@ -189,7 +201,9 @@ class PlainRenderer(BaseRenderer):
             return await self._render_teach_back(ctx, risk)
         if challenge_type in (ChallengeType.QUIZ, ChallengeType.CONFIRM):
             return await self._render_quiz_challenge(ctx, risk)
-        # MULTI_PARTY or unknown -- fall back to confirmation
+        if challenge_type == ChallengeType.MULTI_PARTY:
+            return await self._render_multi_party(ctx, risk)
+        # Unknown challenge type -- fall back to quiz
         return await self._render_quiz_challenge(ctx, risk)
 
     async def _render_quiz_challenge(
@@ -282,6 +296,58 @@ class PlainRenderer(BaseRenderer):
             details={
                 "explanation": explanation.strip(),
                 "word_count": word_count,
+            },
+        )
+
+    async def _render_multi_party(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> ChallengeResult:
+        """Multi-party approval: requires 2 independent approvers."""
+        start = time.monotonic()
+        required_approvers = 2
+        approvals = 0
+        denials = 0
+        sep = "=" * 56
+
+        print()
+        print(f"  {sep}")
+        print(f"  ATTESTA -- MULTI-PARTY APPROVAL REQUIRED")
+        print(f"  {sep}")
+        print(f"  Action: {ctx.function_name}")
+        print(f"  Risk:   {_risk_bar_plain(risk.score)} {risk.level.value.upper()} ({risk.score:.2f})")
+        print(f"  Call:   {_format_call(ctx)}")
+        print(f"  {sep}")
+        print(f"  This action requires approval from {required_approvers} independent reviewers.")
+        print()
+
+        for i in range(required_approvers):
+            print(f"  --- Reviewer {i + 1} of {required_approvers} ---")
+            response = (await _async_input(f"  Reviewer {i + 1} [a]pprove / [d]eny: ")).strip().lower()
+            if response in ("a", "approve", "y", "yes"):
+                approvals += 1
+                print(f"  Reviewer {i + 1}: APPROVED")
+            else:
+                denials += 1
+                print(f"  Reviewer {i + 1}: DENIED")
+
+        elapsed = time.monotonic() - start
+        passed = approvals >= required_approvers
+
+        if passed:
+            print(f"\n  All {required_approvers} reviewers approved.")
+        else:
+            print(f"\n  Multi-party approval FAILED ({approvals}/{required_approvers} approved).")
+
+        return ChallengeResult(
+            passed=passed,
+            challenge_type=ChallengeType.MULTI_PARTY,
+            response_time_seconds=round(elapsed, 3),
+            questions_asked=required_approvers,
+            questions_correct=approvals,
+            details={
+                "required_approvers": required_approvers,
+                "approvals": approvals,
+                "denials": denials,
             },
         )
 
@@ -570,10 +636,11 @@ if _RICH_AVAILABLE:
         ) -> ChallengeResult:
             if challenge_type == ChallengeType.TEACH_BACK:
                 return await self._render_teach_back(ctx, risk)
+            if challenge_type == ChallengeType.MULTI_PARTY:
+                return await self._render_multi_party(ctx, risk)
             if challenge_type in (
                 ChallengeType.QUIZ,
                 ChallengeType.CONFIRM,
-                ChallengeType.MULTI_PARTY,
             ):
                 return await self._render_quiz(ctx, risk)
             # Unknown challenge type -- fall through to quiz
@@ -732,6 +799,97 @@ if _RICH_AVAILABLE:
                 details={
                     "explanation": explanation.strip(),
                     "word_count": word_count,
+                },
+            )
+
+        # -- multi-party approval challenge --------------------------------
+
+        async def _render_multi_party(
+            self, ctx: ActionContext, risk: RiskAssessment
+        ) -> ChallengeResult:
+            """Multi-party approval: requires 2 independent approvers."""
+            start = time.monotonic()
+            required_approvers = 2
+            approvals = 0
+            denials = 0
+            color = _RISK_COLORS[risk.level]
+
+            # Build panel body
+            body = Text()
+            body.append("\n")
+            body.append("  Action: ", style="dim")
+            body.append(ctx.function_name, style="bold white")
+            body.append("\n")
+            body.append("  Risk:   ", style="dim")
+            body.append_text(self._risk_bar(risk.score))
+            body.append(" ")
+            body.append_text(self._risk_label(risk))
+            body.append("\n\n")
+            body.append("  Call: ", style="dim")
+            body.append(_format_call(ctx, max_len=50), style="white")
+            body.append("\n\n")
+            body.append(
+                f"  This action requires approval from {required_approvers} "
+                f"independent reviewers.\n",
+                style="bold white",
+            )
+
+            panel = Panel(
+                body,
+                title="\u26d4 ATTESTA \u2500\u2500 MULTI-PARTY APPROVAL REQUIRED",
+                title_align="left",
+                border_style=color,
+                padding=(1, 2),
+                expand=False,
+                width=58,
+            )
+            self._console.print()
+            self._console.print(panel)
+
+            for i in range(required_approvers):
+                self._console.print(
+                    f"  --- Reviewer {i + 1} of {required_approvers} ---",
+                    style="bold dim",
+                )
+                response = (
+                    await _async_input(f"  Reviewer {i + 1} [a]pprove / [d]eny: ")
+                ).strip().lower()
+                if response in ("a", "approve", "y", "yes"):
+                    approvals += 1
+                    self._console.print(
+                        f"  Reviewer {i + 1}: APPROVED", style="bold green"
+                    )
+                else:
+                    denials += 1
+                    self._console.print(
+                        f"  Reviewer {i + 1}: DENIED", style="bold red"
+                    )
+
+            elapsed = time.monotonic() - start
+            passed = approvals >= required_approvers
+
+            if passed:
+                self._console.print(
+                    f"\n  All {required_approvers} reviewers approved.",
+                    style="bold green",
+                )
+            else:
+                self._console.print(
+                    f"\n  Multi-party approval FAILED "
+                    f"({approvals}/{required_approvers} approved).",
+                    style="bold red",
+                )
+
+            return ChallengeResult(
+                passed=passed,
+                challenge_type=ChallengeType.MULTI_PARTY,
+                response_time_seconds=round(elapsed, 3),
+                questions_asked=required_approvers,
+                questions_correct=approvals,
+                details={
+                    "required_approvers": required_approvers,
+                    "approvals": approvals,
+                    "denials": denials,
                 },
             )
 

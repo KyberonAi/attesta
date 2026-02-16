@@ -8,7 +8,7 @@ Attesta is designed to be testable from day one. Every component -- scorers, ren
 
 ## Auto-Approve in Tests
 
-The simplest approach: gated functions auto-approve when no TTY is detected. In CI environments, stdin is not a TTY, so Attesta automatically uses the `_DefaultRenderer` which approves everything.
+For Python, the simplest approach is relying on no-TTY behavior: in CI environments, stdin is not a TTY, so Attesta automatically uses `_DefaultRenderer` (auto-approve).
 
 ```python
 from attesta import gate
@@ -17,13 +17,13 @@ from attesta import gate
 def deploy(service: str) -> str:
     return f"Deployed {service}"
 
-# In CI (no TTY): auto-approved, the function runs normally
+# In CI (no TTY, Python): auto-approved, the function runs normally
 result = deploy("api-gateway")
 assert result == "Deployed api-gateway"
 ```
 
 <Note>
-Auto-approval in CI means your tests exercise the real risk scoring and audit logging pipeline -- only the human-interaction step is skipped. This catches configuration errors and pipeline bugs.
+In TypeScript, no-TTY behavior defaults to deny. For CI tests in TypeScript, provide a test renderer that approves or denies deterministically.
 </Note>
 
 ---

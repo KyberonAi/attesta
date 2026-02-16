@@ -350,10 +350,10 @@ Most features are available in both SDKs. The table below documents known differ
 | `CompositeRiskScorer` | Yes | Yes | |
 | `MaxRiskScorer` | Yes | Yes | |
 | Domain profiles | Yes | No | Python-only; use `attesta.yaml` domain config with the CLI |
-| Multi-party challenge | Yes | No | Python-only |
+| Multi-party challenge | Yes | Yes | Supported in core; renderer support is implementation-specific |
 | Trust engine | Yes | Yes | |
 | Audit logger (JSONL) | Yes | Yes | |
-| Hash-chain verification | Yes | No | Use `attesta audit verify` CLI instead |
+| Hash-chain verification | Yes | Yes | Python: `verify_chain()` / CLI, TypeScript: `verifyChain()` |
 | `TerminalRenderer` (rich UI) | Yes | Basic | TypeScript uses a basic console renderer |
 | LangChain integration | Yes | Yes | |
 | OpenAI Agents SDK | Yes | No | Python-only |
@@ -373,23 +373,22 @@ Even if you are building a TypeScript project, you can install the Python packag
 
 ## Audit Log Compatibility
 
-Both SDKs write to the same `.attesta/audit.jsonl` format. Entries produced by the Python SDK and the TypeScript SDK are fully interoperable -- you can mix and match within the same project, and the `attesta audit verify` command validates the entire chain regardless of which SDK produced each entry.
+Both SDKs use hash-chained JSONL audit logs, but the serialized field names differ (`snake_case` in Python, `camelCase` in TypeScript). Do not mix Python- and TypeScript-produced entries in the same file if you need chain verification to pass.
 
 ```json
 {
-  "id": "a4f8b2c1e3d5...",
-  "timestamp": "2025-06-15T14:32:18Z",
-  "function_name": "deploy",
+  "entryId": "a4f8b2c1e3d5...",
+  "actionName": "deploy",
   "verdict": "approved",
-  "risk_level": "high",
-  "risk_score": 0.78,
-  "agent_id": "deploy-bot",
-  "prev_hash": "e3d5a4f8b2c1..."
+  "riskLevel": "high",
+  "riskScore": 0.78,
+  "agentId": "deploy-bot",
+  "previousHash": "e3d5a4f8b2c1..."
 }
 ```
 
 <Warning>
-Field names in the audit log JSONL file use `snake_case` regardless of which SDK produced the entry. This is a serialization format decision, not an API convention. The TypeScript SDK maps `camelCase` properties to `snake_case` on write and reverses the mapping on read.
+For now, pick one SDK as the writer for a given audit log file. Cross-SDK mixed logs can break hash-chain verification.
 </Warning>
 
 ---

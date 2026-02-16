@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from attesta.core.types import ActionContext
+from attesta.core.types import ActionContext, Verdict
 
 if TYPE_CHECKING:
     from attesta import Attesta
@@ -70,7 +70,7 @@ def attesta_approval_handler(attesta: Attesta):
             hints=kwargs,
         )
         result = await attesta.evaluate(ctx)
-        approved = result.verdict.value in ("approved", "modified")
+        approved = result.verdict in (Verdict.APPROVED, Verdict.MODIFIED)
         if not approved:
             logger.info(
                 "Attesta denied tool %r via approval handler (risk=%s)",
@@ -132,7 +132,7 @@ class AttestaGuardrail:
         )
         result = await self.gk.evaluate(ctx)
 
-        if result.verdict.value in ("approved", "modified"):
+        if result.verdict in (Verdict.APPROVED, Verdict.MODIFIED):
             return None
 
         risk_label = result.risk_assessment.level.value

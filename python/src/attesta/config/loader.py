@@ -2,10 +2,108 @@
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+import logging
 from pathlib import Path
+import re
 from typing import Any
 
 from attesta.core.types import RiskLevel, ChallengeType
+
+logger = logging.getLogger("attesta")
+
+
+def _clamp(score: float) -> float:
+    """Clamp a score to [0.0, 1.0]."""
+    return max(0.0, min(1.0, score))
+
+
+def _level_score(level: RiskLevel) -> float:
+    """Map a risk level to a representative score."""
+    return {
+        RiskLevel.LOW: 0.15,
+        RiskLevel.MEDIUM: 0.45,
+        RiskLevel.HIGH: 0.70,
+        RiskLevel.CRITICAL: 0.90,
+    }[level]
+
+
+class _AmplifiedRiskScorer:
+    """Decorator scorer that applies config-level regex score boosts."""
+
+    def __init__(self, base_scorer: Any, amplifiers: list[dict[str, Any]]) -> None:
+        self._base = base_scorer
+        self._compiled: list[tuple[re.Pattern[str], float]] = []
+
+        for amp in amplifiers:
+            pattern = amp.get("pattern")
+            boost = amp.get("boost")
+            if not isinstance(pattern, str):
+                logger.warning("Ignoring risk amplifier with non-string pattern: %r", amp)
+                continue
+            try:
+                boost_val = float(boost)
+            except (TypeError, ValueError):
+                logger.warning("Ignoring risk amplifier with invalid boost: %r", amp)
+                continue
+            try:
+                compiled = re.compile(pattern)
+            except re.error:
+                logger.warning("Ignoring risk amplifier with invalid regex: %r", pattern)
+                continue
+            self._compiled.append((compiled, boost_val))
+
+    @property
+    def name(self) -> str:
+        return f"{self._base.name}+amplifiers"
+
+    def score(self, ctx: Any) -> float:
+        score = float(self._base.score(ctx))
+        fn_name = str(getattr(ctx, "function_name", ""))
+        for pattern, boost in self._compiled:
+            if pattern.search(fn_name):
+                score += boost
+        return _clamp(score)
+
+
+class _OverrideRiskScorer:
+    """Decorator scorer that applies exact function-name risk overrides."""
+
+    def __init__(self, base_scorer: Any, overrides: dict[str, str]) -> None:
+        self._base = base_scorer
+        self._overrides: dict[str, RiskLevel] = {}
+
+        for action_name, level_value in overrides.items():
+            key = str(action_name).strip()
+            if not key:
+                continue
+            try:
+                if isinstance(level_value, RiskLevel):
+                    level = level_value
+                else:
+                    level = RiskLevel(str(level_value).strip().lower())
+            except ValueError:
+                logger.warning(
+                    "Ignoring invalid risk override for %s: %r",
+                    key,
+                    level_value,
+                )
+                continue
+            self._overrides[key] = level
+
+    @property
+    def name(self) -> str:
+        return f"{self._base.name}+overrides"
+
+    def score(self, ctx: Any) -> float:
+        base_score = _clamp(float(self._base.score(ctx)))
+        fn_name = str(getattr(ctx, "function_name", ""))
+        override = self._overrides.get(fn_name)
+        if override is None and "." in fn_name:
+            # Support configs that use bare function names while context uses qualname.
+            override = self._overrides.get(fn_name.split(".")[-1])
+        if override is not None:
+            return _level_score(override)
+        return base_score
 
 
 @dataclass
@@ -137,7 +235,9 @@ class Policy:
         """Build a domain-aware risk scorer if a domain is configured.
 
         Returns a :class:`~attesta.domains.scorer.DomainRiskScorer` wrapping
-        the appropriate domain profile(s), or ``None`` if no domain is set.
+        the appropriate domain profile(s), optionally layered with config
+        amplifiers/overrides. Returns ``None`` when no scorer customization
+        is needed.
 
         Domain profiles can be loaded from:
 
@@ -151,42 +251,53 @@ class Policy:
         merged via :meth:`~attesta.domains.profile.DomainRegistry.merge`
         to produce a composite profile.
         """
-        if self.domain is None:
-            return None
-
+        from attesta.core.risk import DefaultRiskScorer
         from attesta.domains.presets import load_preset
         from attesta.domains.scorer import DomainRiskScorer
 
+        scorer: Any | None = None
+
         try:
-            if isinstance(self.domain, str):
-                profile = load_preset(self.domain)
-                return DomainRiskScorer(profile)
+            if self.domain is not None:
+                if isinstance(self.domain, str):
+                    profile = load_preset(self.domain)
+                    scorer = DomainRiskScorer(profile)
+                elif isinstance(self.domain, list) and len(self.domain) == 1:
+                    profile = load_preset(self.domain[0])
+                    scorer = DomainRiskScorer(profile)
+                elif isinstance(self.domain, list) and len(self.domain) > 1:
+                    from attesta.domains.profile import DomainRegistry
 
-            # List of domain names — merge into a composite profile.
-            if isinstance(self.domain, list) and len(self.domain) == 1:
-                profile = load_preset(self.domain[0])
-                return DomainRiskScorer(profile)
-
-            from attesta.domains.profile import DomainRegistry
-
-            profiles = [load_preset(name) for name in self.domain]
-            registry = DomainRegistry()
-            for p in profiles:
-                registry.register(p)
-            merged = registry.merge(*profiles)
-            return DomainRiskScorer(merged)
+                    profiles = [load_preset(name) for name in self.domain]
+                    registry = DomainRegistry()
+                    for p in profiles:
+                        registry.register(p)
+                    merged = registry.merge(*profiles)
+                    scorer = DomainRiskScorer(merged)
         except KeyError as exc:
             if self.domain_strict:
                 raise
-            import logging
-            logging.getLogger("attesta").warning(
+            logger.warning(
                 "Domain profile '%s' not found.  Register presets with "
                 "attesta.domains.presets.register_preset() or create a "
                 "DomainProfile directly.  Error: %s",
                 self.domain,
                 exc,
             )
-            return None
+
+        # If no domain scorer was configured, only build a base scorer when
+        # risk-level overrides or amplifiers are explicitly configured.
+        if scorer is None:
+            if not self.risk_overrides and not self.risk_amplifiers:
+                return None
+            scorer = DefaultRiskScorer()
+
+        # Evaluation order: base/domain scorer -> amplifiers -> overrides.
+        if self.risk_amplifiers:
+            scorer = _AmplifiedRiskScorer(scorer, self.risk_amplifiers)
+        if self.risk_overrides:
+            scorer = _OverrideRiskScorer(scorer, self.risk_overrides)
+        return scorer
 
     def to_trust_engine_kwargs(self) -> dict[str, Any]:
         """Return the trust-related settings as a dict suitable for

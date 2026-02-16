@@ -74,6 +74,9 @@ const restartService = withHighRisk(async (name: string) => {
 | `metadata` | `dict[str, Any] \| None` | `None` | Arbitrary metadata attached to every `ActionContext` created by this gate. |
 | `trust_engine` | `Any \| None` | `None` | Trust engine for adaptive risk adjustment. Requires `agent_id` to be set. |
 | `sync_timeout` | `float` | `300.0` | Maximum seconds to wait when bridging async evaluation from a synchronous context (e.g., Jupyter). Set to `0` for no timeout. |
+| `allow_hint_override` | `bool` | `False` | Whether to honor `ctx.hints["risk_override"]` at runtime. Keep `False` unless hints are trusted server-side input. |
+| `mode` | `str` | `"enforce"` | Gate mode: `enforce`, `shadow`, or `audit_only`. |
+| `approval_timeout_seconds` | `float` | `600.0` | Maximum time to wait for human response before returning `TIMED_OUT`. |
 
 ## Sync and Async Behavior
 
@@ -112,7 +115,7 @@ result = send_email("user@example.com", "Hello")
 </CodeGroup>
 
 <Note>
-When a sync function decorated with `@gate` is called inside an already-running event loop (e.g., Jupyter notebooks), Attesta schedules the evaluation as an asyncio task and waits up to `sync_timeout` seconds. Adjust this value if your approval flow involves long review times.
+When a sync function decorated with `@gate` is called inside an already-running event loop (e.g., Jupyter notebooks), Attesta evaluates in a dedicated worker thread and waits up to `sync_timeout` seconds. Adjust this value if your approval flow involves long review times.
 </Note>
 
 ## Denial Behavior

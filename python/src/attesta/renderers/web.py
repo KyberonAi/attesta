@@ -16,8 +16,11 @@ Usage::
 
 from __future__ import annotations
 
+import asyncio
+import html as _html
 import json
 import logging
+import secrets
 import threading
 import time
 import webbrowser
@@ -37,6 +40,12 @@ from attesta.core.types import (
 __all__ = ["WebRenderer"]
 
 logger = logging.getLogger("attesta.renderers.web")
+
+
+def _esc(s: object) -> str:
+    """HTML-escape a value for safe interpolation into templates."""
+    return _html.escape(str(s), quote=True)
+
 
 # ---------------------------------------------------------------------------
 # HTML templates
@@ -94,7 +103,7 @@ _RISK_CLASS = {
 
 def _risk_badge(level: str) -> str:
     cls = _RISK_CLASS.get(level, "risk-medium")
-    return f'<span class="risk-badge {cls}">{level.upper()}</span>'
+    return f'<span class="risk-badge {cls}">{_esc(level.upper())}</span>'
 
 
 def _base_html(title: str, body: str, min_review_seconds: float = 0) -> str:
@@ -129,15 +138,15 @@ def _confirm_page(ctx: ActionContext, risk: RiskAssessment) -> str:
     factors = ""
     if risk.factors:
         items = "".join(
-            f"<li>{f.name}: {f.description}</li>" for f in risk.factors
+            f"<li>{_esc(f.name)}: {_esc(f.description)}</li>" for f in risk.factors
         )
         factors = f'<div class="factors"><strong>Risk factors:</strong><ul>{items}</ul></div>'
 
     body = f"""
 <h1>Attesta -- Approval Required</h1>
 <div class="detail">
-    <label>Action:</label> {ctx.function_name}<br>
-    <label>Call:</label> {ctx.description}<br>
+    <label>Action:</label> {_esc(ctx.function_name)}<br>
+    <label>Call:</label> {_esc(ctx.description)}<br>
     <label>Risk:</label> {_risk_badge(risk.level.value)} ({risk.score:.2f})
     {factors}
 </div>
@@ -154,7 +163,7 @@ def _quiz_page(ctx: ActionContext, risk: RiskAssessment) -> str:
     body = f"""
 <h1>Attesta -- Quiz Challenge</h1>
 <div class="detail">
-    <label>Action:</label> {ctx.function_name}<br>
+    <label>Action:</label> {_esc(ctx.function_name)}<br>
     <label>Risk:</label> {_risk_badge(risk.level.value)} ({risk.score:.2f})
 </div>
 <form method="POST" action="/respond">
@@ -175,17 +184,17 @@ def _teach_back_page(
     factors = ""
     if risk.factors:
         items = "".join(
-            f"<li>{f.name}: {f.description}</li>" for f in risk.factors
+            f"<li>{_esc(f.name)}: {_esc(f.description)}</li>" for f in risk.factors
         )
         factors = f'<div class="factors"><strong>Risk factors:</strong><ul>{items}</ul></div>'
 
     body = f"""
 <h1>Attesta -- Teach-Back Challenge</h1>
 <div class="detail">
-    <label>Action:</label> {ctx.function_name}<br>
-    <label>Call:</label> {ctx.description}<br>
+    <label>Action:</label> {_esc(ctx.function_name)}<br>
+    <label>Call:</label> {_esc(ctx.description)}<br>
     <label>Risk:</label> {_risk_badge(risk.level.value)} ({risk.score:.2f})<br>
-    {"<label>Docs:</label> " + ctx.function_doc + "<br>" if ctx.function_doc else ""}
+    {"<label>Docs:</label> " + _esc(ctx.function_doc) + "<br>" if ctx.function_doc else ""}
     {factors}
 </div>
 <form method="POST" action="/respond">
@@ -239,12 +248,13 @@ class WebRenderer:
         self.port = port
         self.auto_open = auto_open
         self.min_review_seconds = min_review_seconds
+        self._csrf_token: str = ""
 
     async def render_approval(
         self, ctx: ActionContext, risk: RiskAssessment
     ) -> Verdict:
         html = _confirm_page(ctx, risk)
-        response = self._serve_and_wait(html)
+        response = await self._serve_and_wait(html)
         verdict_str = response.get("verdict", ["deny"])[0]
         return Verdict.APPROVED if verdict_str == "approve" else Verdict.DENIED
 
@@ -256,6 +266,29 @@ class WebRenderer:
     ) -> ChallengeResult:
         start = time.monotonic()
 
+        if challenge_type == ChallengeType.MULTI_PARTY:
+            # Fail closed: this renderer is single-session and cannot reliably
+            # enforce independent multi-party approvals.
+            logger.warning(
+                "WebRenderer does not support multi-party approval. "
+                "Denying %s by default.",
+                ctx.function_name,
+            )
+            return ChallengeResult(
+                passed=False,
+                challenge_type=challenge_type,
+                response_time_seconds=round(time.monotonic() - start, 3),
+                questions_asked=0,
+                questions_correct=0,
+                details={
+                    "source": "web",
+                    "reason": (
+                        "multi-party challenge is unsupported by WebRenderer; "
+                        "configure a renderer that supports independent approvers"
+                    ),
+                },
+            )
+
         if challenge_type == ChallengeType.TEACH_BACK:
             html = _teach_back_page(ctx, risk, self.min_review_seconds)
         elif challenge_type == ChallengeType.QUIZ:
@@ -263,12 +296,11 @@ class WebRenderer:
         else:
             html = _confirm_page(ctx, risk)
 
-        response = self._serve_and_wait(html)
+        response = await self._serve_and_wait(html)
         elapsed = time.monotonic() - start
 
         # Enforce minimum review time server-side
         if elapsed < self.min_review_seconds:
-            import asyncio
             await asyncio.sleep(self.min_review_seconds - elapsed)
             elapsed = time.monotonic() - start
 
@@ -314,10 +346,19 @@ class WebRenderer:
 
     # -- internal ---------------------------------------------------------
 
-    def _serve_and_wait(self, html: str) -> dict[str, list[str]]:
+    async def _serve_and_wait(self, html: str) -> dict[str, list[str]]:
         """Start server, open browser, wait for form submission, return data."""
         result: dict[str, list[str]] = {}
         event = threading.Event()
+
+        self._csrf_token = secrets.token_urlsafe(32)
+        csrf_token = self._csrf_token
+
+        # Inject CSRF token into all forms
+        html = html.replace(
+            '<form method="POST" action="/respond">',
+            f'<form method="POST" action="/respond"><input type="hidden" name="_csrf" value="{csrf_token}">'
+        )
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self_handler):
@@ -329,8 +370,23 @@ class WebRenderer:
             def do_POST(self_handler):
                 nonlocal result
                 length = int(self_handler.headers.get("Content-Length", 0))
+                if length > 65536:  # 64KB limit
+                    self_handler.send_response(413)
+                    self_handler.send_header("Content-Type", "text/plain")
+                    self_handler.end_headers()
+                    self_handler.wfile.write(b"Request body too large")
+                    return
                 body = self_handler.rfile.read(length).decode("utf-8")
                 result = parse_qs(body)
+
+                # Validate CSRF token
+                submitted_csrf = result.get("_csrf", [""])[0]
+                if submitted_csrf != csrf_token:
+                    self_handler.send_response(403)
+                    self_handler.send_header("Content-Type", "text/plain")
+                    self_handler.end_headers()
+                    self_handler.wfile.write(b"CSRF token invalid")
+                    return
 
                 # Send result page
                 passed = result.get("verdict", [""])[0] == "approve" or bool(
@@ -359,8 +415,9 @@ class WebRenderer:
             except Exception:
                 pass
 
-        # Wait for response (with timeout of 10 minutes)
-        event.wait(timeout=600)
+        # Wait for response without blocking the event loop
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: event.wait(timeout=600))
         server.shutdown()
 
         return result

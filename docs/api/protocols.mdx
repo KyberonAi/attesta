@@ -249,10 +249,10 @@ class SlackRenderer implements Renderer {
 | Renderer | Module | Description |
 |----------|--------|-------------|
 | `TerminalRenderer` | `attesta.renderers.terminal` | Rich terminal UI with color-coded risk panels, animated prompts, and quiz formatting. Requires `pip install attesta[terminal]`. |
-| `_DefaultRenderer` | `attesta.core.gate` (internal) | Auto-approves everything. Used in CI/headless environments when `rich` is not installed or stdin is not a TTY. |
+| `_DefaultRenderer` | `attesta.core.gate` (internal) | Python internal fallback renderer. Auto-approves in CI/headless environments when `rich` is not installed or stdin is not a TTY. |
 
 <Note>
-Attesta auto-detects the best renderer at runtime. If `rich` is installed and stdin is a TTY (interactive session), the `TerminalRenderer` is used. Otherwise, the silent `_DefaultRenderer` auto-approves all actions. You can override this by passing a `renderer=` parameter to `@gate` or the `Attesta` constructor.
+Python Attesta auto-detects the best renderer at runtime. If `rich` is installed and stdin is a TTY (interactive session), `TerminalRenderer` is used. Otherwise, Python falls back to `_DefaultRenderer` (auto-approve). In TypeScript, non-interactive mode defaults to deny unless you provide a renderer. You can always override behavior by passing an explicit renderer.
 </Note>
 
 ---

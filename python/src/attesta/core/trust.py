@@ -220,7 +220,13 @@ class TrustEngine:
                 ),
                 "history_count": len(profile.history),
             }
-        self.storage_path.write_text(json.dumps(data, indent=2))
+        # Use restrictive permissions (owner read/write only) for trust data
+        import os
+        content = json.dumps(data, indent=2)
+        if not self.storage_path.exists():
+            fd = os.open(str(self.storage_path), os.O_WRONLY | os.O_CREAT, 0o600)
+            os.close(fd)
+        self.storage_path.write_text(content)
 
     def _load(self):
         if not self.storage_path or not self.storage_path.exists():

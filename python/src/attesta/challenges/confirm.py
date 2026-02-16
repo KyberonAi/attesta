@@ -66,9 +66,14 @@ class ConfirmChallenge:
 
         # -- collect response (blocking I/O delegated to executor) --------
         loop = asyncio.get_running_loop()
-        response: str = await loop.run_in_executor(
-            None, lambda: input("  Approve? [y/N]: ").strip().lower()
-        )
+
+        def _read_input() -> str:
+            try:
+                return input("  Approve? [y/N]: ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                return ""
+
+        response: str = await loop.run_in_executor(None, _read_input)
         elapsed = time.monotonic() - start
 
         approved = response in ("y", "yes")

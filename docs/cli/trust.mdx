@@ -208,7 +208,7 @@ The trust engine adjusts risk scores for agents with established profiles:
 - **CRITICAL actions**: Never downgraded regardless of trust -- this is a safety invariant
 
 ```
-effective_risk = raw_risk - (trust_score * trust_influence)
+effective_risk = raw_risk × (1.0 - (trust_score - 0.5) × trust_influence)
 # But: if raw_risk >= 0.8 (CRITICAL), effective_risk = raw_risk
 ```
 

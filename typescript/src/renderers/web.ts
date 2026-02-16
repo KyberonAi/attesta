@@ -8,6 +8,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { randomBytes } from "node:crypto";
 
 import {
   type ActionContext,
@@ -19,6 +20,19 @@ import {
   createChallengeResult,
   describeAction,
 } from "../types.js";
+
+// ---------------------------------------------------------------------------
+// Utility
+// ---------------------------------------------------------------------------
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -55,7 +69,7 @@ function riskBadge(level: string): string {
         : level === "critical"
           ? "risk-critical"
           : "risk-medium";
-  return `<span class="risk-badge ${cls}">${level.toUpperCase()}</span>`;
+  return `<span class="risk-badge ${cls}">${escapeHtml(level.toUpperCase())}</span>`;
 }
 
 function baseHtml(
@@ -92,8 +106,8 @@ function confirmPage(ctx: ActionContext, risk: RiskAssessment): string {
     "Attesta - Confirm",
     `<h1>Attesta -- Approval Required</h1>
 <div class="detail">
-  <label>Action:</label> ${ctx.functionName}<br>
-  <label>Call:</label> ${describeAction(ctx)}<br>
+  <label>Action:</label> ${escapeHtml(ctx.functionName)}<br>
+  <label>Call:</label> ${escapeHtml(describeAction(ctx))}<br>
   <label>Risk:</label> ${riskBadge(risk.level)} (${risk.score.toFixed(2)})
 </div>
 <form method="POST" action="/respond">
@@ -113,8 +127,8 @@ function teachBackPage(
     "Attesta - Teach-Back",
     `<h1>Attesta -- Teach-Back Challenge</h1>
 <div class="detail">
-  <label>Action:</label> ${ctx.functionName}<br>
-  <label>Call:</label> ${describeAction(ctx)}<br>
+  <label>Action:</label> ${escapeHtml(ctx.functionName)}<br>
+  <label>Call:</label> ${escapeHtml(describeAction(ctx))}<br>
   <label>Risk:</label> ${riskBadge(risk.level)} (${risk.score.toFixed(2)})
 </div>
 <form method="POST" action="/respond">
@@ -167,6 +181,7 @@ export class WebRenderer implements Renderer {
   readonly port: number;
   readonly autoOpen: boolean;
   readonly minReviewSeconds: number;
+  private _csrfToken: string = "";
 
   constructor(options: WebRendererOptions = {}) {
     this.host = options.host ?? "127.0.0.1";
@@ -192,6 +207,23 @@ export class WebRenderer implements Renderer {
     challengeType: ChallengeType
   ): Promise<ChallengeResult> {
     const start = performance.now();
+
+    if (challengeType === ChallengeType.MULTI_PARTY) {
+      // Fail closed: WebRenderer is single-session and cannot enforce
+      // independent multi-party approvals safely.
+      return createChallengeResult({
+        passed: false,
+        challengeType,
+        responseTimeSeconds: (performance.now() - start) / 1000,
+        questionsAsked: 0,
+        questionsCorrect: 0,
+        details: {
+          source: "web",
+          reason:
+            "multi-party challenge is unsupported by WebRenderer; configure a renderer that supports independent approvers",
+        },
+      });
+    }
 
     let html: string;
     if (challengeType === ChallengeType.TEACH_BACK) {
@@ -235,6 +267,15 @@ export class WebRenderer implements Renderer {
   // -- internal ---------------------------------------------------------
 
   private _serveAndWait(html: string): Promise<Map<string, string>> {
+    this._csrfToken = randomBytes(32).toString("hex");
+    const csrfToken = this._csrfToken;
+
+    // Inject CSRF token into forms
+    html = html.replace(
+      '<form method="POST" action="/respond">',
+      `<form method="POST" action="/respond"><input type="hidden" name="_csrf" value="${csrfToken}">`
+    );
+
     return new Promise((resolve) => {
       const result = new Map<string, string>();
 
@@ -247,12 +288,32 @@ export class WebRenderer implements Renderer {
 
         if (req.method === "POST") {
           let body = "";
+          let bodySize = 0;
+          const MAX_BODY = 65536; // 64KB
           req.on("data", (chunk: Buffer) => {
-            body += chunk.toString();
+            bodySize += chunk.length;
+            if (bodySize <= MAX_BODY) {
+              body += chunk.toString();
+            }
           });
           req.on("end", () => {
+            if (bodySize > MAX_BODY) {
+              res.writeHead(413, { "Content-Type": "text/plain" });
+              res.end("Request body too large");
+              return;
+            }
+
             // Parse form data
             const params = new URLSearchParams(body);
+
+            // Validate CSRF token
+            const submittedCsrf = params.get("_csrf") ?? "";
+            if (submittedCsrf !== csrfToken) {
+              res.writeHead(403, { "Content-Type": "text/plain" });
+              res.end("CSRF token invalid");
+              return;
+            }
+
             for (const [k, v] of params) {
               result.set(k, v);
             }
@@ -267,6 +328,7 @@ export class WebRenderer implements Renderer {
             res.end(respHtml);
 
             // Shut down after response
+            clearTimeout(timeout);
             server.close();
             resolve(result);
           });
@@ -280,20 +342,25 @@ export class WebRenderer implements Renderer {
 
         if (this.autoOpen) {
           import("node:child_process")
-            .then(({ exec }) => {
-              const cmd =
-                process.platform === "darwin"
-                  ? `open ${url}`
-                  : process.platform === "win32"
-                    ? `start ${url}`
-                    : `xdg-open ${url}`;
-              exec(cmd);
+            .then(({ execFile }) => {
+              if (process.platform === "darwin") {
+                execFile("open", [url]);
+              } else if (process.platform === "win32") {
+                execFile("cmd", ["/c", "start", url]);
+              } else {
+                execFile("xdg-open", [url]);
+              }
             })
             .catch(() => {
               // Ignore browser open failures
             });
         }
       });
+
+      const timeout = setTimeout(() => {
+        server.close();
+        resolve(result); // Empty result maps to denied
+      }, 600_000); // 10 minute timeout
     });
   }
 }

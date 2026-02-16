@@ -8,7 +8,6 @@ because it requires *active* comprehension rather than passive recognition.
 from __future__ import annotations
 
 import asyncio
-import re
 import time
 from typing import Any
 
@@ -18,53 +17,7 @@ from attesta.core.types import (
     ChallengeType,
     RiskAssessment,
 )
-
-
-def _extract_key_terms(ctx: ActionContext) -> list[str]:
-    """Derive a set of key terms from the action context.
-
-    Key terms are the building blocks used to check whether the operator's
-    free-text explanation demonstrates genuine comprehension.  They come
-    from:
-
-    * Parts of the function name (split on ``_``, ``-``, and camelCase
-      boundaries).
-    * Significant keyword-argument *values* (strings longer than 2 chars,
-      path base-names, table names, etc.).
-    * Significant positional-argument values using the same heuristics.
-    """
-    terms: list[str] = []
-
-    # Function name parts
-    name_parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", ctx.function_name)
-    name_parts = name_parts.replace("-", " ").replace("_", " ")
-    for word in name_parts.split():
-        cleaned = word.strip().lower()
-        if len(cleaned) > 2:
-            terms.append(cleaned)
-
-    # Significant argument values
-    all_values: list[Any] = list(ctx.args) + list(ctx.kwargs.values())
-    for val in all_values:
-        if isinstance(val, str) and len(val) > 2:
-            # Try to extract the basename of a path
-            if "/" in val or "\\" in val:
-                import os
-                terms.append(os.path.basename(val).lower())
-            # Short-ish strings are likely identifiers or names
-            if len(val) <= 80:
-                terms.append(val.strip().lower())
-        elif isinstance(val, (int, float)) and not isinstance(val, bool):
-            terms.append(str(val))
-
-    # Deduplicate while preserving order
-    seen: set[str] = set()
-    unique: list[str] = []
-    for t in terms:
-        if t not in seen:
-            seen.add(t)
-            unique.append(t)
-    return unique
+from attesta.challenges.validators import _extract_key_terms
 
 
 class TeachBackChallenge:
@@ -153,9 +106,14 @@ class TeachBackChallenge:
             "\n  In your own words, explain what this action will do and "
             "what its effects are:"
         )
-        explanation: str = await loop.run_in_executor(
-            None, lambda: input("  > ").strip()
-        )
+
+        def _read_input() -> str:
+            try:
+                return input("  > ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return ""
+
+        explanation: str = await loop.run_in_executor(None, _read_input)
 
         # -- validate via pluggable validator -----------------------------
         passed, validation_note = await self._validator.validate(explanation, ctx)

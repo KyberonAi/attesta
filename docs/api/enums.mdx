@@ -57,12 +57,12 @@ RiskLevel.from_score(-0.1)  # ValueError: Risk score must be in [0, 1], got -0.1
 ```
 
 ```typescript TypeScript
-import { RiskLevel } from "@attesta/core";
+import { riskLevelFromScore } from "@attesta/core";
 
-RiskLevel.fromScore(0.15);  // RiskLevel.LOW
-RiskLevel.fromScore(0.45);  // RiskLevel.MEDIUM
-RiskLevel.fromScore(0.72);  // RiskLevel.HIGH
-RiskLevel.fromScore(0.91);  // RiskLevel.CRITICAL
+riskLevelFromScore(0.15);  // RiskLevel.LOW
+riskLevelFromScore(0.45);  // RiskLevel.MEDIUM
+riskLevelFromScore(0.72);  // RiskLevel.HIGH
+riskLevelFromScore(0.91);  // RiskLevel.CRITICAL
 ```
 </CodeGroup>
 

@@ -38,7 +38,7 @@ print(level.value)    # "high"
 ```
 
 ```typescript TypeScript
-import { RiskLevel } from "@attesta/core";
+import { RiskLevel, riskLevelFromScore } from "@attesta/core";
 
 // Enum members
 RiskLevel.LOW;       // "low"
@@ -47,7 +47,7 @@ RiskLevel.HIGH;      // "high"
 RiskLevel.CRITICAL;  // "critical"
 
 // Convert a numeric score to a risk level
-const level = RiskLevel.fromScore(0.72);
+const level = riskLevelFromScore(0.72);
 console.log(level);  // "high"
 ```
 </CodeGroup>

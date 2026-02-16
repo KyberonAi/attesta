@@ -27,6 +27,8 @@ import {
   riskLevelFromScore,
 } from "./types.js";
 
+import { TrustEngine } from "./trust.js";
+
 // ---------------------------------------------------------------------------
 // Exception
 // ---------------------------------------------------------------------------
@@ -63,42 +65,6 @@ class DefaultRiskScorerInternal implements RiskScorer {
     if (ctx.hints["destructive"]) base += 0.3;
     if (ctx.hints["pii"]) base += 0.2;
     return Math.min(base, 1.0);
-  }
-}
-
-class DefaultRenderer implements Renderer {
-  async renderApproval(
-    _ctx: ActionContext,
-    _risk: RiskAssessment
-  ): Promise<Verdict> {
-    return Verdict.APPROVED;
-  }
-
-  async renderChallenge(
-    _ctx: ActionContext,
-    _risk: RiskAssessment,
-    challengeType: ChallengeType
-  ): Promise<ChallengeResult> {
-    return createChallengeResult({
-      passed: true,
-      challengeType,
-      responder: "auto",
-    });
-  }
-
-  async renderInfo(message: string): Promise<void> {
-    // eslint-disable-next-line no-console
-    console.log(`[attesta] ${message}`);
-  }
-
-  async renderAutoApproved(
-    ctx: ActionContext,
-    risk: RiskAssessment
-  ): Promise<void> {
-    // eslint-disable-next-line no-console
-    console.debug(
-      `[attesta] Auto-approved ${ctx.functionName} (risk=${risk.score.toFixed(2)})`
-    );
   }
 }
 
@@ -164,6 +130,12 @@ export interface AttestaOptions {
 
   /** Optional EventBus for lifecycle event notifications. */
   eventBus?: import("./events.js").EventBus;
+
+  /** Optional trust engine for adaptive risk adjustment. */
+  trustEngine?: TrustEngine;
+
+  /** How much trust influences risk scoring (0-1). Default 0.3. */
+  trustInfluence?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,23 +154,88 @@ export interface AttestaOptions {
  */
 export class Attesta {
   private readonly _scorer: RiskScorer;
-  private readonly _renderer: Renderer;
+  private _renderer?: Renderer;
+  private _rendererResolved: boolean;
   private readonly _audit: AuditLoggerProtocol;
   private readonly _challengeMap?: Partial<Record<RiskLevel, ChallengeType>>;
   private readonly _minReviewSeconds: number;
   private readonly _riskOverride?: RiskLevel;
   private readonly _riskHints: Record<string, unknown>;
   private readonly _eventBus?: import("./events.js").EventBus;
+  private readonly _trustEngine?: TrustEngine;
+  private readonly _trustInfluence: number;
 
   constructor(options: AttestaOptions = {}) {
     this._scorer = options.riskScorer ?? new DefaultRiskScorerInternal();
-    this._renderer = options.renderer ?? new DefaultRenderer();
+    this._renderer = options.renderer;
+    this._rendererResolved = options.renderer != null;
     this._audit = options.auditLogger ?? new DefaultAuditLogger();
     this._challengeMap = options.challengeMap;
     this._minReviewSeconds = options.minReviewSeconds ?? 0;
     this._riskOverride = options.riskOverride;
     this._riskHints = options.riskHints ?? {};
     this._eventBus = options.eventBus;
+    this._trustEngine = options.trustEngine;
+    this._trustInfluence = options.trustInfluence ?? 0.3;
+  }
+
+  /**
+   * Lazily resolve the renderer on first use.
+   * If no renderer was provided, detect TTY and choose appropriately.
+   */
+  private async _resolveRenderer(): Promise<Renderer> {
+    if (this._rendererResolved && this._renderer) {
+      return this._renderer;
+    }
+
+    if (!this._rendererResolved) {
+      this._rendererResolved = true;
+
+      // If no renderer specified, detect environment
+      if (
+        typeof process !== "undefined" &&
+        process.stdout?.isTTY
+      ) {
+        try {
+          const { TerminalRenderer } = await import(
+            "./renderers/terminal.js"
+          );
+          this._renderer = new TerminalRenderer();
+        } catch {
+          // Fall through to deny-all
+        }
+      }
+
+      if (!this._renderer) {
+        // Non-interactive: deny by default for safety
+        this._renderer = {
+          async renderApproval() {
+            return Verdict.DENIED;
+          },
+          async renderChallenge(
+            _ctx: ActionContext,
+            _risk: RiskAssessment,
+            challengeType: ChallengeType
+          ) {
+            return createChallengeResult({
+              passed: false,
+              challengeType,
+              questionsAsked: 0,
+              questionsCorrect: 0,
+              details: { reason: "No interactive terminal available" },
+            });
+          },
+          async renderInfo() {},
+          async renderAutoApproved() {},
+        };
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[attesta] No TTY detected. Using deny-all renderer. Configure a renderer explicitly for non-interactive environments."
+        );
+      }
+    }
+
+    return this._renderer!;
   }
 
   /**
@@ -226,6 +263,7 @@ export class Attesta {
    * Run the full approval pipeline and return the result.
    */
   async evaluate(ctx: ActionContext): Promise<ApprovalResult> {
+    const renderer = await this._resolveRenderer();
     const reviewStart = performance.now();
 
     // 1. Merge extra hints.
@@ -234,13 +272,43 @@ export class Attesta {
     }
 
     // 2. Risk scoring.
-    const risk = this._assessRisk(ctx);
+    let risk = this._assessRisk(ctx);
 
     await this._emit("risk_scored", {
       actionName: ctx.functionName,
       riskScore: risk.score,
       riskLevel: risk.level,
     });
+
+    // Trust-based risk adjustment
+    let adjustedScore = risk.score;
+    const originalLevel = risk.level;
+    if (this._trustEngine && ctx.agentId) {
+      const domain =
+        (ctx.hints?.domain as string) ?? ctx.environment ?? "general";
+      const trustScore = this._trustEngine.computeTrust(ctx.agentId, domain);
+      adjustedScore =
+        adjustedScore * (1 - trustScore * this._trustInfluence);
+      adjustedScore = Math.max(0, Math.min(1, adjustedScore));
+
+      // Safety invariant: CRITICAL actions never downgraded
+      if (originalLevel !== "critical") {
+        const adjustedLevel = riskLevelFromScore(adjustedScore);
+        risk = {
+          ...risk,
+          score: adjustedScore,
+          level: adjustedLevel,
+          factors: [
+            ...risk.factors,
+            {
+              name: "trust_adjustment",
+              contribution: adjustedScore - risk.score,
+              description: `Trust engine adjusted risk from ${risk.score.toFixed(2)} to ${adjustedScore.toFixed(2)}`,
+            },
+          ],
+        };
+      }
+    }
 
     // 3. Select challenge.
     const challengeType = selectChallenge(risk, this._challengeMap);
@@ -251,14 +319,14 @@ export class Attesta {
 
     if (challengeType === ChallengeType.AUTO_APPROVE) {
       verdict = Verdict.APPROVED;
-      await this._renderer.renderAutoApproved(ctx, risk);
+      await renderer.renderAutoApproved(ctx, risk);
     } else {
       await this._emit("challenge_issued", {
         actionName: ctx.functionName,
         challengeType,
         riskLevel: risk.level,
       });
-      challengeResult = await this._renderer.renderChallenge(
+      challengeResult = await renderer.renderChallenge(
         ctx,
         risk,
         challengeType
@@ -300,6 +368,27 @@ export class Attesta {
       riskLevel: risk.level,
       verdict,
     });
+
+    // 6c. Update trust engine
+    if (this._trustEngine && ctx.agentId) {
+      const domain =
+        (ctx.hints?.domain as string) ?? ctx.environment ?? "general";
+      if (verdict === Verdict.APPROVED) {
+        this._trustEngine.recordSuccess({
+          agentId: ctx.agentId,
+          actionName: ctx.functionName,
+          domain,
+          riskScore: risk.score,
+        });
+      } else {
+        this._trustEngine.recordDenial({
+          agentId: ctx.agentId,
+          actionName: ctx.functionName,
+          domain,
+          riskScore: risk.score,
+        });
+      }
+    }
 
     // 7. Audit.
     try {
@@ -367,6 +456,9 @@ export class Attesta {
  * Options for the `gate()` decorator/wrapper.
  */
 export interface AttestaDecoratorOptions extends AttestaOptions {
+  /** Reuse an existing Attesta instance for this gate wrapper. */
+  attesta?: Attesta;
+
   /** Explicit risk level override (e.g. "high" or RiskLevel.HIGH). */
   risk?: RiskLevel;
 
@@ -455,6 +547,14 @@ export function gate<TArgs extends unknown[], TReturn>(
 ): (...args: TArgs) => Promise<TReturn>;
 
 /**
+ * Use as a function-first wrapper with options: `gate(myFunction, options)`.
+ */
+export function gate<TArgs extends unknown[], TReturn>(
+  fn: (...args: TArgs) => TReturn | Promise<TReturn>,
+  options: AttestaDecoratorOptions
+): (...args: TArgs) => Promise<TReturn>;
+
+/**
  * Use as a configured wrapper: `gate({ risk: "high" })(myFunction)`
  * or `gate({ risk: "high" }, myFunction)`.
  */
@@ -499,22 +599,37 @@ export function gate<TArgs extends unknown[], TReturn>(
   fnOrOptions:
     | ((...args: TArgs) => TReturn | Promise<TReturn>)
     | AttestaDecoratorOptions,
-  maybeFn?: (...args: TArgs) => TReturn | Promise<TReturn>
+  maybeFnOrOptions?:
+    | ((...args: TArgs) => TReturn | Promise<TReturn>)
+    | AttestaDecoratorOptions
 ):
   | ((...args: TArgs) => Promise<TReturn>)
   | (<A extends unknown[], R>(
       fn: (...args: A) => R | Promise<R>
     ) => (...args: A) => Promise<R>) {
-  // Case 1: gate(fn) -- bare function wrapper
+  // Case 1: gate(fn) or gate(fn, options)
   if (typeof fnOrOptions === "function") {
+    if (maybeFnOrOptions != null && typeof maybeFnOrOptions === "function") {
+      throw new TypeError(
+        "Invalid gate() call: second argument must be options when first argument is a function."
+      );
+    }
+    if (maybeFnOrOptions != null) {
+      return wrapFunction(fnOrOptions, maybeFnOrOptions);
+    }
     return wrapFunction(fnOrOptions, {});
   }
 
   const options = fnOrOptions;
 
   // Case 2: gate(options, fn) -- options + function
-  if (maybeFn != null) {
-    return wrapFunction(maybeFn, options);
+  if (maybeFnOrOptions != null) {
+    if (typeof maybeFnOrOptions !== "function") {
+      throw new TypeError(
+        "Invalid gate() call: expected a function as the second argument for gate(options, fn)."
+      );
+    }
+    return wrapFunction(maybeFnOrOptions, options);
   }
 
   // Case 3: gate(options) -- returns a decorator/wrapper
@@ -563,6 +678,8 @@ export function gateDecorator(
       minReviewSeconds: options.minReviewSeconds,
       riskOverride: options.risk,
       riskHints: options.riskHints,
+      trustEngine: options.trustEngine,
+      trustInfluence: options.trustInfluence,
     });
 
     const wrapped = async function (
@@ -598,15 +715,19 @@ function wrapFunction<TArgs extends unknown[], TReturn>(
   fn: (...args: TArgs) => TReturn | Promise<TReturn>,
   options: AttestaDecoratorOptions
 ): (...args: TArgs) => Promise<TReturn> {
-  const attestaInstance = new Attesta({
-    riskScorer: options.riskScorer,
-    renderer: options.renderer,
-    auditLogger: options.auditLogger,
-    challengeMap: options.challengeMap,
-    minReviewSeconds: options.minReviewSeconds,
-    riskOverride: options.risk,
-    riskHints: options.riskHints,
-  });
+  const attestaInstance =
+    options.attesta ??
+    new Attesta({
+      riskScorer: options.riskScorer,
+      renderer: options.renderer,
+      auditLogger: options.auditLogger,
+      challengeMap: options.challengeMap,
+      minReviewSeconds: options.minReviewSeconds,
+      riskOverride: options.risk,
+      riskHints: options.riskHints,
+      trustEngine: options.trustEngine,
+      trustInfluence: options.trustInfluence,
+    });
 
   const wrapper = async function (
     this: unknown,

@@ -211,8 +211,23 @@ export class DefaultRiskScorer implements RiskScorer {
    */
   score(ctx: ActionContext): number {
     const factors = this._computeFactors(ctx);
-    const total = factors.reduce((sum, f) => sum + f.contribution, 0);
-    return clamp(total);
+    let finalScore = factors.reduce((sum, f) => sum + f.contribution, 0);
+    finalScore = clamp(finalScore);
+
+    // Environment risk multiplier
+    const envMultipliers: Record<string, number> = {
+      production: 1.3,
+      staging: 1.1,
+      development: 0.8,
+      testing: 0.7,
+      local: 0.6,
+    };
+    const envMultiplier = envMultipliers[ctx.environment ?? ""] ?? 1.0;
+    if (envMultiplier !== 1.0) {
+      finalScore = Math.min(1.0, Math.max(0.0, finalScore * envMultiplier));
+    }
+
+    return finalScore;
   }
 
   /**
@@ -220,11 +235,34 @@ export class DefaultRiskScorer implements RiskScorer {
    */
   assess(ctx: ActionContext): RiskAssessment {
     const factors = this._computeFactors(ctx);
-    const raw = factors.reduce((sum, f) => sum + f.contribution, 0);
-    const clamped = clamp(raw);
+    let finalScore = factors.reduce((sum, f) => sum + f.contribution, 0);
+    finalScore = clamp(finalScore);
+
+    // Environment risk multiplier
+    const envMultipliers: Record<string, number> = {
+      production: 1.3,
+      staging: 1.1,
+      development: 0.8,
+      testing: 0.7,
+      local: 0.6,
+    };
+    const envMultiplier = envMultipliers[ctx.environment ?? ""] ?? 1.0;
+    if (envMultiplier !== 1.0) {
+      const envAdjusted = Math.min(
+        1.0,
+        Math.max(0.0, finalScore * envMultiplier)
+      );
+      factors.push({
+        name: "environment_multiplier",
+        contribution: envAdjusted - finalScore,
+        description: `Environment '${ctx.environment}' multiplier ${envMultiplier}x adjusted risk from ${finalScore.toFixed(2)} to ${envAdjusted.toFixed(2)}`,
+      });
+      finalScore = envAdjusted;
+    }
+
     return createRiskAssessment({
-      score: clamped,
-      level: riskLevelFromScore(clamped),
+      score: finalScore,
+      level: riskLevelFromScore(finalScore),
       factors,
       scorerName: this.name,
     });

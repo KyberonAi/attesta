@@ -1,0 +1,153 @@
+---
+title: "Webhooks"
+description: "Send HTTP POST notifications to external endpoints when pipeline events occur using WebhookConfig and WebhookDispatcher"
+icon: "globe"
+---
+
+The webhook system builds on top of the [EventBus](/api/events) to send HTTP POST requests with JSON payloads to external endpoints when pipeline events occur. Webhook deliveries happen in background threads and never block the approval pipeline. Zero external dependencies -- uses `urllib.request` from stdlib.
+
+## WebhookConfig
+
+Configuration for a single webhook endpoint.
+
+### Import
+
+```python
+from attesta.webhooks import WebhookConfig
+```
+
+### Constructor
+
+```python
+config = WebhookConfig(
+    url="https://hooks.example.com/attesta",
+    events=[EventType.APPROVED, EventType.DENIED],
+    secret="my-shared-secret",
+    timeout=5.0,
+    retry_count=1,
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `url` | `str` | *(required)* | HTTP(S) endpoint to POST events to. |
+| `events` | `list[EventType]` | `[]` | List of event types to send. An empty list means all events. |
+| `secret` | `str \| None` | `None` | Shared secret for HMAC-SHA256 signature verification. When set, an `X-Attesta-Signature` header is included. |
+| `timeout` | `float` | `5.0` | HTTP request timeout in seconds. |
+| `retry_count` | `int` | `1` | Number of retries on failure (0 = no retries). |
+
+### Signature Verification
+
+When `secret` is set, every webhook request includes an `X-Attesta-Signature` header containing an HMAC-SHA256 signature of the request body:
+
+```
+X-Attesta-Signature: sha256=<hex-digest>
+```
+
+To verify on the receiving end:
+
+```python
+import hashlib
+import hmac
+
+def verify_signature(body: bytes, signature: str, secret: str) -> bool:
+    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(f"sha256={expected}", signature)
+```
+
+---
+
+## WebhookDispatcher
+
+Subscribes to an `EventBus` and dispatches HTTP webhooks in background threads. Deliveries are fire-and-forget -- they never block the approval pipeline.
+
+### Import
+
+```python
+from attesta.webhooks import WebhookDispatcher
+```
+
+### Constructor
+
+```python
+dispatcher = WebhookDispatcher(event_bus, configs)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `event_bus` | `EventBus` | The event bus to subscribe to. |
+| `configs` | `list[WebhookConfig]` | List of webhook configurations defining where to send events. |
+
+The dispatcher automatically subscribes to the relevant event types based on the configs. No additional setup is needed after construction.
+
+---
+
+## Webhook Payload
+
+Every webhook POST request sends a JSON body with this structure:
+
+```json
+{
+  "event": "APPROVED",
+  "timestamp": "2025-06-15T14:32:18+00:00",
+  "data": {
+    "agent_id": "deploy-bot",
+    "action_name": "deploy",
+    "risk_score": 0.72,
+    "risk_level": "high"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | `string` | Uppercase event type name (e.g., `"APPROVED"`, `"DENIED"`). |
+| `timestamp` | `string` | ISO 8601 UTC timestamp. |
+| `data` | `object` | Event-specific payload data. |
+
+---
+
+## Full Example
+
+```python
+from attesta import Attesta
+from attesta.events import EventBus, EventType
+from attesta.webhooks import WebhookConfig, WebhookDispatcher
+
+# Set up event bus
+bus = EventBus()
+
+# Configure webhooks
+slack_hook = WebhookConfig(
+    url="https://hooks.slack.com/services/T00/B00/xxx",
+    events=[EventType.DENIED],  # Only notify on denials
+)
+
+audit_hook = WebhookConfig(
+    url="https://audit.internal.company.com/attesta",
+    events=[],  # All events
+    secret="shared-secret-123",
+    retry_count=3,
+)
+
+# Create dispatcher (auto-subscribes to event bus)
+dispatcher = WebhookDispatcher(bus, [slack_hook, audit_hook])
+
+# Pass the event bus to Attesta
+attesta = Attesta(event_bus=bus)
+```
+
+<Note>
+Webhook deliveries run in daemon threads. If the main process exits before a delivery completes, the webhook may not be sent. For critical notifications, consider increasing the `timeout` and `retry_count` values.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Events" icon="bell" href="/api/events">
+    The EventBus system that powers webhooks
+  </Card>
+  <Card title="Production Deployment" icon="server" href="/guides/production-deployment">
+    Recommended webhook configuration for production
+  </Card>
+</CardGroup>

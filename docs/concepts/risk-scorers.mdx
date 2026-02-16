@@ -27,7 +27,7 @@ composite_score = Σ(scorer_i.score × weight_i) / Σ(weight_i)
 
 <CodeGroup>
 ```python Python
-from attesta.scoring import (
+from attesta.core.risk import (
     DefaultRiskScorer,
     CompositeRiskScorer,
     FixedRiskScorer,
@@ -86,7 +86,7 @@ max_score = max(scorer_1.score, scorer_2.score, ..., scorer_n.score)
 
 <CodeGroup>
 ```python Python
-from attesta.scoring import (
+from attesta.core.risk import (
     DefaultRiskScorer,
     MaxRiskScorer,
 )
@@ -141,7 +141,7 @@ The `FixedRiskScorer` always returns the same pre-configured score, regardless o
 
 <CodeGroup>
 ```python Python
-from attesta.scoring import FixedRiskScorer
+from attesta.core.risk import FixedRiskScorer
 
 # Always returns 0.0 — effectively disables challenges
 bypass = FixedRiskScorer(0.0)
@@ -236,7 +236,7 @@ class MyCustomScorer implements RiskScorer {
 You can nest scorers to build sophisticated policies:
 
 ```python
-from attesta.scoring import (
+from attesta.core.risk import (
     DefaultRiskScorer,
     CompositeRiskScorer,
     MaxRiskScorer,

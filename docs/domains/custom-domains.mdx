@@ -362,14 +362,15 @@ Validate your custom profile before deploying:
 
 ```python
 from attesta import Attesta
-from attesta.domains import DomainRegistry
+from attesta.domains import DomainRegistry, DomainRiskScorer
 
 # Register the custom profile
 registry = DomainRegistry()
 registry.register(education_profile)
 
-# Create an Attesta instance with the custom domain
-attesta = Attesta(domain="education")
+# Create an Attesta instance with a domain-aware scorer
+scorer = DomainRiskScorer(education_profile)
+attesta = Attesta(risk_scorer=scorer)
 
 # Test risk scoring for domain-specific actions
 @attesta.gate()
@@ -387,8 +388,8 @@ def get_enrollment_count() -> int:
     """Get the total enrollment count."""
     return 5000
 
-# Verify risk levels (using the risk scorer directly)
-scorer = attesta.policy.build_risk_scorer()
+# Verify risk levels (using the scorer directly)
+# assessment = scorer.assess(...)
 
 # access_student_record should be HIGH (student_id pattern)
 # export_student_data should be CRITICAL (critical action)

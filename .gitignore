@@ -45,6 +45,7 @@ env/
 htmlcov/
 .tox/
 .nox/
+.rollback_backup_*/
 
 # mypy
 .mypy_cache/

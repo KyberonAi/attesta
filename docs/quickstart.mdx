@@ -99,14 +99,18 @@ icon: "rocket"
     ```typescript TypeScript
     import { Attesta, gate } from "@attesta/core";
 
-    const attesta = new Attesta({
-      riskHints: { production: true },
-      environment: "production",
-    });
+    const attesta = new Attesta();
 
-    const deploy = gate(async (service: string, version: string) => {
-      return `Deployed ${service} v${version}`;
-    }, { attesta });
+    const deploy = gate(
+      {
+        attesta,
+        riskHints: { production: true },
+        environment: "production",
+      },
+      async (service: string, version: string) => {
+        return `Deployed ${service} v${version}`;
+      }
+    );
     ```
     </CodeGroup>
   </Step>

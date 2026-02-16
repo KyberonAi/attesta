@@ -1,8 +1,14 @@
 """Community / user-supplied domain profiles.
 
 This package provides the :func:`load_preset` and :func:`list_presets`
-APIs.  In the open-source release no built-in presets are shipped; you
-can create your own :class:`~attesta.domains.profile.DomainProfile`
+APIs.  Two built-in OSS presets are included out of the box:
+
+* ``devops`` -- destructive commands, production access, permission
+  changes, and CI/CD pipeline modifications.
+* ``data-pipeline`` -- data deletion, schema migrations, PII handling,
+  production database access, ETL job changes, exports, and backups.
+
+You can also create your own :class:`~attesta.domains.profile.DomainProfile`
 instances and register them here, or point to a third-party preset
 package.
 
@@ -113,3 +119,30 @@ def list_presets() -> list[str]:
     This includes only the canonical names (not aliases).
     """
     return sorted(PRESET_PROFILES.keys())
+
+
+# ---------------------------------------------------------------------------
+# Built-in OSS presets (auto-registered on import)
+# ---------------------------------------------------------------------------
+
+def _register_builtin_presets() -> None:
+    """Import and register the built-in OSS domain presets.
+
+    Each preset module auto-registers with the global
+    :data:`~attesta.domains.profile.registry`.  Here we also register
+    them in the preset lookup table with convenient aliases.
+    """
+    from attesta.domains.presets.devops import DEVOPS_PROFILE
+    from attesta.domains.presets.data_pipeline import DATA_PIPELINE_PROFILE
+
+    if DEVOPS_PROFILE.name not in PRESET_PROFILES:
+        register_preset(DEVOPS_PROFILE, aliases=["devops", "ops"])
+
+    if DATA_PIPELINE_PROFILE.name not in PRESET_PROFILES:
+        register_preset(
+            DATA_PIPELINE_PROFILE,
+            aliases=["data-pipeline", "data_pipeline", "etl"],
+        )
+
+
+_register_builtin_presets()

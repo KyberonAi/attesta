@@ -17,7 +17,7 @@ When no policy is configured, Attesta uses these defaults:
 | HIGH | `quiz` | Comprehension quiz auto-generated from context |
 | CRITICAL | `multi_party` | 2+ independent approvers, each with a sub-challenge |
 
-These mappings are exposed as fields on the `Policy` dataclass: `auto_approve`, `confirm`, `challenge`, and `teach_back`.
+These mappings are configured via the `challenge_map` field on the `Policy` dataclass.
 
 ## Configuration
 
@@ -61,11 +61,12 @@ The `Policy` dataclass exposes minimum review times through the `min_review_time
 
 ```python
 from attesta.config.loader import Policy
+from attesta.core.types import RiskLevel
 
 policy = Policy()
 
 # Get minimum review time for a risk level
-review_time = policy.min_review_time("high")  # Returns 10
+review_time = policy.min_review_time(RiskLevel.HIGH)  # Returns 10
 
 # Or use the dict directly
 policy.minimum_review_seconds  # {"low": 0, "medium": 3, "high": 10, "critical": 30}
@@ -142,6 +143,7 @@ The full `Policy` dataclass provides programmatic access to all policy settings 
 
 ```python
 from attesta.config.loader import Policy
+from attesta.core.types import RiskLevel
 
 policy = Policy(
     fail_mode="deny",
@@ -158,8 +160,8 @@ policy = Policy(
 )
 
 # Key methods
-policy.challenge_for_risk("high")       # Returns the challenge type for a risk level
-policy.min_review_time("critical")      # Returns 30
+policy.challenge_for_risk(RiskLevel.HIGH)      # -> ChallengeType.QUIZ
+policy.min_review_time(RiskLevel.CRITICAL)     # -> 30.0
 policy.to_challenge_map()               # Returns full challenge mapping dict
 policy.build_risk_scorer()              # Returns a configured risk scorer
 policy.to_trust_engine_kwargs()         # Returns kwargs for TrustEngine constructor
@@ -169,7 +171,7 @@ policy.to_trust_engine_kwargs()         # Returns kwargs for TrustEngine constru
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `challenge_for_risk(level)` | `str` | Challenge type for the given risk level |
+| `challenge_for_risk(level)` | `ChallengeType` | Challenge type for the given risk level |
 | `min_review_time(level)` | `float` | Minimum review seconds for the given risk level |
 | `to_challenge_map()` | `dict` | Full mapping of risk levels to challenge types |
 | `build_risk_scorer()` | `RiskScorer` | Configured scorer with overrides and amplifiers |

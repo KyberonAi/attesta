@@ -40,7 +40,7 @@ class TeachBackValidator(Protocol):
 def _extract_key_terms(ctx: ActionContext) -> list[str]:
     """Derive key terms from the action context.
 
-    Duplicated from teach_back module to avoid circular imports.
+    This is the canonical implementation, imported by the teach_back module.
     """
     terms: list[str] = []
 

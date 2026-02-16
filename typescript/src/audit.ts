@@ -380,13 +380,14 @@ export class AuditLogger implements AuditLoggerProtocol {
       }
 
       const expected = computeEntryHash(entry, previousHash);
-      if (entry.chainHash !== expected) {
+      if (entry.chainHash === expected) {
+        // Only advance previousHash for valid entries
+        previousHash = entry.chainHash;
+      } else {
         broken.push(idx);
+        // Don't advance previousHash -- keep last known good value
+        // so subsequent entries correctly show the chain is broken
       }
-
-      // Advance the chain regardless so we can detect *which* links
-      // are broken rather than cascading all subsequent entries.
-      previousHash = entry.chainHash;
     }
 
     return {

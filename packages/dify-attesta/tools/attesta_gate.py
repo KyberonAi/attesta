@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
+import threading
 from typing import Any, Generator
 
 from dify_plugin import Tool
@@ -11,6 +13,31 @@ from dify_plugin.entities.tool import ToolInvokeMessage
 
 from attesta.core.gate import Attesta
 from attesta.core.types import ActionContext, RiskLevel, Verdict
+
+
+def _run_coroutine_in_worker_thread(
+    coro_factory: Any,
+    *,
+    timeout: float | None = None,
+) -> Any:
+    """Run a coroutine in a dedicated thread to avoid loop-thread deadlocks."""
+    result_future: concurrent.futures.Future[Any] = concurrent.futures.Future()
+
+    def _runner() -> None:
+        try:
+            result = asyncio.run(coro_factory())
+        except Exception as exc:
+            result_future.set_exception(exc)
+        else:
+            result_future.set_result(result)
+
+    thread = threading.Thread(
+        target=_runner,
+        name="attesta-dify-sync-bridge",
+        daemon=True,
+    )
+    thread.start()
+    return result_future.result(timeout=timeout)
 
 
 class AttestaGateTool(Tool):
@@ -74,18 +101,10 @@ class AttestaGateTool(Tool):
             loop = None
 
         if loop is not None and loop.is_running():
-            import concurrent.futures
-            future: concurrent.futures.Future = concurrent.futures.Future()
-
-            async def _run() -> None:
-                try:
-                    res = await attesta.evaluate(ctx)
-                    future.set_result(res)
-                except Exception as exc:
-                    future.set_exception(exc)
-
-            loop.create_task(_run())
-            result = future.result(timeout=30)
+            result = _run_coroutine_in_worker_thread(
+                lambda: attesta.evaluate(ctx),
+                timeout=30,
+            )
         else:
             result = asyncio.run(attesta.evaluate(ctx))
 

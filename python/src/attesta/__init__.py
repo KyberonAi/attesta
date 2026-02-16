@@ -25,7 +25,10 @@ import asyncio
 import functools
 import logging
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
+
+if TYPE_CHECKING:
+    from attesta.core.trust import TrustEngine as _TrustEngine
 
 from attesta.core.gate import Attesta as CoreAttesta, AttestaDenied, gate
 from attesta.core.types import (
@@ -126,6 +129,10 @@ class Attesta:
         for adaptive risk adjustment.  When provided, it is passed to each
         :class:`~attesta.core.gate.Attesta` which adjusts risk based on agent
         trust and records outcomes after evaluation.
+    allow_hint_override:
+        Whether to honour ``ctx.hints["risk_override"]`` at runtime.
+        Defaults to ``False`` for safety. Set explicitly to ``True`` only
+        when hints are controlled by trusted server-side code.
     """
 
     def __init__(
@@ -135,15 +142,23 @@ class Attesta:
         risk_scorer: RiskScorer | None = None,
         renderer: Renderer | None = None,
         audit_logger: AuditLogger | None = None,
-        trust_engine: Any | None = None,
-        event_bus: Any | None = None,
+        trust_engine: _TrustEngine | None = None,
+        event_bus: EventBus | None = None,
+        allow_hint_override: bool | None = None,
     ) -> None:
         self._policy: dict[str, Any] = dict(policy or {})
         self._risk_scorer = risk_scorer
         self._renderer = renderer
         self._audit_logger = audit_logger
-        self._trust_engine = trust_engine
-        self._event_bus = event_bus
+        self._trust_engine: _TrustEngine | None = trust_engine
+        self._event_bus: EventBus | None = event_bus
+        if allow_hint_override is None:
+            self._allow_hint_override = bool(
+                self._policy.get("allow_hint_override", False)
+            )
+        else:
+            self._allow_hint_override = bool(allow_hint_override)
+        self._core_instance: CoreAttesta | None = None
         self._policy_obj: Any | None = None  # stores Policy for introspection
 
         # Pre-parse the challenge map from the policy if present.
@@ -159,8 +174,8 @@ class Attesta:
         """Run the full gate flow for *ctx* and return the result.
 
         This is the primary entry point used by framework integrations.
-        It creates a :class:`~attesta.core.gate.Attesta` using this
-        instance's defaults and delegates to its ``evaluate`` method.
+        It uses a cached :class:`~attesta.core.gate.Attesta` instance
+        to preserve stateful components like novelty tracking.
 
         Parameters
         ----------
@@ -172,18 +187,20 @@ class Attesta:
         ApprovalResult
             The full audit-ready approval record.
         """
-        from attesta.core.gate import Attesta as _CoreAttesta
+        if self._core_instance is None:
+            from attesta.core.gate import Attesta as _CoreAttesta
 
-        gate_instance = _CoreAttesta(
-            risk_scorer=self._risk_scorer,
-            renderer=self._renderer,
-            audit_logger=self._audit_logger,
-            challenge_map=self._challenge_map,
-            min_review_seconds=self._policy.get("min_review_seconds", 0.0),
-            trust_engine=self._trust_engine,
-            event_bus=self._event_bus,
-        )
-        return await gate_instance.evaluate(ctx)
+            self._core_instance = _CoreAttesta(
+                risk_scorer=self._risk_scorer,
+                renderer=self._renderer,
+                audit_logger=self._audit_logger,
+                challenge_map=self._challenge_map,
+                min_review_seconds=self._policy.get("min_review_seconds", 0.0),
+                trust_engine=self._trust_engine,
+                event_bus=self._event_bus,
+                allow_hint_override=self._allow_hint_override,
+            )
+        return await self._core_instance.evaluate(ctx)
 
     @classmethod
     def from_config(cls, path: str | Path) -> Attesta:
@@ -372,6 +389,7 @@ class Attesta:
         session_id: str | None = None,
         environment: str | None = None,
         metadata: dict[str, Any] | None = None,
+        allow_hint_override: bool | None = None,
     ) -> F | Callable[[F], F]:
         """Decorator factory -- like the module-level :func:`gate`, but uses
         this instance's defaults for any parameters not explicitly provided.
@@ -413,6 +431,11 @@ class Attesta:
                 environment=resolved_env,
                 metadata=metadata,
                 trust_engine=self._trust_engine,
+                allow_hint_override=(
+                    self._allow_hint_override
+                    if allow_hint_override is None
+                    else allow_hint_override
+                ),
             )
 
         if fn is not None:

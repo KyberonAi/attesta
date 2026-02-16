@@ -1,0 +1,157 @@
+---
+title: "Environment"
+description: "Auto-detect deployment environments and apply risk multipliers based on production, staging, CI, or development context"
+icon: "server"
+---
+
+The environment module detects the deployment context from environment variables, CI markers, and hostname patterns. The detected environment is used by the gate pipeline to adjust risk scores -- production environments amplify risk while development environments reduce it.
+
+## Environment Enum
+
+Classifies the deployment environment into one of four categories.
+
+### Import
+
+```python
+from attesta.environment import Environment
+```
+
+### Values
+
+| Member | Value | Risk Multiplier | Description |
+|--------|-------|-----------------|-------------|
+| `PRODUCTION` | `"production"` | 1.5x | Live production environment. Risk is amplified. |
+| `STAGING` | `"staging"` | 1.2x | Pre-production staging environment. Slight risk amplification. |
+| `CI` | `"ci"` | 1.0x | Continuous integration environment. No risk adjustment. |
+| `DEVELOPMENT` | `"development"` | 0.8x | Local development environment. Risk is reduced. |
+
+---
+
+## detect_environment()
+
+Auto-detect the deployment environment using a prioritized detection chain. The `ATTESTA_ENV` environment variable always takes precedence. Falls back to heuristic detection from CI markers, production variables, and hostname patterns.
+
+### Import
+
+```python
+from attesta.environment import detect_environment
+```
+
+### Signature
+
+```python
+def detect_environment() -> Environment
+```
+
+**Returns:** The detected (or overridden) `Environment`.
+
+### Detection Order
+
+Detection uses a first-match-wins strategy:
+
+| Priority | Method | Details |
+|----------|--------|---------|
+| 1 | `ATTESTA_ENV` variable | Explicit override. Set to `production`, `staging`, `ci`, or `development`. |
+| 2 | CI markers | Checks `CI`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CIRCLECI`, `TRAVIS`, `BUILDKITE`. |
+| 3 | Production markers | Checks `NODE_ENV=production`, `FLASK_ENV=production`, `DJANGO_SETTINGS_MODULE` containing `prod`, `RAILS_ENV=production`. |
+| 4 | Hostname patterns | Matches `prod-*`, `prod.*` for production; `stg-*`, `stg.*`, `staging-*`, `staging.*` for staging. |
+| 5 | Default | Returns `Environment.DEVELOPMENT`. |
+
+### Example
+
+```python
+from attesta.environment import detect_environment
+
+env = detect_environment()
+print(env)        # Environment.DEVELOPMENT (on a local machine)
+print(env.value)  # "development"
+```
+
+---
+
+## RISK_MULTIPLIERS
+
+A dictionary mapping environment values to risk score multipliers. Used by the gate pipeline to adjust raw risk scores based on the operational context.
+
+### Import
+
+```python
+from attesta.environment import RISK_MULTIPLIERS
+```
+
+### Values
+
+```python
+RISK_MULTIPLIERS = {
+    "production": 1.5,
+    "staging": 1.2,
+    "ci": 1.0,
+    "development": 0.8,
+}
+```
+
+### Usage
+
+```python
+from attesta.environment import detect_environment, RISK_MULTIPLIERS
+
+env = detect_environment()
+multiplier = RISK_MULTIPLIERS[env.value]
+
+raw_score = 0.45
+adjusted_score = min(1.0, raw_score * multiplier)
+print(f"Environment: {env.value}, Multiplier: {multiplier}, Adjusted: {adjusted_score}")
+# Development: 0.45 * 0.8 = 0.36
+# Production:  0.45 * 1.5 = 0.675
+```
+
+---
+
+## Overriding the Environment
+
+### Via Environment Variable
+
+Set the `ATTESTA_ENV` variable to force a specific environment regardless of auto-detection:
+
+```bash
+# Force production environment
+export ATTESTA_ENV=production
+
+# Force development environment
+export ATTESTA_ENV=development
+```
+
+### Via the @gate Decorator
+
+Override the environment per-gate using the `environment` parameter:
+
+```python
+from attesta import gate
+
+@gate(environment="production")
+def deploy(service: str) -> str:
+    """Always treated as production, regardless of actual environment."""
+    return f"Deployed {service}"
+```
+
+### Via attesta.yaml
+
+Set a default environment in the configuration file:
+
+```yaml attesta.yaml
+policy:
+  default_environment: production
+```
+
+<Tip>
+In CI pipelines, the `CI` environment variable is typically set automatically. Attesta will detect this and apply a 1.0x multiplier (no adjustment). If you want CI to be treated like production for risk scoring, set `ATTESTA_ENV=production` in your CI configuration.
+</Tip>
+
+<CardGroup cols={2}>
+  <Card title="Risk Scoring" icon="gauge-high" href="/concepts/risk-scoring">
+    How environment multipliers affect the final risk score
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/attesta-yaml">
+    Set default environment in attesta.yaml
+  </Card>
+</CardGroup>

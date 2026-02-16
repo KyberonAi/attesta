@@ -61,7 +61,7 @@ That is it. When `deploy()` is called, attesta automatically:
 3. **Presents the challenge** to the operator
 4. **Logs the decision** to a tamper-proof audit trail
 
-> **Note:** The bare `@gate` decorator auto-detects the environment. In an interactive terminal it shows rich prompts (`pip install attesta[terminal]`). In CI/headless or without `rich` installed, it auto-approves. For full control over rendering and audit, use the [Recommended Setup](#recommended-setup) below.
+> **Note:** Python `@gate` auto-detects the environment. In an interactive terminal it shows rich prompts (`pip install attesta[terminal]`). In CI/headless or without `rich` installed, Python falls back to auto-approve. In TypeScript, non-interactive mode defaults to deny unless you configure a renderer explicitly. For full control over rendering and audit, use the [Recommended Setup](#recommended-setup) below.
 
 ### Install
 

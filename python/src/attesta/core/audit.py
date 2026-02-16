@@ -258,9 +258,9 @@ class AuditLogger:
                 except (json.JSONDecodeError, TypeError) as exc:
                     logger.warning("Malformed entry at line %d: %s", idx, exc)
                     broken.append(idx)
-                    # We cannot derive previous_hash from a broken entry, so
-                    # use the stored chain_hash (which may itself be wrong).
-                    previous_hash = entry.chain_hash if hasattr(entry, "chain_hash") else previous_hash
+                    # Cannot derive hash from broken entry -- keep previous_hash unchanged.
+                    # Next valid entry's chain verification will also fail, which correctly
+                    # reflects that the chain is broken from this point.
                     continue
 
                 expected = entry.compute_hash(previous_hash)
@@ -430,6 +430,11 @@ class AuditLogger:
         self._entry_count += 1
 
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Use restrictive permissions (owner read/write only) for audit files
+        import os
+        if not self.path.exists():
+            fd = os.open(str(self.path), os.O_WRONLY | os.O_CREAT, 0o600)
+            os.close(fd)
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(entry.to_json() + "\n")
 
