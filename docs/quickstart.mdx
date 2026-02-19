@@ -4,6 +4,10 @@ description: "Get Attesta running in 5 minutes"
 icon: "rocket"
 ---
 
+<Note>
+Need the strict launch-ready path? See <a href="/quickstart-5-minutes">5-Minute Quickstart</a>.
+</Note>
+
 <Steps>
   <Step title="Install Attesta">
     <Tabs>
@@ -24,7 +28,7 @@ icon: "rocket"
       </Tab>
       <Tab title="TypeScript">
         ```bash
-        npm install @attesta/core
+        npm install @kyberon/attesta
         ```
       </Tab>
     </Tabs>
@@ -44,7 +48,7 @@ icon: "rocket"
     ```
 
     ```typescript TypeScript
-    import { gate } from "@attesta/core";
+    import { gate } from "@kyberon/attesta";
 
     const deleteUser = gate(async (userId: string) => {
       return `Deleted user ${userId}`;
@@ -97,7 +101,7 @@ icon: "rocket"
     ```
 
     ```typescript TypeScript
-    import { Attesta, gate } from "@attesta/core";
+    import { Attesta, gate } from "@kyberon/attesta";
 
     const attesta = new Attesta();
 

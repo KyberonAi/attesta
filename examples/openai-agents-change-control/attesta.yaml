@@ -1,0 +1,15 @@
+policy:
+  fail_mode: escalate
+  timeout_seconds: 45
+  minimum_review_seconds:
+    medium: 5
+    high: 15
+    critical: 30
+  require_multi_party:
+    critical: 2
+
+audit:
+  path: .attesta/audit.jsonl
+
+trust:
+  initial_score: 0.3

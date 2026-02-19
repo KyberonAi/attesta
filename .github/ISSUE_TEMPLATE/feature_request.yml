@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose an enhancement to Attesta OSS behavior or developer experience
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Proposals that include problem framing and clear acceptance criteria are easier to prioritize.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user or operator pain does this solve?
+      placeholder: In high-risk workflows, we need...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior/API/docs change you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workaround or competing approach you tested.
+    validations:
+      required: false
+
+  - type: input
+    id: impact
+    attributes:
+      label: Impact level
+      description: Which users are impacted most?
+      placeholder: security teams / platform teams / no-code users / all users
+    validations:
+      required: true

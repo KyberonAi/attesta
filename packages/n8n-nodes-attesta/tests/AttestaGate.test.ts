@@ -7,7 +7,7 @@ jest.mock('n8n-workflow', () => ({
   },
 }));
 
-import { Attesta, createActionContext, Verdict, RiskLevel } from '@attesta/core';
+import { Attesta, createActionContext, Verdict, RiskLevel } from '@kyberon/attesta';
 import { AttestaGate } from '../nodes/AttestaGate/AttestaGate.node';
 
 const MockAttesta = Attesta as jest.MockedClass<typeof Attesta>;

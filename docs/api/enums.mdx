@@ -18,7 +18,7 @@ from attesta import RiskLevel
 ```
 
 ```typescript TypeScript
-import { RiskLevel } from "@attesta/core";
+import { RiskLevel } from "@kyberon/attesta";
 ```
 </CodeGroup>
 
@@ -57,7 +57,7 @@ RiskLevel.from_score(-0.1)  # ValueError: Risk score must be in [0, 1], got -0.1
 ```
 
 ```typescript TypeScript
-import { riskLevelFromScore } from "@attesta/core";
+import { riskLevelFromScore } from "@kyberon/attesta";
 
 riskLevelFromScore(0.15);  // RiskLevel.LOW
 riskLevelFromScore(0.45);  // RiskLevel.MEDIUM
@@ -122,7 +122,7 @@ from attesta import Verdict
 ```
 
 ```typescript TypeScript
-import { Verdict } from "@attesta/core";
+import { Verdict } from "@kyberon/attesta";
 ```
 </CodeGroup>
 
@@ -173,7 +173,7 @@ match result.verdict:
 ```
 
 ```typescript TypeScript
-import { Attesta, ActionContext, Verdict } from "@attesta/core";
+import { Attesta, ActionContext, Verdict } from "@kyberon/attesta";
 
 const attesta = new Attesta();
 const ctx: ActionContext = { functionName: "deploy", args: ["api"] };
@@ -218,7 +218,7 @@ from attesta import ChallengeType
 ```
 
 ```typescript TypeScript
-import { ChallengeType } from "@attesta/core";
+import { ChallengeType } from "@kyberon/attesta";
 ```
 </CodeGroup>
 

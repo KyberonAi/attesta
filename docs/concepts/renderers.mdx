@@ -75,7 +75,7 @@ attesta = Attesta(
 ```
 
 ```typescript TypeScript
-import { Attesta, TerminalRenderer } from "@attesta/core";
+import { Attesta, TerminalRenderer } from "@kyberon/attesta";
 
 // TerminalRenderer is the default
 const attesta = new Attesta();
@@ -138,7 +138,7 @@ attesta = Attesta(renderer=PlainRenderer())
 ```
 
 ```typescript TypeScript
-import { Attesta, PlainRenderer } from "@attesta/core";
+import { Attesta, PlainRenderer } from "@kyberon/attesta";
 
 const attesta = new Attesta({
   renderer: new PlainRenderer(),
@@ -208,7 +208,7 @@ import {
   ActionContext,
   RiskAssessment,
   ChallengeResult,
-} from "@attesta/core";
+} from "@kyberon/attesta";
 
 class MyCustomRenderer implements Renderer {
   async renderApproval(

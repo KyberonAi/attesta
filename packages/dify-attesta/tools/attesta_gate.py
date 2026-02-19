@@ -8,8 +8,18 @@ import json
 import threading
 from typing import Any, Generator
 
-from dify_plugin import Tool
-from dify_plugin.entities.tool import ToolInvokeMessage
+try:
+    from dify_plugin import Tool
+    from dify_plugin.entities.tool import ToolInvokeMessage
+except ImportError:
+    class ToolInvokeMessage(dict):  # type: ignore[no-redef]
+        pass
+
+    class Tool:  # type: ignore[no-redef]
+        runtime: Any
+
+        def create_json_message(self, payload: dict[str, Any]) -> ToolInvokeMessage:
+            return ToolInvokeMessage(payload)
 
 from attesta.core.gate import Attesta
 from attesta.core.types import ActionContext, RiskLevel, Verdict

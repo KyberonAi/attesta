@@ -1,0 +1,136 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python,javascript
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+
+  gitleaks:
+    name: Secrets Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Python dependency audit
+        working-directory: python
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,yaml]" pip-audit
+          pip-audit
+      - name: Node dependency audit (typescript workspace)
+        run: |
+          npm ci
+          npm audit --workspace @kyberon/attesta --audit-level=high
+
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install semgrep
+        run: python -m pip install --upgrade pip semgrep
+      - name: Run semgrep
+        run: |
+          semgrep \
+            --config p/security-audit \
+            --error \
+            --sarif \
+            --output semgrep.sarif \
+            python/src typescript/src
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+  sbom:
+    name: SBOM + Provenance
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install SBOM tooling and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cyclonedx-bom
+          python -m pip install -e "./python[yaml]"
+          npm ci
+      - name: Generate Python SBOM
+        run: |
+          mkdir -p security-artifacts
+          python -m cyclonedx_py environment \
+            --of JSON \
+            --output-file security-artifacts/sbom-python.cdx.json \
+            "$(which python)"
+      - name: Generate TypeScript SBOM
+        run: |
+          npx -y @cyclonedx/cyclonedx-npm \
+            --output-format JSON \
+            --output-file security-artifacts/sbom-typescript.cdx.json \
+            --workspace @kyberon/attesta
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-artifacts
+          path: security-artifacts/*.cdx.json
+      - name: Attest Python SBOM
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: security-artifacts/sbom-python.cdx.json
+      - name: Attest TypeScript SBOM
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: security-artifacts/sbom-typescript.cdx.json

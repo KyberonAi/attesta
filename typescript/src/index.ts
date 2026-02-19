@@ -1,5 +1,5 @@
 /**
- * @attesta/core
+ * @kyberon/attesta
  *
  * Human-in-the-loop approval framework for AI agent actions.
  *
@@ -8,7 +8,7 @@
  *
  * @example
  * ```ts
- * import { gate, Attesta, RiskLevel, DefaultRiskScorer } from "@attesta/core";
+ * import { gate, Attesta, RiskLevel, DefaultRiskScorer } from "@kyberon/attesta";
  *
  * // Wrap a function with attesta approval (simplest usage)
  * const safeFn = gate(myDangerousFunction);
@@ -69,7 +69,7 @@ export {
   getAttesta,
 } from "./gate.js";
 
-export type { AttestaOptions, AttestaDecoratorOptions } from "./gate.js";
+export type { AttestaOptions, AttestaDecoratorOptions, FailMode } from "./gate.js";
 
 // -- Risk -------------------------------------------------------------------
 

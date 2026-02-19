@@ -14,16 +14,16 @@
       "^.+\\.ts$": ["ts-jest", { "diagnostics": false }]
     },
     "moduleNameMapper": {
-      "^@attesta/core$": "<rootDir>/__mocks__/@attesta/core.ts",
+      "^@kyberon/attesta$": "<rootDir>/__mocks__/@kyberon/attesta.ts",
       "^@langchain/core/tools$": "<rootDir>/__mocks__/@langchain/core/tools.ts"
     }
   },
   "dependencies": {
-    "@attesta/core": "^0.1.0"
+    "@kyberon/attesta": "^0.1.0"
   },
   "peerDependencies": {
     "flowise-components": ">=1.0.0",
-    "@langchain/core": ">=0.1.0"
+    "@langchain/core": ">=0.3.80"
   },
   "devDependencies": {
     "typescript": "^5.3.0",
@@ -31,7 +31,7 @@
     "ts-jest": "^29.1.0",
     "@types/jest": "^29.5.0",
     "flowise-components": "^1.0.0",
-    "@langchain/core": "^0.2.0"
+    "@langchain/core": "^0.3.80"
   },
   "keywords": ["flowise", "attesta", "human-in-the-loop", "ai-safety"],
   "license": "MIT",

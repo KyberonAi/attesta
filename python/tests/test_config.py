@@ -119,6 +119,16 @@ class TestParseConfig:
         assert policy.fail_mode == "escalate"
         assert policy.timeout_seconds == 600
 
+    def test_invalid_fail_mode_raises(self):
+        data = {"policy": {"fail_mode": "block"}}
+        with pytest.raises(ValueError, match="policy.fail_mode"):
+            _parse_config(data)
+
+    def test_invalid_timeout_raises(self):
+        data = {"policy": {"timeout_seconds": 0}}
+        with pytest.raises(ValueError, match="policy.timeout_seconds"):
+            _parse_config(data)
+
     def test_challenge_map_from_yaml(self):
         data = {
             "policy": {

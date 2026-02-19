@@ -1,0 +1,14 @@
+# Default owners
+* @rsamal
+
+# Core SDKs
+/python/ @rsamal
+/typescript/ @rsamal
+
+# Integrations and packages
+/packages/ @rsamal
+
+# Release and governance
+/.github/ @rsamal
+/SECURITY.md @rsamal
+/OSS_SCOPE.md @rsamal

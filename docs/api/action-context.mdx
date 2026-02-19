@@ -14,7 +14,7 @@ from attesta import ActionContext
 ```
 
 ```typescript TypeScript
-import { ActionContext } from "@attesta/core";
+import { ActionContext } from "@kyberon/attesta";
 ```
 </CodeGroup>
 
@@ -70,7 +70,7 @@ export_data("users", format="json")
 ```
 
 ```typescript TypeScript
-import { gate } from "@attesta/core";
+import { gate } from "@kyberon/attesta";
 
 const exportData = gate(
   {
@@ -110,7 +110,7 @@ ctx = ActionContext(
 ```
 
 ```typescript TypeScript
-import { ActionContext } from "@attesta/core";
+import { ActionContext } from "@kyberon/attesta";
 
 const ctx: ActionContext = {
   functionName: "executeSql",
@@ -145,7 +145,7 @@ print(ctx.description)
 ```
 
 ```typescript TypeScript
-import { ActionContext } from "@attesta/core";
+import { ActionContext } from "@kyberon/attesta";
 
 const ctx: ActionContext = {
   functionName: "deploy",

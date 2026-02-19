@@ -1,0 +1,35 @@
+---
+title: "Vercel AI Ops Gate"
+description: "Apply Attesta middleware to operations-oriented tool calls"
+icon: "server"
+---
+
+## Scenario
+
+A Vercel AI route can invoke tools that change infrastructure state. Middleware should enforce policy before execution.
+
+## Example App
+
+Reference implementation: `examples/vercel-ai-ops-gate/`
+
+- uses `createAttestaMiddleware`
+- sets timeout + `failMode: escalate`
+- treats denied/escalated outcomes as non-executable paths
+
+## Core Pattern
+
+```typescript
+import { createAttestaMiddleware } from "@kyberon/attesta/integrations";
+
+const middleware = createAttestaMiddleware({
+  failMode: "escalate",
+  approvalTimeoutSeconds: 45,
+  riskHints: { production: true, external_side_effect: true },
+});
+```
+
+## Production Notes
+
+- fail closed for unknown tool categories
+- map escalation events into your incident/change-control channel
+- keep policy defaults in one config path and reuse across routes

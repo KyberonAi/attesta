@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -71,6 +72,36 @@ class DenyAllRenderer:
             passed=False,
             challenge_type=challenge_type,
             responder="test-deny",
+        )
+
+    async def render_info(self, message: str) -> None:
+        pass
+
+    async def render_auto_approved(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> None:
+        pass
+
+
+class SlowRenderer:
+    """Mock renderer that never returns challenge responses."""
+
+    async def render_approval(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> Verdict:
+        await asyncio.sleep(9999)
+        return Verdict.APPROVED  # pragma: no cover
+
+    async def render_challenge(
+        self,
+        ctx: ActionContext,
+        risk: RiskAssessment,
+        challenge_type: ChallengeType,
+    ) -> ChallengeResult:
+        await asyncio.sleep(9999)
+        return ChallengeResult(  # pragma: no cover
+            passed=True,
+            challenge_type=challenge_type,
         )
 
     async def render_info(self, message: str) -> None:
@@ -277,6 +308,18 @@ class TestAttestaDecoratorSync:
             pass
 
         assert my_special_func.__name__ == "my_special_func"
+
+    def test_fail_mode_allow_allows_sync_execution_after_timeout(self):
+        @gate(
+            risk="high",
+            renderer=SlowRenderer(),
+            approval_timeout_seconds=0.05,
+            fail_mode="allow",
+        )
+        def do_work() -> str:
+            return "executed"
+
+        assert do_work() == "executed"
 
     def test_preserves_docstring(self):
         @gate

@@ -117,6 +117,8 @@ class Attesta:
         * ``min_review_seconds`` -- minimum review wall-clock time (float).
         * ``challenge_map`` -- mapping from risk level name to challenge type
           name, e.g. ``{"low": "auto_approve", "high": "quiz"}``.
+        * ``fail_mode`` -- timeout policy: ``deny``, ``allow``, or ``escalate``.
+        * ``timeout_seconds`` -- max seconds to wait for challenge completion.
 
     risk_scorer:
         Default risk scorer for all gates.
@@ -145,6 +147,8 @@ class Attesta:
         trust_engine: _TrustEngine | None = None,
         event_bus: EventBus | None = None,
         allow_hint_override: bool | None = None,
+        fail_mode: str | None = None,
+        timeout_seconds: float | None = None,
     ) -> None:
         self._policy: dict[str, Any] = dict(policy or {})
         self._risk_scorer = risk_scorer
@@ -158,6 +162,12 @@ class Attesta:
             )
         else:
             self._allow_hint_override = bool(allow_hint_override)
+        self._fail_mode = str(fail_mode or self._policy.get("fail_mode", "deny"))
+        self._timeout_seconds = float(
+            timeout_seconds
+            if timeout_seconds is not None
+            else self._policy.get("timeout_seconds", 600.0)
+        )
         self._core_instance: CoreAttesta | None = None
         self._policy_obj: Any | None = None  # stores Policy for introspection
 
@@ -199,6 +209,8 @@ class Attesta:
                 trust_engine=self._trust_engine,
                 event_bus=self._event_bus,
                 allow_hint_override=self._allow_hint_override,
+                fail_mode=self._fail_mode,
+                approval_timeout_seconds=self._timeout_seconds,
             )
         return await self._core_instance.evaluate(ctx)
 
@@ -364,12 +376,16 @@ class Attesta:
             renderer=renderer_inst,
             audit_logger=audit_logger_inst,
             trust_engine=trust_engine,
+            fail_mode=policy_obj.fail_mode,
+            timeout_seconds=policy_obj.timeout_seconds,
         )
         # Override the challenge map and min_review_seconds derived from
         # the rich Policy object (they take precedence over the raw dict
         # parse done in __init__).
         instance._challenge_map = challenge_map
         instance._policy["min_review_seconds"] = min_review_seconds
+        instance._policy["fail_mode"] = policy_obj.fail_mode
+        instance._policy["timeout_seconds"] = policy_obj.timeout_seconds
         instance._policy_obj = policy_obj
         return instance
 
@@ -390,6 +406,8 @@ class Attesta:
         environment: str | None = None,
         metadata: dict[str, Any] | None = None,
         allow_hint_override: bool | None = None,
+        fail_mode: str | None = None,
+        approval_timeout_seconds: float | None = None,
     ) -> F | Callable[[F], F]:
         """Decorator factory -- like the module-level :func:`gate`, but uses
         this instance's defaults for any parameters not explicitly provided.
@@ -412,6 +430,12 @@ class Attesta:
             min_review_seconds
             if min_review_seconds is not None
             else self._policy.get("min_review_seconds", 0.0)
+        )
+        resolved_fail_mode = str(fail_mode or self._fail_mode)
+        resolved_timeout_seconds = (
+            approval_timeout_seconds
+            if approval_timeout_seconds is not None
+            else self._timeout_seconds
         )
 
         def decorator(func: F) -> F:
@@ -436,6 +460,8 @@ class Attesta:
                     if allow_hint_override is None
                     else allow_hint_override
                 ),
+                fail_mode=resolved_fail_mode,
+                approval_timeout_seconds=resolved_timeout_seconds,
             )
 
         if fn is not None:

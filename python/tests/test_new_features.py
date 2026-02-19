@@ -4,6 +4,7 @@ renderer detection, and configurable sync_timeout.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from unittest.mock import patch
 
@@ -73,6 +74,36 @@ class DenyAllRenderer:
             passed=False,
             challenge_type=challenge_type,
             responder="test-deny",
+        )
+
+    async def render_info(self, message: str) -> None:
+        pass
+
+    async def render_auto_approved(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> None:
+        pass
+
+
+class SlowRenderer:
+    """Mock renderer that times out challenge flows."""
+
+    async def render_approval(
+        self, ctx: ActionContext, risk: RiskAssessment
+    ) -> Verdict:
+        await asyncio.sleep(9999)
+        return Verdict.APPROVED  # pragma: no cover
+
+    async def render_challenge(
+        self,
+        ctx: ActionContext,
+        risk: RiskAssessment,
+        challenge_type: ChallengeType,
+    ) -> ChallengeResult:
+        await asyncio.sleep(9999)
+        return ChallengeResult(  # pragma: no cover
+            passed=True,
+            challenge_type=challenge_type,
         )
 
     async def render_info(self, message: str) -> None:
@@ -359,6 +390,49 @@ class TestAttestaFromConfig:
         gk = Attesta.from_config(config)
         assert gk._challenge_map is not None
         assert gk._challenge_map[RiskLevel.CRITICAL] == ChallengeType.TEACH_BACK
+
+    def test_rich_format_wires_fail_mode_escalate(self, tmp_path):
+        """policy.fail_mode + policy.timeout_seconds affect runtime decisions."""
+        from attesta import Attesta, AttestaDenied
+
+        config = tmp_path / "attesta.yaml"
+        config.write_text(
+            "policy:\n"
+            "  fail_mode: escalate\n"
+            "  timeout_seconds: 0.05\n"
+        )
+        gk = Attesta.from_config(config)
+
+        @gk.gate(risk="medium", renderer=SlowRenderer())
+        def protected_action() -> str:
+            return "should-not-run"
+
+        with pytest.raises(AttestaDenied) as exc_info:
+            protected_action()
+
+        assert exc_info.value.result is not None
+        assert exc_info.value.result.verdict == Verdict.ESCALATED
+        assert exc_info.value.result.metadata["timed_out"] is True
+        assert gk.policy["fail_mode"] == "escalate"
+        assert gk.policy["timeout_seconds"] == 0.05
+
+    def test_rich_format_wires_fail_mode_allow(self, tmp_path):
+        """policy.fail_mode=allow permits execution after timeout."""
+        from attesta import Attesta
+
+        config = tmp_path / "attesta.yaml"
+        config.write_text(
+            "policy:\n"
+            "  fail_mode: allow\n"
+            "  timeout_seconds: 0.05\n"
+        )
+        gk = Attesta.from_config(config)
+
+        @gk.gate(risk="high", renderer=SlowRenderer())
+        def protected_action() -> str:
+            return "ran"
+
+        assert protected_action() == "ran"
 
 
 # =========================================================================

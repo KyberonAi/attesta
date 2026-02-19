@@ -2,8 +2,15 @@
 
 from typing import Any
 
-from dify_plugin import ToolProvider
-from dify_plugin.errors import ToolProviderCredentialValidationError
+try:
+    from dify_plugin import ToolProvider
+    from dify_plugin.errors import ToolProviderCredentialValidationError
+except ImportError:
+    class ToolProvider:  # type: ignore[no-redef]
+        pass
+
+    class ToolProviderCredentialValidationError(Exception):  # type: ignore[no-redef]
+        pass
 
 
 class AttestaProvider(ToolProvider):

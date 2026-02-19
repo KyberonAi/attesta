@@ -842,6 +842,38 @@ class TestApprovalTimeout:
         # LOW risk -> AUTO_APPROVE, no challenge, so timeout is irrelevant
         assert result.verdict is Verdict.APPROVED
 
+    async def test_timeout_with_fail_mode_allow_returns_approved(self):
+        """fail_mode=allow permits execution when challenge times out."""
+        g = Attesta(
+            renderer=_SlowRenderer(),
+            risk_override=RiskLevel.HIGH,
+            fail_mode="allow",
+            approval_timeout_seconds=0.1,
+        )
+        ctx = ActionContext(function_name="allow_on_timeout")
+        result = await g.evaluate(ctx)
+
+        assert result.verdict is Verdict.APPROVED
+        assert result.challenge_result is not None
+        assert result.challenge_result.details["fail_mode"] == "allow"
+        assert result.metadata["timed_out"] is True
+
+    async def test_timeout_with_fail_mode_escalate_returns_escalated(self):
+        """fail_mode=escalate returns ESCALATED and preserves timeout metadata."""
+        g = Attesta(
+            renderer=_SlowRenderer(),
+            risk_override=RiskLevel.HIGH,
+            fail_mode="escalate",
+            approval_timeout_seconds=0.1,
+        )
+        ctx = ActionContext(function_name="escalate_on_timeout")
+        result = await g.evaluate(ctx)
+
+        assert result.verdict is Verdict.ESCALATED
+        assert result.challenge_result is not None
+        assert result.challenge_result.details["fail_mode"] == "escalate"
+        assert result.metadata["timed_out"] is True
+
 
 # =========================================================================
 # 7. Audit Chain Verification

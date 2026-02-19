@@ -20,11 +20,11 @@
       "^.+\\.ts$": ["ts-jest", { "diagnostics": false }]
     },
     "moduleNameMapper": {
-      "^@attesta/core$": "<rootDir>/__mocks__/@attesta/core.ts"
+      "^@kyberon/attesta$": "<rootDir>/__mocks__/@kyberon/attesta.ts"
     }
   },
   "dependencies": {
-    "@attesta/core": "^0.1.0"
+    "@kyberon/attesta": "^0.1.0"
   },
   "peerDependencies": {
     "n8n-workflow": ">=1.0.0"

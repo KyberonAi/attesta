@@ -1,7 +1,7 @@
 import { INode, INodeData, INodeParams } from 'flowise-components';
 import { DynamicTool } from '@langchain/core/tools';
-import { Attesta, createActionContext, Verdict, RiskLevel } from '@attesta/core';
-import type { ApprovalResult } from '@attesta/core';
+import { Attesta, createActionContext, Verdict, RiskLevel } from '@kyberon/attesta';
+import type { ApprovalResult } from '@kyberon/attesta';
 
 class AttestaGate implements INode {
   label: string;

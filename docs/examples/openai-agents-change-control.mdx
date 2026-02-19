@@ -1,0 +1,38 @@
+---
+title: "OpenAI Agents Change Control"
+description: "Gate high-risk tool calls before agent-side effects execute"
+icon: "shield-halved"
+---
+
+## Scenario
+
+An agent can execute production SQL changes. We require meaningful human verification with escalation on timeout.
+
+## Example App
+
+Reference implementation: `examples/openai-agents-change-control/`
+
+- uses `attesta_approval_handler`
+- sets `fail_mode: escalate`
+- records audit evidence for each tool call
+
+## Core Pattern
+
+```python
+from attesta import Attesta
+from attesta.integrations.openai_sdk import attesta_approval_handler
+
+attesta = Attesta.from_config("attesta.yaml")
+approval = attesta_approval_handler(attesta)
+
+approved = await approval("execute_sql_change", {"sql": "DROP TABLE users;"})
+if not approved:
+    # treat as non-executable and route to incident/change queue
+    ...
+```
+
+## Production Notes
+
+- route escalated outcomes into a ticketed out-of-band workflow
+- require `change_ticket` metadata for every destructive action
+- alert on repeated timeout escalations to detect approval-path drift

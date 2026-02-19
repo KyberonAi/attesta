@@ -68,7 +68,7 @@ export interface GatedVercelToolOptions extends AttestaOptions {
  * ```ts
  * import { tool } from "ai";
  * import { z } from "zod";
- * import { gatedVercelTool } from "@attesta/core/integrations";
+ * import { gatedVercelTool } from "@kyberon/attesta/integrations";
  *
  * const deleteTool = tool({
  *   description: "Delete a file",
@@ -94,6 +94,8 @@ export function gatedVercelTool<T extends VercelAIToolLike>(
     minReviewSeconds: options.minReviewSeconds,
     riskOverride: options.riskOverride,
     riskHints: options.riskHints,
+    failMode: options.failMode,
+    approvalTimeoutSeconds: options.approvalTimeoutSeconds,
   });
 
   const originalExecute = tool.execute;
@@ -181,7 +183,7 @@ export interface AttestaMiddlewareOptions extends AttestaOptions {
  *
  * ```ts
  * import { generateText } from "ai";
- * import { createAttestaMiddleware } from "@attesta/core/integrations";
+ * import { createAttestaMiddleware } from "@kyberon/attesta/integrations";
  *
  * const attesta = createAttestaMiddleware({
  *   riskHints: { pii: true },
@@ -210,6 +212,8 @@ export function createAttestaMiddleware(
     minReviewSeconds: options.minReviewSeconds,
     riskOverride: options.riskOverride,
     riskHints: options.riskHints,
+    failMode: options.failMode,
+    approvalTimeoutSeconds: options.approvalTimeoutSeconds,
   });
 
   const getActionName =

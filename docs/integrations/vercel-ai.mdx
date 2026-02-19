@@ -9,12 +9,12 @@ Attesta integrates with the Vercel AI SDK (`ai` package) through two mechanisms:
 1. **`gatedVercelTool`** -- wraps a single tool definition with Attesta approval before `execute` runs.
 2. **`createAttestaMiddleware`** -- returns middleware that intercepts all tool calls in `generateText` / `streamText` pipelines.
 
-Both are TypeScript-only and ship with `@attesta/core`.
+Both are TypeScript-only and ship with `@kyberon/attesta`.
 
 ## Installation
 
 ```bash
-npm install @attesta/core ai
+npm install @kyberon/attesta ai
 ```
 
 ---
@@ -57,7 +57,7 @@ gatedVercelTool<T extends VercelAIToolLike>(
 import { tool, generateText } from "ai";
 import { z } from "zod";
 import { openai } from "@ai-sdk/openai";
-import { gatedVercelTool } from "@attesta/core/integrations";
+import { gatedVercelTool } from "@kyberon/attesta/integrations";
 
 // Define a tool
 const deleteFileTool = tool({
@@ -143,7 +143,7 @@ createAttestaMiddleware(options?: AttestaMiddlewareOptions): {
 import { generateText, tool } from "ai";
 import { z } from "zod";
 import { openai } from "@ai-sdk/openai";
-import { createAttestaMiddleware } from "@attesta/core/integrations";
+import { createAttestaMiddleware } from "@kyberon/attesta/integrations";
 
 // Create middleware
 const attesta = createAttestaMiddleware({
@@ -207,7 +207,7 @@ The middleware works with `streamText` as well:
 
 ```typescript
 import { streamText } from "ai";
-import { createAttestaMiddleware } from "@attesta/core/integrations";
+import { createAttestaMiddleware } from "@kyberon/attesta/integrations";
 
 const attesta = createAttestaMiddleware({
   agentId: "chat-agent",

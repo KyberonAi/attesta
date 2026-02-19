@@ -1,0 +1,29 @@
+name: Documentation improvement
+description: Report unclear, missing, or incorrect docs
+title: "[Docs]: "
+labels: ["documentation", "needs-triage"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page or file
+      description: Link or path to the docs page.
+      placeholder: /docs/quickstart.mdx
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is wrong or missing?
+      description: Be specific about the incorrect statement or gap.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording or structure
+      description: Optional, but helpful for fast turnaround.
+    validations:
+      required: false

@@ -104,7 +104,7 @@ icon: "circle-question"
     ```
 
     ```typescript TypeScript
-    import { RiskScorer, ActionContext, gate } from "@attesta/core";
+    import { RiskScorer, ActionContext, gate } from "@kyberon/attesta";
 
     class MyScorer implements RiskScorer {
       readonly name = "my-scorer";
@@ -130,9 +130,9 @@ icon: "circle-question"
 
     | `fail_mode` | Behavior on Timeout |
     |-------------|---------------------|
-    | `deny` (default) | The action is blocked. `AttestaDenied` is raised with verdict `TIMED_OUT`. |
-    | `escalate` | The action is forwarded to a secondary approver or webhook. |
-    | `allow` | The action proceeds without approval. |
+    | `deny` (default) | The action is blocked with verdict `TIMED_OUT`. |
+    | `escalate` | The action is blocked with verdict `ESCALATED` and an escalation event is emitted. |
+    | `allow` | The action proceeds with verdict `APPROVED` (timeout metadata is still recorded). |
 
     ```yaml
     policy:
@@ -307,7 +307,7 @@ icon: "circle-question"
     Alternatively, use the `evaluate()` method directly in your TypeScript MCP server's `call_tool` handler:
 
     ```typescript
-    import { Attesta, ActionContext, Verdict } from "@attesta/core";
+    import { Attesta, ActionContext, Verdict } from "@kyberon/attesta";
 
     const attesta = new Attesta();
 

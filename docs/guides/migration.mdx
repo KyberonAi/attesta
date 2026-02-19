@@ -373,6 +373,32 @@ Attesta follows semantic versioning. The v0.x series is the initial release; v1.
 
 ---
 
+## Timeout Policy Migration Notes (`fail_mode`)
+
+Recent releases wire `policy.fail_mode` and `policy.timeout_seconds` directly into
+runtime gate behavior (Python and TypeScript SDKs).
+
+For challenge timeouts:
+
+| `fail_mode` | Runtime verdict | Executes protected action? |
+|-------------|-----------------|----------------------------|
+| `deny` | `TIMED_OUT` | No |
+| `allow` | `APPROVED` | Yes |
+| `escalate` | `ESCALATED` | No |
+
+Example:
+
+```yaml
+policy:
+  fail_mode: escalate
+  timeout_seconds: 300
+```
+
+If you previously assumed timeouts always denied with `TIMED_OUT`, audit your
+policy config before upgrading and explicitly set `fail_mode: deny`.
+
+---
+
 ## Upgrading Domain Profiles
 
 Domain profiles encode industry-specific risk patterns, sensitive terms, and compliance references. When regulations change or your domain knowledge evolves, you need to update them.

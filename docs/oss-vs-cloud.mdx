@@ -1,0 +1,44 @@
+---
+title: "OSS vs Cloud"
+description: "Public feature boundary for the mostly OSS + services model"
+icon: "scale-balanced"
+---
+
+This page is the public boundary contract for Attesta OSS and commercial services.
+
+## Boundary Rule
+
+Keep product mechanics open source. Monetize operational scale and enterprise integrations.
+
+## Feature Matrix
+
+| Capability | OSS (this repo) | Cloud / Enterprise Services |
+|---|---|---|
+| Core gate pipeline | Yes | Yes |
+| Python + TypeScript SDKs | Yes | Yes |
+| Risk scoring + challenge routing | Yes | Yes |
+| Trust engine + audit chain | Yes | Yes |
+| CLI and docs | Yes | Yes |
+| Framework adapters and no-code connectors | Yes | Yes |
+| Hosted approval routing | No | Yes |
+| Identity-aware multi-party orchestration | No | Yes |
+| SSO/SIEM/GRC enterprise connectors | No | Yes |
+| Managed immutable retention and search | No | Yes |
+| Compliance reporting UI and policy governance | No | Yes |
+| SLA-backed operations support | No | Yes |
+
+## What OSS Users Can Expect
+
+- Fully functional local/self-hosted gating for high-impact agent actions.
+- Extensible integration points for custom risk scorers, renderers, and audit sinks.
+- Public release artifacts, SBOMs, and provenance attestations.
+
+## What Service Users Get In Addition
+
+- Managed control plane for approval routing at organizational scale.
+- Enterprise identity and governance integrations.
+- Operational reliability commitments and support SLAs.
+
+## Source of Truth
+
+For release scoping details, see `OSS_SCOPE.md` in the repository root.

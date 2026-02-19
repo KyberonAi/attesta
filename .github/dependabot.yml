@@ -1,0 +1,85 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: UTC
+    labels:
+      - dependencies
+      - security
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: pip
+    directory: /python
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:15"
+      timezone: UTC
+    labels:
+      - dependencies
+      - python
+      - security
+    open-pull-requests-limit: 10
+    groups:
+      python-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /typescript
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:30"
+      timezone: UTC
+    labels:
+      - dependencies
+      - javascript
+      - security
+    open-pull-requests-limit: 10
+    groups:
+      typescript-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /packages/flowise-attesta
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
+      timezone: UTC
+    labels:
+      - dependencies
+      - flowise
+      - security
+    open-pull-requests-limit: 5
+    groups:
+      flowise-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /packages/n8n-nodes-attesta
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: UTC
+    labels:
+      - dependencies
+      - n8n
+      - security
+    open-pull-requests-limit: 5
+    groups:
+      n8n-security:
+        applies-to: security-updates
+        patterns:
+          - "*"

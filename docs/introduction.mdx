@@ -5,7 +5,7 @@ icon: "shield-check"
 ---
 
 <Warning>
-**Early Release (v0.1.x)** — Attesta is under active development. The core API is functional and tested, but interfaces may change between minor versions. Pin your dependency to a specific version in production. [Report issues on GitHub](https://github.com/KyberonAi/attesta/issues).
+**Early Release (v0.1.x)** — Attesta is under active development. The core API is functional and tested, but interfaces may change between minor versions. Pin your dependency to a specific version in production. Report issues through this repository's issue tracker.
 </Warning>
 
 <Note>
@@ -118,7 +118,7 @@ deploy("api-gateway", "2.1.0")
 ```
 
 ```typescript TypeScript
-import { gate } from "@attesta/core";
+import { gate } from "@kyberon/attesta";
 
 const deploy = gate(async (service: string, version: string) => {
   return `Deployed ${service} v${version}`;
@@ -160,6 +160,9 @@ await deploy("api-gateway", "2.1.0");
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" color="#16A34A" href="/quickstart">
     Get up and running in 5 minutes
+  </Card>
+  <Card title="OSS vs Cloud" icon="scale-balanced" color="#15803D" href="/oss-vs-cloud">
+    See the public feature boundary
   </Card>
   <Card title="How It Works" icon="diagram-project" color="#15803D" href="/how-it-works">
     Understand the 4-stage approval pipeline

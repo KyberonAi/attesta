@@ -258,6 +258,9 @@ export interface ApprovalResult {
 
   /** Description of modifications (when verdict is MODIFIED). */
   modification?: string;
+
+  /** Additional pipeline metadata (mode, timeout handling, etc.). */
+  metadata: Record<string, unknown>;
 }
 
 /**
@@ -271,6 +274,7 @@ export function createApprovalResult(
     approvers: [],
     reviewTimeSeconds: 0,
     timestamp: new Date(),
+    metadata: {},
     ...options,
   };
 }

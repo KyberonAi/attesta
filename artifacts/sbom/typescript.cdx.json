@@ -1,0 +1,3982 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "serialNumber": "urn:uuid:f3104da6-be01-4fb3-810a-107a23ef875a",
+  "metadata": {
+    "timestamp": "2026-02-18T02:41:15.991Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "npm",
+          "version": "11.9.0"
+        },
+        {
+          "type": "application",
+          "name": "cyclonedx-npm",
+          "group": "@cyclonedx",
+          "version": "4.1.2",
+          "author": "Jan Kowalleck",
+          "description": "Create CycloneDX Software Bill of Materials (SBOM) from NPM projects.",
+          "licenses": [
+            {
+              "license": {
+                "id": "Apache-2.0"
+              }
+            }
+          ],
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/CycloneDX/cyclonedx-node-npm.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/CycloneDX/cyclonedx-node-npm#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/CycloneDX/cyclonedx-node-npm/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ]
+        },
+        {
+          "type": "library",
+          "name": "cyclonedx-library",
+          "group": "@cyclonedx",
+          "version": "9.4.1",
+          "author": "Jan Kowalleck",
+          "description": "Core functionality of CycloneDX for JavaScript (Node.js or WebBrowser).",
+          "licenses": [
+            {
+              "license": {
+                "id": "Apache-2.0"
+              }
+            }
+          ],
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/CycloneDX/cyclonedx-javascript-library.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/CycloneDX/cyclonedx-javascript-library#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/CycloneDX/cyclonedx-javascript-library/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ]
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "name": "attesta",
+      "bom-ref": "attesta",
+      "purl": "pkg:npm/attesta",
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": ""
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "attesta",
+      "group": "@kyberon",
+      "version": "0.1.0",
+      "bom-ref": "attesta|@kyberon/attesta@0.1.0",
+      "description": "Human-in-the-loop approval framework for AI agent actions",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40kyberon/attesta@0.1.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@kyberon/attesta"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "core",
+      "group": "@langchain",
+      "version": "1.1.25",
+      "bom-ref": "attesta|@langchain/core@1.1.25",
+      "author": "LangChain",
+      "description": "Core LangChain.js abstractions and schemas",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40langchain/core@1.1.25",
+      "externalReferences": [
+        {
+          "url": "git+ssh://git@github.com/langchain-ai/langchainjs.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/langchain-ai/langchainjs/tree/main/langchain-core/",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/langchain-ai/langchainjs/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/@langchain/core/-/core-1.1.25.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "c9b03277ebf782b03744d7a35359412fbd4a9fc38c7a46edbe8ce35c4d748aaaf7d6ee8a36b553ac557a4bd9391ce69d36fadb04ef0aeace8266036fb7819f3a"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@langchain/core"
+        }
+      ],
+      "components": [
+        {
+          "type": "library",
+          "name": "ansi-styles",
+          "version": "6.2.3",
+          "bom-ref": "attesta|@langchain/core@1.1.25|ansi-styles@6.2.3",
+          "author": "Sindre Sorhus",
+          "description": "ANSI escape codes for styling strings in the terminal",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/ansi-styles@6.2.3",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/chalk/ansi-styles.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/chalk/ansi-styles#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/chalk/ansi-styles/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            },
+            {
+              "url": "https://registry.npmjs.org/ansi-styles/-/ansi-styles-6.2.3.tgz",
+              "type": "distribution",
+              "hashes": [
+                {
+                  "alg": "SHA-512",
+                  "content": "e038fa336f0907ea001fc9059132d4a3e6b68f038592ea9bdf2b9c53408035c45151bc52d1c3f49d96021a371cdc1357c1122c5159831a0cdac267bbcef247be"
+                }
+              ],
+              "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/@langchain/core/node_modules/ansi-styles"
+            }
+          ]
+        },
+        {
+          "type": "library",
+          "name": "langsmith",
+          "version": "0.5.4",
+          "bom-ref": "attesta|@langchain/core@1.1.25|langsmith@0.5.4",
+          "author": "LangChain",
+          "description": "Client library to connect to the LangSmith Observability and Evaluation Platform.",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/langsmith@0.5.4",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/langchain-ai/langsmith-sdk.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/langchain-ai/langsmith-sdk#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/langchain-ai/langsmith-sdk/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            },
+            {
+              "url": "https://registry.npmjs.org/langsmith/-/langsmith-0.5.4.tgz",
+              "type": "distribution",
+              "hashes": [
+                {
+                  "alg": "SHA-512",
+                  "content": "a9890d2282a97f4658b7e718ceb0d5f972371427b10299999a9f0432cdde0d332fd0ebeb1cc2e8c49f48a647a85c9497db8f863e4d3f8d78cac768567aba72f7"
+                }
+              ],
+              "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/@langchain/core/node_modules/langsmith"
+            }
+          ]
+        },
+        {
+          "type": "library",
+          "name": "chalk",
+          "version": "4.1.2",
+          "bom-ref": "attesta|@langchain/core@1.1.25|chalk@4.1.2",
+          "description": "Terminal string styling done right",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/chalk@4.1.2",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/chalk/chalk.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/chalk/chalk#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/chalk/chalk/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            },
+            {
+              "url": "https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz",
+              "type": "distribution",
+              "hashes": [
+                {
+                  "alg": "SHA-512",
+                  "content": "a0a9db845c91217a54b9ecfc881326c846b89db8f820e432ba173fc32f6463bfd654f73020ef5503aebc3eef1190eefed06efa48b44e7b2c3d0a9434eb58b898"
+                }
+              ],
+              "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/@langchain/core/node_modules/chalk"
+            }
+          ],
+          "components": [
+            {
+              "type": "library",
+              "name": "ansi-styles",
+              "version": "4.3.0",
+              "bom-ref": "attesta|@langchain/core@1.1.25|chalk@4.1.2|ansi-styles@4.3.0",
+              "author": "Sindre Sorhus",
+              "description": "ANSI escape codes for styling strings in the terminal",
+              "licenses": [
+                {
+                  "license": {
+                    "id": "MIT",
+                    "acknowledgement": "declared"
+                  }
+                }
+              ],
+              "purl": "pkg:npm/ansi-styles@4.3.0",
+              "externalReferences": [
+                {
+                  "url": "git+https://github.com/chalk/ansi-styles.git",
+                  "type": "vcs",
+                  "comment": "as detected from PackageJson property \"repository.url\""
+                },
+                {
+                  "url": "https://github.com/chalk/ansi-styles#readme",
+                  "type": "website",
+                  "comment": "as detected from PackageJson property \"homepage\""
+                },
+                {
+                  "url": "https://github.com/chalk/ansi-styles/issues",
+                  "type": "issue-tracker",
+                  "comment": "as detected from PackageJson property \"bugs.url\""
+                },
+                {
+                  "url": "https://registry.npmjs.org/ansi-styles/-/ansi-styles-4.3.0.tgz",
+                  "type": "distribution",
+                  "hashes": [
+                    {
+                      "alg": "SHA-512",
+                      "content": "cdb07dac22404f5adb8e25436f686a2851cd60bc60b64f0d511c59dc86700f717a36dc5b5d94029e74a2d4b931f880e885d3e5169db6db05402c885e64941212"
+                    }
+                  ],
+                  "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+                }
+              ],
+              "properties": [
+                {
+                  "name": "cdx:npm:package:development",
+                  "value": "true"
+                },
+                {
+                  "name": "cdx:npm:package:path",
+                  "value": "node_modules/@langchain/core/node_modules/chalk/node_modules/ansi-styles"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "chalk",
+      "version": "5.6.2",
+      "bom-ref": "attesta|chalk@5.6.2",
+      "description": "Terminal string styling done right",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/chalk@5.6.2",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/chalk/chalk.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/chalk/chalk#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/chalk/chalk/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/chalk/-/chalk-5.6.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "ecdcc12f4acde9f3145be7fb03a228e21e34a90946fb11a6b4cc5f6e71ff2bb4c0b6df094165502beea0d145ca31e549a3257912490db04ad0f29543ddb2c76c"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/chalk"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript",
+      "version": "5.9.3",
+      "bom-ref": "attesta|typescript@5.9.3",
+      "author": "Microsoft Corp.",
+      "description": "TypeScript is a language for application scale JavaScript development",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/typescript@5.9.3?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fmicrosoft%2FTypeScript.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/microsoft/TypeScript.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://www.typescriptlang.org/",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/microsoft/TypeScript/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/typescript"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "json-schema",
+      "group": "@cfworker",
+      "version": "4.1.1",
+      "bom-ref": "attesta|@cfworker/json-schema@4.1.1",
+      "author": "Jeremy Danyow",
+      "description": "A JSON schema validator that will run on Cloudflare workers. Supports drafts 4, 7, 2019-09, and 2020-12.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40cfworker/json-schema@4.1.1",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/cfworker/cfworker.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/cfworker/cfworker/tree/master/packages/json-schema/README.md",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/cfworker/cfworker/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/@cfworker/json-schema/-/json-schema-4.1.1.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "8009ab519486b4a73702204bef588d5b10ecc940b9b8c68a28676fcd8b01a135bfc62e362501e5ede295d8e633094aaf73e0f644271fec45d8da20b214893aa2"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@cfworker/json-schema"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "camelcase",
+      "version": "6.3.0",
+      "bom-ref": "attesta|camelcase@6.3.0",
+      "author": "Sindre Sorhus",
+      "description": "Convert a dash/dot/underscore/space separated string to camelCase or PascalCase: `foo-bar` → `fooBar`",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/camelcase@6.3.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fsindresorhus%2Fcamelcase.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/sindresorhus/camelcase.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/camelcase#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/camelcase/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/camelcase"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "decamelize",
+      "version": "1.2.0",
+      "bom-ref": "attesta|decamelize@1.2.0",
+      "author": "Sindre Sorhus",
+      "description": "Convert a camelized string into a lowercased one with a custom separator: unicornRainbow → unicorn_rainbow",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/decamelize@1.2.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fsindresorhus%2Fdecamelize.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/sindresorhus/decamelize.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/decamelize#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/decamelize/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/decamelize"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "js-tiktoken",
+      "version": "1.0.21",
+      "bom-ref": "attesta|js-tiktoken@1.0.21",
+      "description": "JavaScript port of tiktoken",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/js-tiktoken@1.0.21?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fdqbd%2Ftiktoken.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/dqbd/tiktoken.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/dqbd/tiktoken#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/dqbd/tiktoken/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/js-tiktoken"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "mustache",
+      "version": "4.2.0",
+      "bom-ref": "attesta|mustache@4.2.0",
+      "author": "mustache.js Authors",
+      "description": "Logic-less {{mustache}} templates with JavaScript",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/mustache@4.2.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fjanl%2Fmustache.js.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/janl/mustache.js.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/janl/mustache.js",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/janl/mustache.js/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/mustache"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "p-queue",
+      "version": "6.6.2",
+      "bom-ref": "attesta|p-queue@6.6.2",
+      "description": "Promise queue with concurrency control",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/p-queue@6.6.2?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fsindresorhus%2Fp-queue.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/sindresorhus/p-queue.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/p-queue#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/p-queue/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/p-queue"
+        }
+      ],
+      "components": [
+        {
+          "type": "library",
+          "name": "eventemitter3",
+          "version": "4.0.7",
+          "bom-ref": "attesta|p-queue@6.6.2|eventemitter3@4.0.7",
+          "author": "Arnout Kazemier",
+          "description": "EventEmitter3 focuses on performance while maintaining a Node.js AND browser compatible interface.",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/eventemitter3@4.0.7?vcs_url=git%3A%2F%2Fgithub.com%2Fprimus%2Feventemitter3.git",
+          "externalReferences": [
+            {
+              "url": "git://github.com/primus/eventemitter3.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/primus/eventemitter3#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/primus/eventemitter3/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/p-queue/node_modules/eventemitter3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "uuid",
+      "version": "10.0.0",
+      "bom-ref": "attesta|uuid@10.0.0",
+      "description": "RFC9562 UUIDs",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/uuid@10.0.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fuuidjs%2Fuuid.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/uuidjs/uuid.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/uuidjs/uuid#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/uuidjs/uuid/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/uuid"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "zod",
+      "version": "3.25.76",
+      "bom-ref": "attesta|zod@3.25.76",
+      "author": "Colin McDonnell",
+      "description": "TypeScript-first schema declaration and validation library with static type inference",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/zod@3.25.76?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fcolinhacks%2Fzod.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/colinhacks/zod.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://zod.dev",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/colinhacks/zod/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/zod"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "base64-js",
+      "version": "1.5.1",
+      "bom-ref": "attesta|base64-js@1.5.1",
+      "author": "T. Jameson Little",
+      "description": "Base64 encoding/decoding in pure JS",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/base64-js@1.5.1?vcs_url=git%3A%2F%2Fgithub.com%2Fbeatgammit%2Fbase64-js.git",
+      "externalReferences": [
+        {
+          "url": "git://github.com/beatgammit/base64-js.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/beatgammit/base64-js",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/beatgammit/base64-js/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/base64-js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "api",
+      "group": "@opentelemetry",
+      "version": "1.9.0",
+      "bom-ref": "attesta|@opentelemetry/api@1.9.0",
+      "author": "OpenTelemetry Authors",
+      "description": "Public API for OpenTelemetry",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40opentelemetry/api@1.9.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-js.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/open-telemetry/opentelemetry-js.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/open-telemetry/opentelemetry-js/tree/main/api",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/open-telemetry/opentelemetry-js/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@opentelemetry/api"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "sdk-trace-base",
+      "group": "@opentelemetry",
+      "version": "1.30.1",
+      "bom-ref": "attesta|@opentelemetry/sdk-trace-base@1.30.1",
+      "author": "OpenTelemetry Authors",
+      "description": "OpenTelemetry Tracing",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40opentelemetry/sdk-trace-base@1.30.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-js.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/open-telemetry/opentelemetry-js.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/open-telemetry/opentelemetry-js/tree/main/packages/opentelemetry-sdk-trace-base",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/open-telemetry/opentelemetry-js/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@opentelemetry/sdk-trace-base"
+        }
+      ],
+      "components": [
+        {
+          "type": "library",
+          "name": "core",
+          "group": "@opentelemetry",
+          "version": "1.30.1",
+          "bom-ref": "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/core@1.30.1",
+          "author": "OpenTelemetry Authors",
+          "description": "OpenTelemetry Core provides constants and utilities shared by all OpenTelemetry SDK packages.",
+          "licenses": [
+            {
+              "license": {
+                "id": "Apache-2.0",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/%40opentelemetry/core@1.30.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-js.git",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/open-telemetry/opentelemetry-js.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/open-telemetry/opentelemetry-js/tree/main/packages/opentelemetry-core",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/open-telemetry/opentelemetry-js/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/@opentelemetry/sdk-trace-base/node_modules/@opentelemetry/core"
+            }
+          ]
+        },
+        {
+          "type": "library",
+          "name": "resources",
+          "group": "@opentelemetry",
+          "version": "1.30.1",
+          "bom-ref": "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/resources@1.30.1",
+          "author": "OpenTelemetry Authors",
+          "description": "OpenTelemetry SDK resources",
+          "licenses": [
+            {
+              "license": {
+                "id": "Apache-2.0",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/%40opentelemetry/resources@1.30.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-js.git",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/open-telemetry/opentelemetry-js.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/open-telemetry/opentelemetry-js/tree/main/packages/opentelemetry-resources",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/open-telemetry/opentelemetry-js/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/@opentelemetry/sdk-trace-base/node_modules/@opentelemetry/resources"
+            }
+          ]
+        },
+        {
+          "type": "library",
+          "name": "semantic-conventions",
+          "group": "@opentelemetry",
+          "version": "1.28.0",
+          "bom-ref": "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/semantic-conventions@1.28.0",
+          "author": "OpenTelemetry Authors",
+          "description": "OpenTelemetry semantic conventions",
+          "licenses": [
+            {
+              "license": {
+                "id": "Apache-2.0",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/%40opentelemetry/semantic-conventions@1.28.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-js.git",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/open-telemetry/opentelemetry-js.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/open-telemetry/opentelemetry-js/tree/main/semantic-conventions",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/open-telemetry/opentelemetry-js/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/@opentelemetry/sdk-trace-base/node_modules/@opentelemetry/semantic-conventions"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "uuid",
+      "group": "@types",
+      "version": "10.0.0",
+      "bom-ref": "attesta|@types/uuid@10.0.0",
+      "description": "TypeScript definitions for uuid",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40types/uuid@10.0.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2FDefinitelyTyped%2FDefinitelyTyped.git#types/uuid",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/DefinitelyTyped/DefinitelyTyped.git#types/uuid",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\" and \"repository.directory\""
+        },
+        {
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/uuid",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@types/uuid"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "console-table-printer",
+      "version": "2.15.0",
+      "bom-ref": "attesta|console-table-printer@2.15.0",
+      "author": "Nahiyan Kamal",
+      "description": "Printing pretty tables on console log",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/console-table-printer@2.15.0",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/console-table-printer/console-table-printer.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://console-table.netlify.app",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/console-table-printer/console-table-printer/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/console-table-printer/-/console-table-printer-2.15.0.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "4ab841ab88585632c290154e59a4f371e25a96f9f92b566ae5a400eb05c2fdc6232377eb29634f10c2b7b19b097cd350029bc242680171cd7764a9858fca84c7"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/console-table-printer"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "openai",
+      "version": "4.104.0",
+      "bom-ref": "attesta|openai@4.104.0",
+      "author": "OpenAI",
+      "description": "The official TypeScript library for the OpenAI API",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/openai@4.104.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fopenai%2Fopenai-node.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/openai/openai-node.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/openai/openai-node#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/openai/openai-node/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/openai"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "semver",
+      "version": "7.7.4",
+      "bom-ref": "attesta|semver@7.7.4",
+      "author": "GitHub Inc.",
+      "description": "The semantic version parser used by npm.",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/semver@7.7.4?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fnpm%2Fnode-semver.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/npm/node-semver.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/npm/node-semver#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/npm/node-semver/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/semver"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "p-timeout",
+      "version": "3.2.0",
+      "bom-ref": "attesta|p-timeout@3.2.0",
+      "author": "Sindre Sorhus",
+      "description": "Timeout a promise after a specified amount of time",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/p-timeout@3.2.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fsindresorhus%2Fp-timeout.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/sindresorhus/p-timeout.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/p-timeout#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/p-timeout/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/p-timeout"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "supports-color",
+      "version": "7.2.0",
+      "bom-ref": "attesta|supports-color@7.2.0",
+      "author": "Sindre Sorhus",
+      "description": "Detect whether a terminal supports color",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/supports-color@7.2.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fchalk%2Fsupports-color.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/chalk/supports-color.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/chalk/supports-color#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/chalk/supports-color/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/supports-color"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "simple-wcswidth",
+      "version": "1.1.2",
+      "bom-ref": "attesta|simple-wcswidth@1.1.2",
+      "author": "Nahiyan Kamal",
+      "description": "Simplified JS/TS implementation of wcswidth() written by Markus Kuhn in C",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/simple-wcswidth@1.1.2",
+      "externalReferences": [
+        {
+          "url": "git+ssh://git@github.com/console-table-printer/simple-wcswidth.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/console-table-printer/simple-wcswidth#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/console-table-printer/simple-wcswidth/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/simple-wcswidth/-/simple-wcswidth-1.1.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "8fba62c828c07930d28f34d243b0e8919b4c370365100cb1a9265e092f825c7edf2788f1dc5b89fe64d6de613ee892ece152416dc965d0a8e7f8a5c8e6ddb523"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/simple-wcswidth"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "node-fetch",
+      "group": "@types",
+      "version": "2.6.13",
+      "bom-ref": "attesta|@types/node-fetch@2.6.13",
+      "description": "TypeScript definitions for node-fetch",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40types/node-fetch@2.6.13?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2FDefinitelyTyped%2FDefinitelyTyped.git#types/node-fetch",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/DefinitelyTyped/DefinitelyTyped.git#types/node-fetch",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\" and \"repository.directory\""
+        },
+        {
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node-fetch",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@types/node-fetch"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "node",
+      "group": "@types",
+      "version": "18.19.130",
+      "bom-ref": "attesta|@types/node@18.19.130",
+      "description": "TypeScript definitions for node",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40types/node@18.19.130?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2FDefinitelyTyped%2FDefinitelyTyped.git#types/node",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/DefinitelyTyped/DefinitelyTyped.git#types/node",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\" and \"repository.directory\""
+        },
+        {
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@types/node"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "abort-controller",
+      "version": "3.0.0",
+      "bom-ref": "attesta|abort-controller@3.0.0",
+      "author": "Toru Nagashima",
+      "description": "An implementation of WHATWG AbortController interface.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/abort-controller@3.0.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fmysticatea%2Fabort-controller.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/mysticatea/abort-controller.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/mysticatea/abort-controller#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/mysticatea/abort-controller/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/abort-controller"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "agentkeepalive",
+      "version": "4.6.0",
+      "bom-ref": "attesta|agentkeepalive@4.6.0",
+      "author": "fengmk2",
+      "description": "Missing keepalive http.Agent",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/agentkeepalive@4.6.0?vcs_url=git%3A%2F%2Fgithub.com%2Fnode-modules%2Fagentkeepalive.git",
+      "externalReferences": [
+        {
+          "url": "git://github.com/node-modules/agentkeepalive.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/node-modules/agentkeepalive#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/node-modules/agentkeepalive/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/agentkeepalive"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "form-data-encoder",
+      "version": "1.7.2",
+      "bom-ref": "attesta|form-data-encoder@1.7.2",
+      "author": "Nick K.",
+      "description": "Encode FormData content into the multipart/form-data format",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/form-data-encoder@1.7.2?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Foctet-stream%2Fform-data-encoder.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/octet-stream/form-data-encoder.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/octet-stream/form-data-encoder#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/octet-stream/form-data-encoder/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/form-data-encoder"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "formdata-node",
+      "version": "4.4.1",
+      "bom-ref": "attesta|formdata-node@4.4.1",
+      "author": "Nick K.",
+      "description": "Spec-compliant FormData implementation for Node.js",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/formdata-node@4.4.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Foctet-stream%2Fform-data.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/octet-stream/form-data.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/octet-stream/form-data#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/octet-stream/form-data/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/formdata-node"
+        }
+      ],
+      "components": [
+        {
+          "type": "library",
+          "name": "web-streams-polyfill",
+          "version": "4.0.0-beta.3",
+          "bom-ref": "attesta|formdata-node@4.4.1|web-streams-polyfill@4.0.0-beta.3",
+          "author": "Mattias Buelens",
+          "description": "Web Streams, based on the WHATWG spec reference implementation",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/web-streams-polyfill@4.0.0-beta.3?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2FMattiasBuelens%2Fweb-streams-polyfill.git",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/MattiasBuelens/web-streams-polyfill.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/MattiasBuelens/web-streams-polyfill#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/MattiasBuelens/web-streams-polyfill/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/formdata-node/node_modules/web-streams-polyfill"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "node-fetch",
+      "version": "2.7.0",
+      "bom-ref": "attesta|node-fetch@2.7.0",
+      "author": "David Frank",
+      "description": "A light-weight module that brings window.fetch to node.js",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/node-fetch@2.7.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fbitinn%2Fnode-fetch.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/bitinn/node-fetch.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/bitinn/node-fetch",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/bitinn/node-fetch/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/node-fetch"
+        }
+      ],
+      "components": [
+        {
+          "type": "library",
+          "name": "whatwg-url",
+          "version": "5.0.0",
+          "bom-ref": "attesta|node-fetch@2.7.0|whatwg-url@5.0.0",
+          "author": "Sebastian Mayr",
+          "description": "An implementation of the WHATWG URL Standard's URL API and parsing machinery",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/whatwg-url@5.0.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fjsdom%2Fwhatwg-url.git",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/jsdom/whatwg-url.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/jsdom/whatwg-url#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/jsdom/whatwg-url/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/node-fetch/node_modules/whatwg-url"
+            }
+          ]
+        },
+        {
+          "type": "library",
+          "name": "tr46",
+          "version": "0.0.3",
+          "bom-ref": "attesta|node-fetch@2.7.0|tr46@0.0.3",
+          "author": "Sebastian Mayr",
+          "description": "An implementation of the Unicode TR46 spec",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/tr46@0.0.3?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2FSebmaster%2Ftr46.js.git",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/Sebmaster/tr46.js.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/Sebmaster/tr46.js#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/Sebmaster/tr46.js/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/node-fetch/node_modules/tr46"
+            }
+          ]
+        },
+        {
+          "type": "library",
+          "name": "webidl-conversions",
+          "version": "3.0.1",
+          "bom-ref": "attesta|node-fetch@2.7.0|webidl-conversions@3.0.1",
+          "author": "Domenic Denicola",
+          "description": "Implements the WebIDL algorithms for converting to and from JavaScript values",
+          "licenses": [
+            {
+              "license": {
+                "id": "BSD-2-Clause",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/webidl-conversions@3.0.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fjsdom%2Fwebidl-conversions.git",
+          "externalReferences": [
+            {
+              "url": "git+https://github.com/jsdom/webidl-conversions.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/jsdom/webidl-conversions#readme",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/jsdom/webidl-conversions/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/node-fetch/node_modules/webidl-conversions"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ws",
+      "version": "8.19.0",
+      "bom-ref": "attesta|ws@8.19.0",
+      "author": "Einar Otto Stangvik",
+      "description": "Simple to use, blazing fast and thoroughly tested websocket client and server for Node.js",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/ws@8.19.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fwebsockets%2Fws.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/websockets/ws.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/websockets/ws",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/websockets/ws/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/ws"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "p-finally",
+      "version": "1.0.0",
+      "bom-ref": "attesta|p-finally@1.0.0",
+      "author": "Sindre Sorhus",
+      "description": "`Promise#finally()` ponyfill - Invoked when the promise is settled regardless of outcome",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/p-finally@1.0.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fsindresorhus%2Fp-finally.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/sindresorhus/p-finally.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/p-finally#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/p-finally/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/p-finally"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "color-convert",
+      "version": "2.0.1",
+      "bom-ref": "attesta|color-convert@2.0.1",
+      "author": "Heather Arthur",
+      "description": "Plain color conversion functions",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/color-convert@2.0.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2FQix-%2Fcolor-convert.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/Qix-/color-convert.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/Qix-/color-convert#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/Qix-/color-convert/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/color-convert"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "has-flag",
+      "version": "4.0.0",
+      "bom-ref": "attesta|has-flag@4.0.0",
+      "author": "Sindre Sorhus",
+      "description": "Check if argv has a specific flag",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/has-flag@4.0.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fsindresorhus%2Fhas-flag.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/sindresorhus/has-flag.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/has-flag#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/sindresorhus/has-flag/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/has-flag"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "form-data",
+      "version": "4.0.5",
+      "bom-ref": "attesta|form-data@4.0.5",
+      "author": "Felix Geisendörfer",
+      "description": "A library to create readable \"multipart/form-data\" streams. Can be used to submit forms and file uploads to other web applications.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/form-data@4.0.5?vcs_url=git%3A%2F%2Fgithub.com%2Fform-data%2Fform-data.git",
+      "externalReferences": [
+        {
+          "url": "git://github.com/form-data/form-data.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/form-data/form-data#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/form-data/form-data/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/form-data"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "undici-types",
+      "version": "5.26.5",
+      "bom-ref": "attesta|undici-types@5.26.5",
+      "description": "A stand-alone types package for Undici",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/undici-types@5.26.5?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fnodejs%2Fundici.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/nodejs/undici.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://undici.nodejs.org",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/nodejs/undici/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/undici-types"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "event-target-shim",
+      "version": "5.0.1",
+      "bom-ref": "attesta|event-target-shim@5.0.1",
+      "author": "Toru Nagashima",
+      "description": "An implementation of WHATWG EventTarget interface.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/event-target-shim@5.0.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fmysticatea%2Fevent-target-shim.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/mysticatea/event-target-shim.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/mysticatea/event-target-shim",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/mysticatea/event-target-shim/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/event-target-shim"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "humanize-ms",
+      "version": "1.2.1",
+      "bom-ref": "attesta|humanize-ms@1.2.1",
+      "author": "dead-horse",
+      "description": "transform humanize time to ms",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/humanize-ms@1.2.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fnode-modules%2Fhumanize-ms.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/node-modules/humanize-ms.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/node-modules/humanize-ms#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/node-modules/humanize-ms/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/humanize-ms"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "node-domexception",
+      "version": "1.0.0",
+      "bom-ref": "attesta|node-domexception@1.0.0",
+      "author": "Jimmy Wärting",
+      "description": "An implementation of the DOMException class from NodeJS",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/node-domexception@1.0.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fjimmywarting%2Fnode-domexception.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/jimmywarting/node-domexception.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/jimmywarting/node-domexception#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/jimmywarting/node-domexception/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/node-domexception"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "encoding",
+      "version": "0.1.13",
+      "bom-ref": "attesta|encoding@0.1.13",
+      "author": "Andris Reinman",
+      "description": "Convert encodings, uses iconv-lite",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/encoding@0.1.13?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fandris9%2Fencoding.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/andris9/encoding.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/andris9/encoding#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/andris9/encoding/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/encoding"
+        }
+      ],
+      "components": [
+        {
+          "type": "library",
+          "name": "iconv-lite",
+          "version": "0.6.3",
+          "bom-ref": "attesta|encoding@0.1.13|iconv-lite@0.6.3",
+          "author": "Alexander Shtuchkin",
+          "description": "Convert character encodings in pure javascript.",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "acknowledgement": "declared"
+              }
+            }
+          ],
+          "purl": "pkg:npm/iconv-lite@0.6.3?vcs_url=git%3A%2F%2Fgithub.com%2Fashtuchkin%2Ficonv-lite.git",
+          "externalReferences": [
+            {
+              "url": "git://github.com/ashtuchkin/iconv-lite.git",
+              "type": "vcs",
+              "comment": "as detected from PackageJson property \"repository.url\""
+            },
+            {
+              "url": "https://github.com/ashtuchkin/iconv-lite",
+              "type": "website",
+              "comment": "as detected from PackageJson property \"homepage\""
+            },
+            {
+              "url": "https://github.com/ashtuchkin/iconv-lite/issues",
+              "type": "issue-tracker",
+              "comment": "as detected from PackageJson property \"bugs.url\""
+            }
+          ],
+          "properties": [
+            {
+              "name": "cdx:npm:package:development",
+              "value": "true"
+            },
+            {
+              "name": "cdx:npm:package:path",
+              "value": "node_modules/encoding/node_modules/iconv-lite"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "bufferutil",
+      "version": "4.1.0",
+      "bom-ref": "attesta|bufferutil@4.1.0",
+      "author": "Einar Otto Stangvik",
+      "description": "WebSocket buffer utils",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/bufferutil@4.1.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fwebsockets%2Fbufferutil.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/websockets/bufferutil.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/websockets/bufferutil",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/websockets/bufferutil/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/bufferutil"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "utf-8-validate",
+      "version": "6.0.6",
+      "bom-ref": "attesta|utf-8-validate@6.0.6",
+      "author": "Einar Otto Stangvik",
+      "description": "Check if a buffer contains valid UTF-8",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/utf-8-validate@6.0.6?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fwebsockets%2Futf-8-validate.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/websockets/utf-8-validate.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/websockets/utf-8-validate",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/websockets/utf-8-validate/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/utf-8-validate"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "color-name",
+      "version": "1.1.4",
+      "bom-ref": "attesta|color-name@1.1.4",
+      "author": "DY",
+      "description": "A list of color names and its values",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/color-name@1.1.4?vcs_url=git%2Bssh%3A%2F%2Fgit%40github.com%2Fcolorjs%2Fcolor-name.git",
+      "externalReferences": [
+        {
+          "url": "git+ssh://git@github.com/colorjs/color-name.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/colorjs/color-name",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/colorjs/color-name/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/color-name"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "asynckit",
+      "version": "0.4.0",
+      "bom-ref": "attesta|asynckit@0.4.0",
+      "author": "Alex Indigo",
+      "description": "Minimal async jobs utility library, with streams support",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/asynckit@0.4.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Falexindigo%2Fasynckit.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/alexindigo/asynckit.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/alexindigo/asynckit#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/alexindigo/asynckit/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/asynckit"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "combined-stream",
+      "version": "1.0.8",
+      "bom-ref": "attesta|combined-stream@1.0.8",
+      "author": "Felix Geisendörfer",
+      "description": "A stream that emits multiple other streams one after another.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/combined-stream@1.0.8?vcs_url=git%3A%2F%2Fgithub.com%2Ffelixge%2Fnode-combined-stream.git",
+      "externalReferences": [
+        {
+          "url": "git://github.com/felixge/node-combined-stream.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/felixge/node-combined-stream",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/felixge/node-combined-stream/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/combined-stream"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "es-set-tostringtag",
+      "version": "2.1.0",
+      "bom-ref": "attesta|es-set-tostringtag@2.1.0",
+      "author": "Jordan Harband",
+      "description": "A helper to optimistically set Symbol.toStringTag, when possible.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/es-set-tostringtag@2.1.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fes-shims%2Fes-set-tostringtag.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/es-shims/es-set-tostringtag.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/es-shims/es-set-tostringtag#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/es-shims/es-set-tostringtag/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/es-set-tostringtag"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "hasown",
+      "version": "2.0.2",
+      "bom-ref": "attesta|hasown@2.0.2",
+      "author": "Jordan Harband",
+      "description": "A robust, ES3 compatible, \"has own property\" predicate.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/hasown@2.0.2?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Finspect-js%2FhasOwn.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/inspect-js/hasOwn.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/inspect-js/hasOwn#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/inspect-js/hasOwn/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/hasown"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "mime-types",
+      "version": "2.1.35",
+      "bom-ref": "attesta|mime-types@2.1.35",
+      "description": "The ultimate javascript content-type utility.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/mime-types@2.1.35?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fjshttp%2Fmime-types.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/jshttp/mime-types.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/jshttp/mime-types#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/jshttp/mime-types/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/mime-types"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ms",
+      "version": "2.1.3",
+      "bom-ref": "attesta|ms@2.1.3",
+      "description": "Tiny millisecond conversion utility",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/ms@2.1.3?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fvercel%2Fms.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/vercel/ms.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/vercel/ms#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/vercel/ms/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/ms"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "node-gyp-build",
+      "version": "4.8.4",
+      "bom-ref": "attesta|node-gyp-build@4.8.4",
+      "author": "Mathias Buus",
+      "description": "Build tool and bindings loader for node-gyp that supports prebuilds",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/node-gyp-build@4.8.4?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fprebuild%2Fnode-gyp-build.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/prebuild/node-gyp-build.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/prebuild/node-gyp-build",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/prebuild/node-gyp-build/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/node-gyp-build"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "delayed-stream",
+      "version": "1.0.0",
+      "bom-ref": "attesta|delayed-stream@1.0.0",
+      "author": "Felix Geisendörfer",
+      "description": "Buffers events from a stream until you are ready to handle them.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/delayed-stream@1.0.0?vcs_url=git%3A%2F%2Fgithub.com%2Ffelixge%2Fnode-delayed-stream.git",
+      "externalReferences": [
+        {
+          "url": "git://github.com/felixge/node-delayed-stream.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/felixge/node-delayed-stream",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/felixge/node-delayed-stream/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/delayed-stream"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "es-errors",
+      "version": "1.3.0",
+      "bom-ref": "attesta|es-errors@1.3.0",
+      "author": "Jordan Harband",
+      "description": "A simple cache for a few of the JS Error constructors.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/es-errors@1.3.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fljharb%2Fes-errors.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/ljharb/es-errors.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/ljharb/es-errors#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/ljharb/es-errors/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/es-errors"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "get-intrinsic",
+      "version": "1.3.0",
+      "bom-ref": "attesta|get-intrinsic@1.3.0",
+      "author": "Jordan Harband",
+      "description": "Get and robustly cache all JS language-level intrinsics at first require time",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/get-intrinsic@1.3.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fljharb%2Fget-intrinsic.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/ljharb/get-intrinsic.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/ljharb/get-intrinsic#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/ljharb/get-intrinsic/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/get-intrinsic"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "has-tostringtag",
+      "version": "1.0.2",
+      "bom-ref": "attesta|has-tostringtag@1.0.2",
+      "author": "Jordan Harband",
+      "description": "Determine if the JS environment has `Symbol.toStringTag` support. Supports spec, or shams.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/has-tostringtag@1.0.2?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Finspect-js%2Fhas-tostringtag.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/inspect-js/has-tostringtag.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/inspect-js/has-tostringtag#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/inspect-js/has-tostringtag/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/has-tostringtag"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "function-bind",
+      "version": "1.1.2",
+      "bom-ref": "attesta|function-bind@1.1.2",
+      "author": "Raynos",
+      "description": "Implementation of Function.prototype.bind",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/function-bind@1.1.2?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2FRaynos%2Ffunction-bind.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/Raynos/function-bind.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/Raynos/function-bind",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/Raynos/function-bind/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/function-bind"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "mime-db",
+      "version": "1.52.0",
+      "bom-ref": "attesta|mime-db@1.52.0",
+      "description": "Media Type Database",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/mime-db@1.52.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fjshttp%2Fmime-db.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/jshttp/mime-db.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/jshttp/mime-db#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/jshttp/mime-db/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/mime-db"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "safer-buffer",
+      "version": "2.1.2",
+      "bom-ref": "attesta|safer-buffer@2.1.2",
+      "author": "Nikita Skovoroda",
+      "description": "Modern Buffer API polyfill without footguns",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/safer-buffer@2.1.2?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2FChALkeR%2Fsafer-buffer.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/ChALkeR/safer-buffer.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/ChALkeR/safer-buffer#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/ChALkeR/safer-buffer/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/safer-buffer"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "call-bind-apply-helpers",
+      "version": "1.0.2",
+      "bom-ref": "attesta|call-bind-apply-helpers@1.0.2",
+      "author": "Jordan Harband",
+      "description": "Helper functions around Function call/apply/bind, for use in `call-bind`",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/call-bind-apply-helpers@1.0.2?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fljharb%2Fcall-bind-apply-helpers.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/ljharb/call-bind-apply-helpers.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/ljharb/call-bind-apply-helpers#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/ljharb/call-bind-apply-helpers/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/call-bind-apply-helpers"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "es-define-property",
+      "version": "1.0.1",
+      "bom-ref": "attesta|es-define-property@1.0.1",
+      "author": "Jordan Harband",
+      "description": "`Object.defineProperty`, but not IE 8's broken one.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/es-define-property@1.0.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fljharb%2Fes-define-property.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/ljharb/es-define-property.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/ljharb/es-define-property#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/ljharb/es-define-property/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/es-define-property"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "es-object-atoms",
+      "version": "1.1.1",
+      "bom-ref": "attesta|es-object-atoms@1.1.1",
+      "author": "Jordan Harband",
+      "description": "ES Object-related atoms: Object, ToObject, RequireObjectCoercible",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/es-object-atoms@1.1.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fljharb%2Fes-object-atoms.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/ljharb/es-object-atoms.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/ljharb/es-object-atoms#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/ljharb/es-object-atoms/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/es-object-atoms"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "get-proto",
+      "version": "1.0.1",
+      "bom-ref": "attesta|get-proto@1.0.1",
+      "author": "Jordan Harband",
+      "description": "Robustly get the [[Prototype]] of an object",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/get-proto@1.0.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fljharb%2Fget-proto.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/ljharb/get-proto.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/ljharb/get-proto#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/ljharb/get-proto/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/get-proto"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "gopd",
+      "version": "1.2.0",
+      "bom-ref": "attesta|gopd@1.2.0",
+      "author": "Jordan Harband",
+      "description": "`Object.getOwnPropertyDescriptor`, but accounts for IE's broken implementation.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/gopd@1.2.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fljharb%2Fgopd.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/ljharb/gopd.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/ljharb/gopd#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/ljharb/gopd/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/gopd"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "has-symbols",
+      "version": "1.1.0",
+      "bom-ref": "attesta|has-symbols@1.1.0",
+      "author": "Jordan Harband",
+      "description": "Determine if the JS environment has Symbol support. Supports spec, or shams.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/has-symbols@1.1.0?vcs_url=git%3A%2F%2Fgithub.com%2Finspect-js%2Fhas-symbols.git",
+      "externalReferences": [
+        {
+          "url": "git://github.com/inspect-js/has-symbols.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/ljharb/has-symbols#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/ljharb/has-symbols/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/has-symbols"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "math-intrinsics",
+      "version": "1.1.0",
+      "bom-ref": "attesta|math-intrinsics@1.1.0",
+      "author": "Jordan Harband",
+      "description": "ES Math-related intrinsics and helpers, robustly cached.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/math-intrinsics@1.1.0?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fes-shims%2Fmath-intrinsics.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/es-shims/math-intrinsics.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/es-shims/math-intrinsics#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/es-shims/math-intrinsics/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/math-intrinsics"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "dunder-proto",
+      "version": "1.0.1",
+      "bom-ref": "attesta|dunder-proto@1.0.1",
+      "author": "Jordan Harband",
+      "description": "If available, the `Object.prototype.__proto__` accessor and mutator, call-bound",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/dunder-proto@1.0.1?vcs_url=git%2Bhttps%3A%2F%2Fgithub.com%2Fes-shims%2Fdunder-proto.git",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/es-shims/dunder-proto.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/es-shims/dunder-proto#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/es-shims/dunder-proto/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/dunder-proto"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "attesta",
+      "dependsOn": [
+        "attesta|@kyberon/attesta@0.1.0"
+      ]
+    },
+    {
+      "ref": "attesta|@kyberon/attesta@0.1.0",
+      "dependsOn": [
+        "attesta|@langchain/core@1.1.25",
+        "attesta|chalk@5.6.2",
+        "attesta|typescript@5.9.3"
+      ]
+    },
+    {
+      "ref": "attesta|@langchain/core@1.1.25",
+      "dependsOn": [
+        "attesta|@cfworker/json-schema@4.1.1",
+        "attesta|@langchain/core@1.1.25|ansi-styles@6.2.3",
+        "attesta|camelcase@6.3.0",
+        "attesta|decamelize@1.2.0",
+        "attesta|js-tiktoken@1.0.21",
+        "attesta|@langchain/core@1.1.25|langsmith@0.5.4",
+        "attesta|mustache@4.2.0",
+        "attesta|p-queue@6.6.2",
+        "attesta|uuid@10.0.0",
+        "attesta|zod@3.25.76"
+      ]
+    },
+    {
+      "ref": "attesta|@langchain/core@1.1.25|ansi-styles@6.2.3"
+    },
+    {
+      "ref": "attesta|@langchain/core@1.1.25|langsmith@0.5.4",
+      "dependsOn": [
+        "attesta|@opentelemetry/api@1.9.0",
+        "attesta|@opentelemetry/sdk-trace-base@1.30.1",
+        "attesta|@types/uuid@10.0.0",
+        "attesta|@langchain/core@1.1.25|chalk@4.1.2",
+        "attesta|console-table-printer@2.15.0",
+        "attesta|openai@4.104.0",
+        "attesta|p-queue@6.6.2",
+        "attesta|semver@7.7.4",
+        "attesta|uuid@10.0.0"
+      ]
+    },
+    {
+      "ref": "attesta|@langchain/core@1.1.25|chalk@4.1.2",
+      "dependsOn": [
+        "attesta|@langchain/core@1.1.25|chalk@4.1.2|ansi-styles@4.3.0",
+        "attesta|supports-color@7.2.0"
+      ]
+    },
+    {
+      "ref": "attesta|@langchain/core@1.1.25|chalk@4.1.2|ansi-styles@4.3.0",
+      "dependsOn": [
+        "attesta|color-convert@2.0.1"
+      ]
+    },
+    {
+      "ref": "attesta|chalk@5.6.2"
+    },
+    {
+      "ref": "attesta|typescript@5.9.3"
+    },
+    {
+      "ref": "attesta|@cfworker/json-schema@4.1.1"
+    },
+    {
+      "ref": "attesta|camelcase@6.3.0"
+    },
+    {
+      "ref": "attesta|decamelize@1.2.0"
+    },
+    {
+      "ref": "attesta|js-tiktoken@1.0.21",
+      "dependsOn": [
+        "attesta|base64-js@1.5.1"
+      ]
+    },
+    {
+      "ref": "attesta|mustache@4.2.0"
+    },
+    {
+      "ref": "attesta|p-queue@6.6.2",
+      "dependsOn": [
+        "attesta|p-queue@6.6.2|eventemitter3@4.0.7",
+        "attesta|p-timeout@3.2.0"
+      ]
+    },
+    {
+      "ref": "attesta|p-queue@6.6.2|eventemitter3@4.0.7"
+    },
+    {
+      "ref": "attesta|uuid@10.0.0"
+    },
+    {
+      "ref": "attesta|zod@3.25.76"
+    },
+    {
+      "ref": "attesta|base64-js@1.5.1"
+    },
+    {
+      "ref": "attesta|@opentelemetry/api@1.9.0"
+    },
+    {
+      "ref": "attesta|@opentelemetry/sdk-trace-base@1.30.1",
+      "dependsOn": [
+        "attesta|@opentelemetry/api@1.9.0",
+        "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/core@1.30.1",
+        "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/resources@1.30.1",
+        "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/semantic-conventions@1.28.0"
+      ]
+    },
+    {
+      "ref": "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/core@1.30.1",
+      "dependsOn": [
+        "attesta|@opentelemetry/api@1.9.0",
+        "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/semantic-conventions@1.28.0"
+      ]
+    },
+    {
+      "ref": "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/resources@1.30.1",
+      "dependsOn": [
+        "attesta|@opentelemetry/api@1.9.0",
+        "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/core@1.30.1",
+        "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/semantic-conventions@1.28.0"
+      ]
+    },
+    {
+      "ref": "attesta|@opentelemetry/sdk-trace-base@1.30.1|@opentelemetry/semantic-conventions@1.28.0"
+    },
+    {
+      "ref": "attesta|@types/uuid@10.0.0"
+    },
+    {
+      "ref": "attesta|console-table-printer@2.15.0",
+      "dependsOn": [
+        "attesta|simple-wcswidth@1.1.2"
+      ]
+    },
+    {
+      "ref": "attesta|openai@4.104.0",
+      "dependsOn": [
+        "attesta|@types/node-fetch@2.6.13",
+        "attesta|@types/node@18.19.130",
+        "attesta|abort-controller@3.0.0",
+        "attesta|agentkeepalive@4.6.0",
+        "attesta|form-data-encoder@1.7.2",
+        "attesta|formdata-node@4.4.1",
+        "attesta|node-fetch@2.7.0",
+        "attesta|ws@8.19.0",
+        "attesta|zod@3.25.76"
+      ]
+    },
+    {
+      "ref": "attesta|semver@7.7.4"
+    },
+    {
+      "ref": "attesta|p-timeout@3.2.0",
+      "dependsOn": [
+        "attesta|p-finally@1.0.0"
+      ]
+    },
+    {
+      "ref": "attesta|supports-color@7.2.0",
+      "dependsOn": [
+        "attesta|has-flag@4.0.0"
+      ]
+    },
+    {
+      "ref": "attesta|simple-wcswidth@1.1.2"
+    },
+    {
+      "ref": "attesta|@types/node-fetch@2.6.13",
+      "dependsOn": [
+        "attesta|@types/node@18.19.130",
+        "attesta|form-data@4.0.5"
+      ]
+    },
+    {
+      "ref": "attesta|@types/node@18.19.130",
+      "dependsOn": [
+        "attesta|undici-types@5.26.5"
+      ]
+    },
+    {
+      "ref": "attesta|abort-controller@3.0.0",
+      "dependsOn": [
+        "attesta|event-target-shim@5.0.1"
+      ]
+    },
+    {
+      "ref": "attesta|agentkeepalive@4.6.0",
+      "dependsOn": [
+        "attesta|humanize-ms@1.2.1"
+      ]
+    },
+    {
+      "ref": "attesta|form-data-encoder@1.7.2"
+    },
+    {
+      "ref": "attesta|formdata-node@4.4.1",
+      "dependsOn": [
+        "attesta|node-domexception@1.0.0",
+        "attesta|formdata-node@4.4.1|web-streams-polyfill@4.0.0-beta.3"
+      ]
+    },
+    {
+      "ref": "attesta|formdata-node@4.4.1|web-streams-polyfill@4.0.0-beta.3"
+    },
+    {
+      "ref": "attesta|node-fetch@2.7.0",
+      "dependsOn": [
+        "attesta|encoding@0.1.13",
+        "attesta|node-fetch@2.7.0|whatwg-url@5.0.0"
+      ]
+    },
+    {
+      "ref": "attesta|node-fetch@2.7.0|whatwg-url@5.0.0",
+      "dependsOn": [
+        "attesta|node-fetch@2.7.0|tr46@0.0.3",
+        "attesta|node-fetch@2.7.0|webidl-conversions@3.0.1"
+      ]
+    },
+    {
+      "ref": "attesta|node-fetch@2.7.0|tr46@0.0.3"
+    },
+    {
+      "ref": "attesta|node-fetch@2.7.0|webidl-conversions@3.0.1"
+    },
+    {
+      "ref": "attesta|ws@8.19.0",
+      "dependsOn": [
+        "attesta|bufferutil@4.1.0",
+        "attesta|utf-8-validate@6.0.6"
+      ]
+    },
+    {
+      "ref": "attesta|p-finally@1.0.0"
+    },
+    {
+      "ref": "attesta|color-convert@2.0.1",
+      "dependsOn": [
+        "attesta|color-name@1.1.4"
+      ]
+    },
+    {
+      "ref": "attesta|has-flag@4.0.0"
+    },
+    {
+      "ref": "attesta|form-data@4.0.5",
+      "dependsOn": [
+        "attesta|asynckit@0.4.0",
+        "attesta|combined-stream@1.0.8",
+        "attesta|es-set-tostringtag@2.1.0",
+        "attesta|hasown@2.0.2",
+        "attesta|mime-types@2.1.35"
+      ]
+    },
+    {
+      "ref": "attesta|undici-types@5.26.5"
+    },
+    {
+      "ref": "attesta|event-target-shim@5.0.1"
+    },
+    {
+      "ref": "attesta|humanize-ms@1.2.1",
+      "dependsOn": [
+        "attesta|ms@2.1.3"
+      ]
+    },
+    {
+      "ref": "attesta|node-domexception@1.0.0"
+    },
+    {
+      "ref": "attesta|encoding@0.1.13",
+      "dependsOn": [
+        "attesta|encoding@0.1.13|iconv-lite@0.6.3"
+      ]
+    },
+    {
+      "ref": "attesta|encoding@0.1.13|iconv-lite@0.6.3",
+      "dependsOn": [
+        "attesta|safer-buffer@2.1.2"
+      ]
+    },
+    {
+      "ref": "attesta|bufferutil@4.1.0",
+      "dependsOn": [
+        "attesta|node-gyp-build@4.8.4"
+      ]
+    },
+    {
+      "ref": "attesta|utf-8-validate@6.0.6",
+      "dependsOn": [
+        "attesta|node-gyp-build@4.8.4"
+      ]
+    },
+    {
+      "ref": "attesta|color-name@1.1.4"
+    },
+    {
+      "ref": "attesta|asynckit@0.4.0"
+    },
+    {
+      "ref": "attesta|combined-stream@1.0.8",
+      "dependsOn": [
+        "attesta|delayed-stream@1.0.0"
+      ]
+    },
+    {
+      "ref": "attesta|es-set-tostringtag@2.1.0",
+      "dependsOn": [
+        "attesta|es-errors@1.3.0",
+        "attesta|get-intrinsic@1.3.0",
+        "attesta|has-tostringtag@1.0.2",
+        "attesta|hasown@2.0.2"
+      ]
+    },
+    {
+      "ref": "attesta|hasown@2.0.2",
+      "dependsOn": [
+        "attesta|function-bind@1.1.2"
+      ]
+    },
+    {
+      "ref": "attesta|mime-types@2.1.35",
+      "dependsOn": [
+        "attesta|mime-db@1.52.0"
+      ]
+    },
+    {
+      "ref": "attesta|ms@2.1.3"
+    },
+    {
+      "ref": "attesta|node-gyp-build@4.8.4"
+    },
+    {
+      "ref": "attesta|delayed-stream@1.0.0"
+    },
+    {
+      "ref": "attesta|es-errors@1.3.0"
+    },
+    {
+      "ref": "attesta|get-intrinsic@1.3.0",
+      "dependsOn": [
+        "attesta|call-bind-apply-helpers@1.0.2",
+        "attesta|es-define-property@1.0.1",
+        "attesta|es-errors@1.3.0",
+        "attesta|es-object-atoms@1.1.1",
+        "attesta|function-bind@1.1.2",
+        "attesta|get-proto@1.0.1",
+        "attesta|gopd@1.2.0",
+        "attesta|has-symbols@1.1.0",
+        "attesta|hasown@2.0.2",
+        "attesta|math-intrinsics@1.1.0"
+      ]
+    },
+    {
+      "ref": "attesta|has-tostringtag@1.0.2",
+      "dependsOn": [
+        "attesta|has-symbols@1.1.0"
+      ]
+    },
+    {
+      "ref": "attesta|function-bind@1.1.2"
+    },
+    {
+      "ref": "attesta|mime-db@1.52.0"
+    },
+    {
+      "ref": "attesta|safer-buffer@2.1.2"
+    },
+    {
+      "ref": "attesta|call-bind-apply-helpers@1.0.2",
+      "dependsOn": [
+        "attesta|es-errors@1.3.0",
+        "attesta|function-bind@1.1.2"
+      ]
+    },
+    {
+      "ref": "attesta|es-define-property@1.0.1"
+    },
+    {
+      "ref": "attesta|es-object-atoms@1.1.1",
+      "dependsOn": [
+        "attesta|es-errors@1.3.0"
+      ]
+    },
+    {
+      "ref": "attesta|get-proto@1.0.1",
+      "dependsOn": [
+        "attesta|dunder-proto@1.0.1",
+        "attesta|es-object-atoms@1.1.1"
+      ]
+    },
+    {
+      "ref": "attesta|gopd@1.2.0"
+    },
+    {
+      "ref": "attesta|has-symbols@1.1.0"
+    },
+    {
+      "ref": "attesta|math-intrinsics@1.1.0"
+    },
+    {
+      "ref": "attesta|dunder-proto@1.0.1",
+      "dependsOn": [
+        "attesta|call-bind-apply-helpers@1.0.2",
+        "attesta|es-errors@1.3.0",
+        "attesta|gopd@1.2.0"
+      ]
+    }
+  ]
+}

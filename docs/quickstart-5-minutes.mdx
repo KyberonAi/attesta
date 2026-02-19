@@ -1,0 +1,73 @@
+---
+title: "5-Minute Quickstart"
+description: "A strict first-success path for production-style gating"
+icon: "stopwatch"
+---
+
+Use this path when you need a first validated Attesta gate in under 5 minutes.
+
+## 1. Install (60s)
+
+<CodeGroup>
+```bash Python
+pip install "attesta[terminal,yaml]"
+```
+
+```bash TypeScript
+npm install @kyberon/attesta
+```
+</CodeGroup>
+
+## 2. Create `attesta.yaml` (60s)
+
+```yaml
+policy:
+  fail_mode: escalate
+  timeout_seconds: 30
+
+audit:
+  path: .attesta/audit.jsonl
+```
+
+## 3. Protect one high-impact action (90s)
+
+<CodeGroup>
+```python Python
+from attesta import Attesta
+
+attesta = Attesta.from_config("attesta.yaml")
+
+@attesta.gate(risk_hints={"production": True, "destructive": True})
+def rotate_prod_keys(service: str) -> str:
+    return f"rotated {service}"
+
+print(rotate_prod_keys("payments-api"))
+```
+
+```typescript TypeScript
+import { gate } from "@kyberon/attesta";
+
+const rotateProdKeys = gate(
+  {
+    failMode: "escalate",
+    approvalTimeoutSeconds: 30,
+    riskHints: { production: true, destructive: true },
+  },
+  async (service: string) => `rotated ${service}`
+);
+
+console.log(await rotateProdKeys("payments-api"));
+```
+</CodeGroup>
+
+## 4. Validate evidence (60s)
+
+- Confirm the action prompted for approval (or escalated on timeout).
+- Confirm `.attesta/audit.jsonl` was written.
+- Run `attesta audit verify` if using the Python CLI.
+
+## 5. Expand immediately (60s)
+
+- Apply the gate to 3-5 highest impact tools first.
+- Add explicit `risk_hints` for production, financial, or PII operations.
+- Keep `fail_mode: escalate` for any action where silent timeout behavior is unsafe.

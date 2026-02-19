@@ -1,0 +1,34 @@
+---
+title: "LangChain Tool Approval"
+description: "Wrap LangChain tools with risk-based gating"
+icon: "wrench"
+---
+
+## Scenario
+
+A LangChain agent can run both read-only and destructive tools. We want low-friction reads and strict gating for writes.
+
+## Example App
+
+Reference implementation: `examples/langchain-tooling-approval/`
+
+- wraps tools with `AttestaToolWrapper`
+- applies per-tool risk overrides
+- keeps audit consistency across tool invocations
+
+## Core Pattern
+
+```python
+from attesta import Attesta
+from attesta.integrations.langchain import AttestaToolWrapper
+
+attesta = Attesta.from_config("attesta.yaml")
+wrapper = AttestaToolWrapper(attesta, risk_overrides={"restart_production_service": "critical"})
+protected_tools = wrapper.wrap_tools(tools)
+```
+
+## Production Notes
+
+- classify tools by side-effect class (read/write/irreversible)
+- enforce `critical` overrides for infrastructure mutation tools
+- monitor denied/escalated rates to tune challenge friction

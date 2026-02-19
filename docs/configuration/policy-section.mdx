@@ -99,21 +99,21 @@ The `fail_mode` setting controls what happens when a challenge times out or the 
     policy:
       fail_mode: deny
     ```
-    The action is blocked. An `AttestaDenied` exception is raised. This is the safest option and the recommended setting for production.
+    The action is blocked with verdict `TIMED_OUT`. The gate decorator raises `AttestaDenied`. This is the safest option and the recommended setting for production.
   </Tab>
   <Tab title="allow">
     ```yaml
     policy:
       fail_mode: allow
     ```
-    The action is permitted without approval. **Use only in local development.** This mode is logged as a warning in the audit trail.
+    The action is permitted with verdict `APPROVED` (timeout metadata is still recorded). **Use only in local development.**
   </Tab>
   <Tab title="escalate">
     ```yaml
     policy:
       fail_mode: escalate
     ```
-    The action is forwarded to a secondary approver or external webhook. Use this when you have a fallback approval chain (e.g., on-call engineer, Slack notification, or PagerDuty integration).
+    The action is blocked with verdict `ESCALATED`, and an `escalated` lifecycle event is emitted. Use this when you have a fallback escalation workflow listening to that event.
   </Tab>
 </Tabs>
 

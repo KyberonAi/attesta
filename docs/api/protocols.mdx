@@ -20,7 +20,7 @@ from attesta import RiskScorer
 ```
 
 ```typescript TypeScript
-import { RiskScorer } from "@attesta/core";
+import { RiskScorer } from "@kyberon/attesta";
 ```
 </CodeGroup>
 
@@ -64,7 +64,7 @@ def delete_user(user_id: str) -> str:
 ```
 
 ```typescript TypeScript
-import { RiskScorer, ActionContext } from "@attesta/core";
+import { RiskScorer, ActionContext } from "@kyberon/attesta";
 
 class KeywordRiskScorer implements RiskScorer {
   readonly name = "keyword";
@@ -120,7 +120,7 @@ from attesta import Renderer
 ```
 
 ```typescript TypeScript
-import { Renderer } from "@attesta/core";
+import { Renderer } from "@kyberon/attesta";
 ```
 </CodeGroup>
 
@@ -193,7 +193,7 @@ assert isinstance(SlackRenderer("https://...", "#approvals"), Renderer)
 import {
   Renderer, ActionContext, RiskAssessment,
   ChallengeType, ChallengeResult, Verdict,
-} from "@attesta/core";
+} from "@kyberon/attesta";
 
 class SlackRenderer implements Renderer {
   constructor(
@@ -269,7 +269,7 @@ from attesta import AuditLogger
 ```
 
 ```typescript TypeScript
-import { AuditLogger } from "@attesta/core";
+import { AuditLogger } from "@kyberon/attesta";
 ```
 </CodeGroup>
 
@@ -317,7 +317,7 @@ assert isinstance(PostgresAuditLogger("postgres://..."), AuditLogger)
 ```
 
 ```typescript TypeScript
-import { AuditLogger, ActionContext, ApprovalResult } from "@attesta/core";
+import { AuditLogger, ActionContext, ApprovalResult } from "@kyberon/attesta";
 import { v4 as uuidv4 } from "uuid";
 
 class PostgresAuditLogger implements AuditLogger {
@@ -370,7 +370,7 @@ from attesta import ChallengeProtocol
 ```
 
 ```typescript TypeScript
-import { ChallengeProtocol } from "@attesta/core";
+import { ChallengeProtocol } from "@kyberon/attesta";
 ```
 </CodeGroup>
 
@@ -432,7 +432,7 @@ assert isinstance(TimedConfirmChallenge(), ChallengeProtocol)
 import {
   ChallengeProtocol, ActionContext, RiskAssessment,
   ChallengeResult, ChallengeType,
-} from "@attesta/core";
+} from "@kyberon/attesta";
 
 class TimedConfirmChallenge implements ChallengeProtocol {
   readonly challengeType = ChallengeType.CONFIRM;

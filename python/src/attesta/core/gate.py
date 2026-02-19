@@ -16,7 +16,7 @@ import threading
 import textwrap
 import time
 import uuid
-from typing import Any, Callable, Coroutine, TypeVar, overload
+from typing import Any, Callable, Coroutine, Literal, TypeVar, overload
 
 from attesta.core.types import (
     ActionContext,
@@ -204,6 +204,7 @@ class Attesta:
     """
 
     _VALID_MODES: frozenset[str] = frozenset({"enforce", "shadow", "audit_only"})
+    _VALID_FAIL_MODES: frozenset[str] = frozenset({"deny", "allow", "escalate"})
 
     def __init__(
         self,
@@ -219,12 +220,22 @@ class Attesta:
         event_bus: Any | None = None,
         allow_hint_override: bool = False,
         mode: str = "enforce",
+        fail_mode: Literal["deny", "allow", "escalate"] = "deny",
         approval_timeout_seconds: float = 600.0,
     ) -> None:
         if mode not in self._VALID_MODES:
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be one of "
                 f"{sorted(self._VALID_MODES)}"
+            )
+        if fail_mode not in self._VALID_FAIL_MODES:
+            raise ValueError(
+                f"Invalid fail_mode '{fail_mode}'. Must be one of "
+                f"{sorted(self._VALID_FAIL_MODES)}"
+            )
+        if approval_timeout_seconds <= 0:
+            raise ValueError(
+                f"approval_timeout_seconds must be > 0, got {approval_timeout_seconds}"
             )
 
         self._scorer: RiskScorer = risk_scorer or _get_default_risk_scorer()
@@ -237,6 +248,7 @@ class Attesta:
         self._event_bus = event_bus
         self._allow_hint_override = allow_hint_override
         self._mode = mode
+        self._fail_mode = fail_mode
         self._approval_timeout = approval_timeout_seconds
 
         # Normalise risk_override to a RiskLevel or None.
@@ -335,7 +347,11 @@ class Attesta:
 
         # 3a. Mode handling -- audit_only and shadow modes alter the
         #     challenge / verdict flow while preserving the audit trail.
-        mode_metadata: dict[str, Any] = {"mode": self._mode}
+        mode_metadata: dict[str, Any] = {
+            "mode": self._mode,
+            "fail_mode": self._fail_mode,
+            "approval_timeout_seconds": self._approval_timeout,
+        }
 
         if self._mode == "audit_only":
             # Skip the challenge entirely; auto-approve and record.
@@ -417,15 +433,26 @@ class Attesta:
                         self._approval_timeout,
                         ctx.function_name,
                     )
-                    verdict = Verdict.TIMED_OUT
+                    timeout_reason = (
+                        f"Approval timed out after {self._approval_timeout:.0f}s"
+                    )
+                    if self._fail_mode == "allow":
+                        verdict = Verdict.APPROVED
+                    elif self._fail_mode == "escalate":
+                        verdict = Verdict.ESCALATED
+                    else:
+                        verdict = Verdict.TIMED_OUT
                     challenge_result = ChallengeResult(
                         passed=False,
                         challenge_type=challenge_type,
                         details={
-                            "reason": f"Approval timed out after "
-                                      f"{self._approval_timeout:.0f}s",
+                            "reason": timeout_reason,
+                            "fail_mode": self._fail_mode,
+                            "timeout_seconds": self._approval_timeout,
                         },
                     )
+                    mode_metadata["timed_out"] = True
+                    mode_metadata["timeout_reason"] = timeout_reason
                 else:
                     verdict = Verdict.APPROVED if challenge_result.passed else Verdict.DENIED
                 await self._emit("challenge_completed", {
@@ -452,7 +479,12 @@ class Attesta:
         )
 
         # 6b. Emit verdict event.
-        verdict_event = "approved" if verdict == Verdict.APPROVED else "denied"
+        if verdict == Verdict.APPROVED:
+            verdict_event = "approved"
+        elif verdict == Verdict.ESCALATED:
+            verdict_event = "escalated"
+        else:
+            verdict_event = "denied"
         await self._emit(verdict_event, {
             "action_name": ctx.function_name,
             "risk_score": risk.score,
@@ -484,7 +516,11 @@ class Attesta:
                         domain=domain,
                         risk_score=risk.score,
                     )
-                elif verdict == Verdict.DENIED:
+                elif verdict in {
+                    Verdict.DENIED,
+                    Verdict.TIMED_OUT,
+                    Verdict.ESCALATED,
+                }:
                     self._trust_engine.record_denial(
                         agent_id=ctx.agent_id,
                         action_name=ctx.function_name,
@@ -701,6 +737,7 @@ def gate(
     sync_timeout: float = ...,
     allow_hint_override: bool = ...,
     mode: str = ...,
+    fail_mode: Literal["deny", "allow", "escalate"] = ...,
     approval_timeout_seconds: float = ...,
 ) -> Callable[[F], F]: ...  # @gate() or @gate(risk="high")
 
@@ -725,6 +762,7 @@ def gate(
     sync_timeout: float = 300.0,
     allow_hint_override: bool = False,
     mode: str = "enforce",
+    fail_mode: Literal["deny", "allow", "escalate"] = "deny",
     approval_timeout_seconds: float = 600.0,
 ) -> F | Callable[[F], F]:
     """Decorator that wraps a function with attesta approval.
@@ -767,9 +805,14 @@ def gate(
         * ``"audit_only"`` -- skip challenges entirely, auto-approve
           every action, and log the risk assessment for analysis.
     approval_timeout_seconds:
-        Maximum seconds to wait for a human response before auto-denying.
-        Defaults to 600 (10 minutes).  If no response is received within
-        this window, the action is denied with ``Verdict.TIMED_OUT``.
+        Maximum seconds to wait for a human response before timeout policy
+        handling. Defaults to 600 (10 minutes).
+    fail_mode:
+        Timeout policy for non-auto-approved actions:
+
+        * ``"deny"`` (default) -> return ``Verdict.TIMED_OUT`` and block.
+        * ``"allow"`` -> return ``Verdict.APPROVED`` and continue.
+        * ``"escalate"`` -> return ``Verdict.ESCALATED`` and block.
     """
 
     def decorator(func: F) -> F:
@@ -783,6 +826,7 @@ def gate(
             risk_hints=risk_hints,
             trust_engine=trust_engine,
             event_bus=event_bus,
+            fail_mode=fail_mode,
             approval_timeout_seconds=approval_timeout_seconds,
             allow_hint_override=allow_hint_override,
             mode=mode,

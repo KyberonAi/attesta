@@ -1,0 +1,350 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without v (e.g. 0.1.0). Required for manual runs."
+        required: false
+        type: string
+      publish_docs:
+        description: "Trigger Mintlify deploy hook after publish"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Release Verification
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: Boundary check
+        run: ./scripts/check_release_boundary.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate Python release version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          PY_VER="$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          data = tomllib.loads(Path("python/pyproject.toml").read_text())
+          print(data["project"]["version"])
+          PY
+          )"
+          EXPECTED=""
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            EXPECTED="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${INPUT_VERSION:-}" ]]; then
+            EXPECTED="${INPUT_VERSION}"
+          fi
+          if [[ -z "${EXPECTED}" ]]; then
+            echo "No release version found. Use a vX.Y.Z tag or provide workflow input version."
+            exit 1
+          fi
+          if [[ "${PY_VER}" != "${EXPECTED}" ]]; then
+            echo "Version mismatch: python=${PY_VER}, expected=${EXPECTED}"
+            exit 1
+          fi
+      - name: Python verify
+        working-directory: python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,yaml]" build twine
+          pytest -q
+          python -m build
+          twine check dist/*
+          sha256sum dist/* > dist/SHA256SUMS.txt
+      - name: Upload Python artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: python/dist/*
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: TypeScript verify
+        run: |
+          npm ci
+          npm run --workspace @kyberon/attesta typecheck
+          npm run --workspace @kyberon/attesta build
+          npm --workspace @kyberon/attesta pack --dry-run
+      - name: Build npm artifact
+        run: |
+          cd typescript
+          npm pack
+          sha256sum *.tgz > SHA256SUMS.txt
+      - name: Upload npm artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-dist
+          path: |
+            typescript/*.tgz
+            typescript/SHA256SUMS.txt
+
+      - name: Generate release SBOMs
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cyclonedx-bom
+          mkdir -p security-artifacts
+          python -m cyclonedx_py environment \
+            --of JSON \
+            --output-file security-artifacts/release-sbom-python.cdx.json \
+            "$(which python)"
+          npx -y @cyclonedx/cyclonedx-npm \
+            --output-format JSON \
+            --output-file security-artifacts/release-sbom-typescript.cdx.json \
+            --workspace @kyberon/attesta
+      - name: Upload release SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-sbom
+          path: security-artifacts/*.cdx.json
+
+      - name: Attest Python release artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            python/dist/*.tar.gz
+            python/dist/*.whl
+            python/dist/SHA256SUMS.txt
+      - name: Attest npm release artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            typescript/*.tgz
+            typescript/SHA256SUMS.txt
+      - name: Attest release SBOM artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            security-artifacts/release-sbom-python.cdx.json
+            security-artifacts/release-sbom-typescript.cdx.json
+
+      - name: Docs verify
+        working-directory: docs
+        run: npx -y mintlify broken-links
+
+  publish-python:
+    name: Publish PyPI
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download Python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: python/dist
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist/
+
+  publish-npm:
+    name: Publish npm
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+      - name: Validate release version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          NPM_NAME="$(node -p "require('./typescript/package.json').name")"
+          NPM_VER="$(node -p "require('./typescript/package.json').version")"
+          if [[ "${NPM_NAME}" != "@kyberon/attesta" ]]; then
+            echo "Unexpected npm package name: ${NPM_NAME} (expected @kyberon/attesta)"
+            exit 1
+          fi
+          EXPECTED=""
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            EXPECTED="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${INPUT_VERSION:-}" ]]; then
+            EXPECTED="${INPUT_VERSION}"
+          fi
+          if [[ -z "${EXPECTED}" ]]; then
+            echo "No release version found. Use a vX.Y.Z tag or provide workflow input version."
+            exit 1
+          fi
+          if [[ "${NPM_VER}" != "${EXPECTED}" ]]; then
+            echo "Version mismatch: npm=${NPM_VER}, expected=${EXPECTED}"
+            exit 1
+          fi
+      - name: Build and publish npm package (OIDC)
+        run: |
+          npm ci
+          npm run --workspace @kyberon/attesta build
+          cd typescript
+          npm publish --access public --provenance
+
+  smoke-python:
+    name: Smoke Test PyPI Package
+    needs: publish-python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Resolve version
+        id: pyver
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "${GITHUB_OUTPUT}"
+          elif [[ -n "${INPUT_VERSION:-}" ]]; then
+            echo "version=${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "Unable to resolve release version."
+            exit 1
+          fi
+      - name: Install from PyPI with retry
+        env:
+          VERSION: ${{ steps.pyver.outputs.version }}
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          for i in {1..10}; do
+            if python -m pip install --no-cache-dir "attesta==${VERSION}"; then
+              python - <<'PY'
+              import attesta
+              from attesta import Attesta, gate  # noqa: F401
+              print("Installed attesta:", attesta.__version__)
+              PY
+              exit 0
+            fi
+            echo "PyPI not ready yet (attempt ${i}/10). Retrying in 30s..."
+            sleep 30
+          done
+          echo "Failed to install attesta==${VERSION} from PyPI after retries."
+          exit 1
+
+  smoke-npm:
+    name: Smoke Test npm Package
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Resolve version
+        id: npmver
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "${GITHUB_OUTPUT}"
+          elif [[ -n "${INPUT_VERSION:-}" ]]; then
+            echo "version=${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "Unable to resolve release version."
+            exit 1
+          fi
+      - name: Install from npm with retry
+        env:
+          VERSION: ${{ steps.npmver.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p smoke-npm
+          cd smoke-npm
+          npm init -y >/dev/null 2>&1
+          for i in {1..10}; do
+            if npm install "@kyberon/attesta@${VERSION}"; then
+              node --input-type=module -e "import('@kyberon/attesta').then(m => { console.log('Loaded @kyberon/attesta exports:', Object.keys(m).length); }).catch((e) => { console.error(e); process.exit(1); });"
+              exit 0
+            fi
+            echo "npm not ready yet (attempt ${i}/10). Retrying in 30s..."
+            sleep 30
+          done
+          echo "Failed to install @kyberon/attesta@${VERSION} after retries."
+          exit 1
+
+  github-release:
+    name: Create GitHub Release
+    needs: [publish-python, publish-npm, smoke-python, smoke-npm]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: release-assets/python
+      - name: Download npm artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-dist
+          path: release-assets/npm
+      - name: Create release entry
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release-assets/python/*
+            release-assets/npm/*
+
+  mintlify-release-deploy:
+    name: Trigger Mintlify Deploy
+    needs: [publish-python, publish-npm, smoke-python, smoke-npm]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.publish_docs == 'true' }}
+    environment: docs-prod
+    permissions:
+      contents: read
+    steps:
+      - name: Trigger Mintlify deploy hook
+        env:
+          MINTLIFY_DEPLOY_HOOK_URL: ${{ secrets.MINTLIFY_DEPLOY_HOOK_URL }}
+        run: |
+          if [[ -z "${MINTLIFY_DEPLOY_HOOK_URL}" ]]; then
+            echo "MINTLIFY_DEPLOY_HOOK_URL not configured; skipping deploy trigger."
+            exit 0
+          fi
+          curl -fsSL -X POST "${MINTLIFY_DEPLOY_HOOK_URL}"
+          echo "Mintlify deploy trigger sent."

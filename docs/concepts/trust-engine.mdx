@@ -107,7 +107,7 @@ trust.revoke(agent_id="deploy-bot")            # reset to 0.0
 ```
 
 ```typescript TypeScript
-import { TrustEngine } from "@attesta/core";
+import { TrustEngine } from "@kyberon/attesta";
 
 // Create a trust engine with default parameters
 const trust = new TrustEngine();
@@ -223,7 +223,7 @@ def deploy(service: str) -> str:
 ```
 
 ```typescript TypeScript
-import { Attesta, TrustEngine } from "@attesta/core";
+import { Attesta, TrustEngine } from "@kyberon/attesta";
 
 const attesta = new Attesta({
   trustEngine: new TrustEngine({

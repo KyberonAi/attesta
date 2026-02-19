@@ -51,7 +51,7 @@ import {
   DefaultRiskScorer,
   CompositeRiskScorer,
   FixedRiskScorer,
-} from "@attesta/core";
+} from "@kyberon/attesta";
 
 const composite = new CompositeRiskScorer([
   { scorer: new DefaultRiskScorer(), weight: 3.0 },
@@ -105,7 +105,7 @@ conservative = MaxRiskScorer(
 ```
 
 ```typescript TypeScript
-import { DefaultRiskScorer, MaxRiskScorer } from "@attesta/core";
+import { DefaultRiskScorer, MaxRiskScorer } from "@kyberon/attesta";
 
 class ComplianceScorer {
   score(context: ActionContext): number {
@@ -154,7 +154,7 @@ testing = FixedRiskScorer(0.5)
 ```
 
 ```typescript TypeScript
-import { FixedRiskScorer } from "@attesta/core";
+import { FixedRiskScorer } from "@kyberon/attesta";
 
 // Always returns 0.0 — effectively disables challenges
 const bypass = new FixedRiskScorer(0.0);
@@ -209,7 +209,7 @@ class MyCustomScorer:
 ```
 
 ```typescript TypeScript
-import { RiskScorer, ActionContext } from "@attesta/core";
+import { RiskScorer, ActionContext } from "@kyberon/attesta";
 
 class MyCustomScorer implements RiskScorer {
   score(context: ActionContext): number {

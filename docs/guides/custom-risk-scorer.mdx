@@ -34,7 +34,7 @@ assert isinstance(MyScorer(), RiskScorer)
 ```
 
 ```typescript TypeScript
-import { RiskScorer, ActionContext } from "@attesta/core";
+import { RiskScorer, ActionContext } from "@kyberon/attesta";
 
 class MyScorer implements RiskScorer {
   readonly name = "my-scorer";
@@ -349,7 +349,7 @@ class APICostScorer:
 ```
 
 ```typescript TypeScript
-import { RiskScorer, ActionContext } from "@attesta/core";
+import { RiskScorer, ActionContext } from "@kyberon/attesta";
 
 class APICostScorer implements RiskScorer {
   readonly name = "api-cost";

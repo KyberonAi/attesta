@@ -1,0 +1,271 @@
+name: AI Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to review"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    name: Codex + Claude Review
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'ai-review') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve PR metadata
+        id: prmeta
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let pr;
+            if (context.eventName === "pull_request") {
+              pr = context.payload.pull_request;
+            } else {
+              const prNumberRaw = context.payload.inputs?.pr_number;
+              const prNumber = Number(prNumberRaw);
+              if (!Number.isFinite(prNumber) || prNumber <= 0) {
+                core.setFailed("Invalid pr_number input.");
+                return;
+              }
+              const resp = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+              });
+              pr = resp.data;
+            }
+            core.setOutput("pr_number", String(pr.number));
+            core.setOutput("base_sha", pr.base.sha);
+            core.setOutput("head_sha", pr.head.sha);
+            core.setOutput("title", pr.title);
+
+      - name: Build PR diff
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ steps.prmeta.outputs.base_sha }}"
+          HEAD_SHA="${{ steps.prmeta.outputs.head_sha }}"
+          git fetch --no-tags --depth=1 origin "${BASE_SHA}" "${HEAD_SHA}" || true
+          git diff --unified=2 "${BASE_SHA}" "${HEAD_SHA}" > pr.diff
+          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > changed_files.txt
+          DIFF_SIZE="$(wc -c < pr.diff | tr -d ' ')"
+          echo "Diff size: ${DIFF_SIZE} bytes"
+          MAX=120000
+          if [ "${DIFF_SIZE}" -gt "${MAX}" ]; then
+            head -c "${MAX}" pr.diff > pr.truncated.diff
+            printf "\n\n[DIFF TRUNCATED FOR AI REVIEW]\n" >> pr.truncated.diff
+          else
+            cp pr.diff pr.truncated.diff
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Codex review (OpenAI)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_REVIEW_MODEL: ${{ vars.OPENAI_REVIEW_MODEL }}
+          PR_TITLE: ${{ steps.prmeta.outputs.title }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          out_path = "openai_review.md"
+          api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+          if not api_key:
+              with open(out_path, "w", encoding="utf-8") as f:
+                  f.write("_Skipped: OPENAI_API_KEY not configured._\n")
+              sys.exit(0)
+
+          model = os.environ.get("OPENAI_REVIEW_MODEL", "").strip() or "gpt-4o-mini"
+          with open("changed_files.txt", "r", encoding="utf-8") as f:
+              files = f.read().strip()
+          with open("pr.truncated.diff", "r", encoding="utf-8") as f:
+              diff = f.read()
+
+          system = (
+              "You are Codex, a code-level reviewer. Focus on implementation defects in the patch only: "
+              "logic bugs, regressions, unsafe code paths, API contract breaks, and missing tests. "
+              "Prioritize precise findings with file references and practical fix suggestions."
+          )
+          prompt = f"""PR Title: {os.environ.get("PR_TITLE", "")}
+
+          Changed files:
+          {files}
+
+          Diff:
+          {diff}
+
+          Return markdown with:
+          1. Findings (P0-P3, highest severity first)
+          2. Open questions
+          3. Test gaps
+          For each finding, include file path and why it fails in production."""
+
+          payload = {
+              "model": model,
+              "messages": [
+                  {"role": "system", "content": system},
+                  {"role": "user", "content": prompt},
+              ],
+              "temperature": 0.1,
+          }
+          req = urllib.request.Request(
+              "https://api.openai.com/v1/chat/completions",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "Authorization": f"Bearer {api_key}",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=120) as resp:
+                  body = json.loads(resp.read().decode("utf-8"))
+              content = body["choices"][0]["message"]["content"].strip()
+          except Exception as exc:
+              content = f"_OpenAI review failed: {exc}_"
+
+          with open(out_path, "w", encoding="utf-8") as f:
+              f.write(content + "\n")
+          PY
+
+      - name: Run Claude review (Anthropic)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_REVIEW_MODEL: ${{ vars.ANTHROPIC_REVIEW_MODEL }}
+          PR_TITLE: ${{ steps.prmeta.outputs.title }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          out_path = "anthropic_review.md"
+          api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+          if not api_key:
+              with open(out_path, "w", encoding="utf-8") as f:
+                  f.write("_Skipped: ANTHROPIC_API_KEY not configured._\n")
+              sys.exit(0)
+
+          model = os.environ.get("ANTHROPIC_REVIEW_MODEL", "").strip() or "claude-3-5-sonnet-latest"
+          with open("changed_files.txt", "r", encoding="utf-8") as f:
+              files = f.read().strip()
+          with open("pr.truncated.diff", "r", encoding="utf-8") as f:
+              diff = f.read()
+
+          system = (
+              "You are Claude, a systems reviewer. Focus on architecture and product risks in the patch: "
+              "security posture changes, design inconsistencies, OSS boundary leaks, docs/usability drift, "
+              "and operational release risks. Prioritize issues that affect maintainability and adoption."
+          )
+          prompt = f"""PR Title: {os.environ.get("PR_TITLE", "")}
+
+          Changed files:
+          {files}
+
+          Diff:
+          {diff}
+
+          Return markdown with:
+          1. Findings (P0-P3, ordered by severity)
+          2. Open questions
+          3. Missing tests
+          Include file references and explain system-level impact."""
+
+          payload = {
+              "model": model,
+              "max_tokens": 1800,
+              "temperature": 0.1,
+              "system": system,
+              "messages": [
+                  {"role": "user", "content": prompt},
+              ],
+          }
+          req = urllib.request.Request(
+              "https://api.anthropic.com/v1/messages",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "x-api-key": api_key,
+                  "anthropic-version": "2023-06-01",
+                  "content-type": "application/json",
+              },
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=120) as resp:
+                  body = json.loads(resp.read().decode("utf-8"))
+              parts = body.get("content", [])
+              text = "\n".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+              content = text or "_Claude returned no textual content._"
+          except Exception as exc:
+              content = f"_Anthropic review failed: {exc}_"
+
+          with open(out_path, "w", encoding="utf-8") as f:
+              f.write(content + "\n")
+          PY
+
+      - name: Publish review comment to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- ai-review-bot -->";
+            const prNumber = Number("${{ steps.prmeta.outputs.pr_number }}");
+            const openai = fs.existsSync("openai_review.md")
+              ? fs.readFileSync("openai_review.md", "utf8")
+              : "_No OpenAI output._";
+            const anthropic = fs.existsSync("anthropic_review.md")
+              ? fs.readFileSync("anthropic_review.md", "utf8")
+              : "_No Anthropic output._";
+
+            const body = `${marker}
+            ## AI Review Summary
+
+            ### Codex (OpenAI)
+            ${openai}
+
+            ### Claude (Anthropic)
+            ${anthropic}
+            `;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }

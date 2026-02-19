@@ -32,7 +32,7 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "installation", "how-it-works"]
+            "pages": ["introduction", "quickstart", "quickstart-5-minutes", "installation", "how-it-works"]
           },
           {
             "group": "Core Concepts",
@@ -61,7 +61,9 @@
           {
             "group": "Examples",
             "pages": [
-              "examples/devops-pipeline", "examples/multi-framework"
+              "examples/devops-pipeline", "examples/multi-framework",
+              "examples/openai-agents-change-control", "examples/langchain-tooling-approval",
+              "examples/vercel-ai-ops-gate"
             ]
           },
           {
@@ -69,7 +71,7 @@
             "pages": [
               "guides/custom-risk-scorer", "guides/custom-renderer",
               "guides/custom-challenge", "guides/production-deployment",
-              "guides/testing", "guides/migration"
+              "guides/testing", "guides/migration", "guides/maintainer-operations"
             ]
           },
           {
@@ -78,7 +80,7 @@
           },
           {
             "group": "Resources",
-            "pages": ["changelog", "faq"]
+            "pages": ["oss-vs-cloud", "support-policy", "changelog", "faq"]
           }
         ]
       },

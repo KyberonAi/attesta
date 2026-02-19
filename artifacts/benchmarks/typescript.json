@@ -1,0 +1,17 @@
+{
+  "benchmark": "attesta-typescript",
+  "iterations": 500,
+  "warmup": 50,
+  "cases": {
+    "low_risk_auto_approve": {
+      "p50_ms": 0.001417,
+      "p95_ms": 0.002792,
+      "mean_ms": 0.001913
+    },
+    "high_risk_challenge_pass": {
+      "p50_ms": 0.002916,
+      "p95_ms": 0.006917,
+      "mean_ms": 0.003963
+    }
+  }
+}

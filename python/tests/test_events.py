@@ -2,9 +2,27 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from attesta.events import Event, EventBus, EventType
+
+
+class _SlowRenderer:
+    async def render_approval(self, ctx, risk):
+        await asyncio.sleep(9999)
+        return None  # pragma: no cover
+
+    async def render_challenge(self, ctx, risk, challenge_type):
+        await asyncio.sleep(9999)
+        return None  # pragma: no cover
+
+    async def render_info(self, message):
+        return None
+
+    async def render_auto_approved(self, ctx, risk):
+        return None
 
 
 class TestEventType:
@@ -15,10 +33,11 @@ class TestEventType:
         assert EventType.CHALLENGE_COMPLETED.value == "challenge_completed"
         assert EventType.APPROVED.value == "approved"
         assert EventType.DENIED.value == "denied"
+        assert EventType.ESCALATED.value == "escalated"
         assert EventType.AUDIT_LOGGED.value == "audit_logged"
 
     def test_member_count(self):
-        assert len(EventType) == 7
+        assert len(EventType) == 8
 
 
 class TestEvent:
@@ -179,3 +198,24 @@ class TestEventBusIntegration:
         event_types = [e.type for e in events]
         assert EventType.RISK_SCORED in event_types
         assert EventType.APPROVED in event_types or EventType.DENIED in event_types
+
+    async def test_timeout_escalation_emits_escalated_event(self):
+        from attesta.core.gate import Attesta
+        from attesta.core.types import ActionContext, RiskLevel
+
+        bus = EventBus()
+        events = []
+        bus.on(EventType.ESCALATED, lambda e: events.append(e))
+
+        g = Attesta(
+            renderer=_SlowRenderer(),
+            risk_override=RiskLevel.MEDIUM,
+            event_bus=bus,
+            fail_mode="escalate",
+            approval_timeout_seconds=0.05,
+        )
+        ctx = ActionContext(function_name="slow_action")
+        await g.evaluate(ctx)
+
+        assert len(events) == 1
+        assert events[0].data["verdict"] == "escalated"

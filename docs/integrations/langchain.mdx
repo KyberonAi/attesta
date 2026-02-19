@@ -17,7 +17,7 @@ pip install attesta[langchain]
 ```
 
 ```bash TypeScript
-npm install @attesta/core @langchain/core
+npm install @kyberon/attesta @langchain/core
 ```
 </CodeGroup>
 
@@ -127,7 +127,7 @@ gatedTool<T extends LangChainToolLike>(tool: T, options?: GatedToolOptions): T
 ```typescript
 import { WikipediaQueryRun } from "@langchain/community/tools/wikipedia_query";
 import { ChatOpenAI } from "@langchain/openai";
-import { gatedTool } from "@attesta/core/integrations";
+import { gatedTool } from "@kyberon/attesta/integrations";
 
 const wiki = new WikipediaQueryRun();
 
@@ -212,7 +212,7 @@ The TypeScript SDK provides `createGateNode` for LangGraph.
 
 ```typescript
 import { StateGraph } from "@langchain/langgraph";
-import { createGateNode } from "@attesta/core/integrations";
+import { createGateNode } from "@kyberon/attesta/integrations";
 
 const gateNode = createGateNode({
   actionName: "process-order",

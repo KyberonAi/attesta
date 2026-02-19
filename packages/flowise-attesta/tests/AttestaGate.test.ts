@@ -1,6 +1,6 @@
 jest.mock('flowise-components', () => ({}), { virtual: true });
 
-import { Attesta, Verdict } from '@attesta/core';
+import { Attesta, Verdict } from '@kyberon/attesta';
 import { DynamicTool } from '@langchain/core/tools';
 
 const MockAttesta = Attesta as jest.MockedClass<typeof Attesta>;

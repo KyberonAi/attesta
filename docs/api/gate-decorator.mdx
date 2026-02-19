@@ -34,7 +34,7 @@ def delete_database(db_name: str) -> str:
 ```
 
 ```typescript TypeScript
-import { gate } from "@attesta/core";
+import { gate } from "@kyberon/attesta";
 
 // Style 1: Wrap a function directly
 const deploy = gate(async (service: string, version: string) => {
@@ -76,7 +76,8 @@ const restartService = withHighRisk(async (name: string) => {
 | `sync_timeout` | `float` | `300.0` | Maximum seconds to wait when bridging async evaluation from a synchronous context (e.g., Jupyter). Set to `0` for no timeout. |
 | `allow_hint_override` | `bool` | `False` | Whether to honor `ctx.hints["risk_override"]` at runtime. Keep `False` unless hints are trusted server-side input. |
 | `mode` | `str` | `"enforce"` | Gate mode: `enforce`, `shadow`, or `audit_only`. |
-| `approval_timeout_seconds` | `float` | `600.0` | Maximum time to wait for human response before returning `TIMED_OUT`. |
+| `fail_mode` | `"deny" \| "allow" \| "escalate"` | `"deny"` | Timeout policy for non-auto-approved actions: `deny` -> `TIMED_OUT`, `allow` -> `APPROVED`, `escalate` -> `ESCALATED`. |
+| `approval_timeout_seconds` | `float` | `600.0` | Maximum time to wait for a challenge response before `fail_mode` is applied. |
 
 ## Sync and Async Behavior
 
@@ -142,7 +143,7 @@ except AttestaDenied as e:
 ```
 
 ```typescript TypeScript
-import { gate, AttestaDenied } from "@attesta/core";
+import { gate, AttestaDenied } from "@kyberon/attesta";
 
 const dropTable = gate(
   { risk: "critical" },
@@ -190,7 +191,7 @@ print(core._risk_override)       # RiskLevel.HIGH
 ```
 
 ```typescript TypeScript
-import { gate } from "@attesta/core";
+import { gate } from "@kyberon/attesta";
 
 const deploy = gate({ risk: "high" }, async (service: string) => {
   return `Deployed ${service}`;
@@ -220,7 +221,7 @@ def export_users(format: str) -> str:
 ```
 
 ```typescript TypeScript
-import { gate } from "@attesta/core";
+import { gate } from "@kyberon/attesta";
 
 const exportUsers = gate(
   {
@@ -260,7 +261,7 @@ def delete_user(user_id: str) -> str:
 ```
 
 ```typescript TypeScript
-import { Attesta, gate } from "@attesta/core";
+import { Attesta, gate } from "@kyberon/attesta";
 
 const attesta = new Attesta({
   minReviewSeconds: 3.0,

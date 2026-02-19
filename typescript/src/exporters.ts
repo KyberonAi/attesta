@@ -3,8 +3,8 @@
  *
  * @example
  * ```ts
- * import { AuditLogger } from "@attesta/core";
- * import { CSVExporter } from "@attesta/core/exporters";
+ * import { AuditLogger } from "@kyberon/attesta";
+ * import { CSVExporter } from "@kyberon/attesta/exporters";
  *
  * const audit = new AuditLogger(".attesta/audit.jsonl");
  * const entries = audit.query({ verdict: "approved" });

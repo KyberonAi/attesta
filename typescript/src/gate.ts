@@ -27,6 +27,7 @@ import {
   riskLevelFromScore,
 } from "./types.js";
 
+import { DefaultRiskScorer } from "./risk.js";
 import { TrustEngine } from "./trust.js";
 
 // ---------------------------------------------------------------------------
@@ -53,21 +54,6 @@ export class AttestaDenied extends Error {
 // Default implementations (used when no external components are supplied)
 // ---------------------------------------------------------------------------
 
-class DefaultRiskScorerInternal implements RiskScorer {
-  get name(): string {
-    return "default";
-  }
-
-  score(ctx: ActionContext): number {
-    let base = 0.1;
-    if (ctx.environment === "production") base += 0.3;
-    if (ctx.hints["production"]) base += 0.2;
-    if (ctx.hints["destructive"]) base += 0.3;
-    if (ctx.hints["pii"]) base += 0.2;
-    return Math.min(base, 1.0);
-  }
-}
-
 class DefaultAuditLogger implements AuditLoggerProtocol {
   async log(ctx: ActionContext, result: ApprovalResult): Promise<string> {
     const entryId = randomUUID().replace(/-/g, "").slice(0, 12);
@@ -90,6 +76,8 @@ const DEFAULT_CHALLENGE_MAP: Record<RiskLevel, ChallengeType> = {
   [RiskLevel.HIGH]: ChallengeType.QUIZ,
   [RiskLevel.CRITICAL]: ChallengeType.MULTI_PARTY,
 } as const;
+
+export type FailMode = "deny" | "allow" | "escalate";
 
 function selectChallenge(
   risk: RiskAssessment,
@@ -136,6 +124,12 @@ export interface AttestaOptions {
 
   /** How much trust influences risk scoring (0-1). Default 0.3. */
   trustInfluence?: number;
+
+  /** Timeout policy: deny (default), allow, or escalate. */
+  failMode?: FailMode;
+
+  /** Maximum seconds to wait for challenge completion before timeout policy. */
+  approvalTimeoutSeconds?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -164,9 +158,11 @@ export class Attesta {
   private readonly _eventBus?: import("./events.js").EventBus;
   private readonly _trustEngine?: TrustEngine;
   private readonly _trustInfluence: number;
+  private readonly _failMode: FailMode;
+  private readonly _approvalTimeoutSeconds: number;
 
   constructor(options: AttestaOptions = {}) {
-    this._scorer = options.riskScorer ?? new DefaultRiskScorerInternal();
+    this._scorer = options.riskScorer ?? new DefaultRiskScorer();
     this._renderer = options.renderer;
     this._rendererResolved = options.renderer != null;
     this._audit = options.auditLogger ?? new DefaultAuditLogger();
@@ -177,6 +173,19 @@ export class Attesta {
     this._eventBus = options.eventBus;
     this._trustEngine = options.trustEngine;
     this._trustInfluence = options.trustInfluence ?? 0.3;
+    this._failMode = options.failMode ?? "deny";
+    this._approvalTimeoutSeconds = options.approvalTimeoutSeconds ?? 600;
+
+    if (!["deny", "allow", "escalate"].includes(this._failMode)) {
+      throw new TypeError(
+        `Invalid failMode '${this._failMode}'. Expected one of: deny, allow, escalate.`
+      );
+    }
+    if (this._approvalTimeoutSeconds <= 0) {
+      throw new RangeError(
+        `approvalTimeoutSeconds must be > 0, got ${this._approvalTimeoutSeconds}`
+      );
+    }
   }
 
   /**
@@ -259,6 +268,45 @@ export class Attesta {
     }
   }
 
+  private _timeoutOutcome(challengeType: ChallengeType): {
+    verdict: Verdict;
+    challengeResult: ChallengeResult;
+    metadata: Record<string, unknown>;
+  } {
+    const timeoutReason =
+      `Approval timed out after ${this._approvalTimeoutSeconds.toFixed(0)}s`;
+
+    const challengeResult = createChallengeResult({
+      passed: false,
+      challengeType,
+      details: {
+        reason: timeoutReason,
+        failMode: this._failMode,
+        timeoutSeconds: this._approvalTimeoutSeconds,
+      },
+    });
+
+    let verdict: Verdict;
+    if (this._failMode === "allow") {
+      verdict = Verdict.APPROVED;
+    } else if (this._failMode === "escalate") {
+      verdict = Verdict.ESCALATED;
+    } else {
+      verdict = Verdict.TIMED_OUT;
+    }
+
+    return {
+      verdict,
+      challengeResult,
+      metadata: {
+        failMode: this._failMode,
+        approvalTimeoutSeconds: this._approvalTimeoutSeconds,
+        timedOut: true,
+        timeoutReason,
+      },
+    };
+  }
+
   /**
    * Run the full approval pipeline and return the result.
    */
@@ -316,6 +364,10 @@ export class Attesta {
     // 4. Present challenge / collect verdict.
     let challengeResult: ChallengeResult | undefined;
     let verdict: Verdict;
+    const resultMetadata: Record<string, unknown> = {
+      failMode: this._failMode,
+      approvalTimeoutSeconds: this._approvalTimeoutSeconds,
+    };
 
     if (challengeType === ChallengeType.AUTO_APPROVE) {
       verdict = Verdict.APPROVED;
@@ -326,12 +378,32 @@ export class Attesta {
         challengeType,
         riskLevel: risk.level,
       });
-      challengeResult = await renderer.renderChallenge(
-        ctx,
-        risk,
-        challengeType
-      );
-      verdict = challengeResult.passed ? Verdict.APPROVED : Verdict.DENIED;
+      const timeoutMs = this._approvalTimeoutSeconds * 1000;
+      class _ApprovalTimeoutError extends Error {}
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      try {
+        challengeResult = await Promise.race([
+          renderer.renderChallenge(ctx, risk, challengeType),
+          new Promise<ChallengeResult>((_resolve, reject) => {
+            timeoutHandle = setTimeout(() => {
+              reject(new _ApprovalTimeoutError("approval timeout"));
+            }, timeoutMs);
+          }),
+        ]);
+        verdict = challengeResult.passed ? Verdict.APPROVED : Verdict.DENIED;
+      } catch (err) {
+        if (!(err instanceof _ApprovalTimeoutError)) {
+          throw err;
+        }
+        const timeoutOutcome = this._timeoutOutcome(challengeType);
+        verdict = timeoutOutcome.verdict;
+        challengeResult = timeoutOutcome.challengeResult;
+        Object.assign(resultMetadata, timeoutOutcome.metadata);
+      } finally {
+        if (timeoutHandle != null) {
+          clearTimeout(timeoutHandle);
+        }
+      }
       await this._emit("challenge_completed", {
         actionName: ctx.functionName,
         challengeType,
@@ -357,11 +429,16 @@ export class Attesta {
       riskAssessment: risk,
       challengeResult,
       reviewTimeSeconds: reviewTime,
+      metadata: resultMetadata,
     });
 
     // 6b. Emit verdict event.
     const verdictEvent =
-      verdict === Verdict.APPROVED ? "approved" : "denied";
+      verdict === Verdict.APPROVED
+        ? "approved"
+        : verdict === Verdict.ESCALATED
+          ? "escalated"
+          : "denied";
     await this._emit(verdictEvent, {
       actionName: ctx.functionName,
       riskScore: risk.score,
@@ -434,6 +511,20 @@ export class Attesta {
           },
         ],
         scorerName: "override",
+      });
+    }
+
+    const scorerWithAssess = this._scorer as RiskScorer & {
+      assess?: (context: ActionContext) => RiskAssessment;
+    };
+    if (typeof scorerWithAssess.assess === "function") {
+      const assessed = scorerWithAssess.assess(ctx);
+      const score = Math.max(0.0, Math.min(1.0, assessed.score));
+      return createRiskAssessment({
+        score,
+        level: riskLevelFromScore(score),
+        factors: assessed.factors,
+        scorerName: assessed.scorerName ?? this._scorer.name,
       });
     }
 
@@ -680,6 +771,8 @@ export function gateDecorator(
       riskHints: options.riskHints,
       trustEngine: options.trustEngine,
       trustInfluence: options.trustInfluence,
+      failMode: options.failMode,
+      approvalTimeoutSeconds: options.approvalTimeoutSeconds,
     });
 
     const wrapped = async function (
@@ -727,6 +820,8 @@ function wrapFunction<TArgs extends unknown[], TReturn>(
       riskHints: options.riskHints,
       trustEngine: options.trustEngine,
       trustInfluence: options.trustInfluence,
+      failMode: options.failMode,
+      approvalTimeoutSeconds: options.approvalTimeoutSeconds,
     });
 
   const wrapper = async function (

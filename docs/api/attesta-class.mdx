@@ -22,7 +22,7 @@ attesta = Attesta(
 ```
 
 ```typescript TypeScript
-import { Attesta } from "@attesta/core";
+import { Attesta } from "@kyberon/attesta";
 
 const attesta = new Attesta({
   riskScorer: myScorer,
@@ -84,7 +84,7 @@ attesta = Attesta.from_config(Path("/etc/attesta/config.yaml"))
 ```
 
 ```typescript TypeScript
-import { Attesta } from "@attesta/core";
+import { Attesta } from "@kyberon/attesta";
 
 const attesta = new Attesta();
 ```
@@ -180,7 +180,7 @@ def deploy(service: str, version: str) -> str:
 ```
 
 ```typescript TypeScript
-import { Attesta, gate } from "@attesta/core";
+import { Attesta, gate } from "@kyberon/attesta";
 
 const attesta = new Attesta();
 
@@ -244,7 +244,7 @@ elif result.verdict == Verdict.DENIED:
 ```
 
 ```typescript TypeScript
-import { Attesta, ActionContext, Verdict } from "@attesta/core";
+import { Attesta, ActionContext, Verdict } from "@kyberon/attesta";
 
 const attesta = new Attesta();
 

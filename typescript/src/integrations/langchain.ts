@@ -66,7 +66,7 @@ export interface GatedToolOptions extends AttestaOptions {
  *
  * ```ts
  * import { WikipediaQueryRun } from "@langchain/community/tools/wikipedia_query";
- * import { gatedTool } from "@attesta/core/integrations";
+ * import { gatedTool } from "@kyberon/attesta/integrations";
  *
  * const wiki = new WikipediaQueryRun();
  * const safeWiki = gatedTool(wiki, { riskHints: { pii: false } });
@@ -84,6 +84,8 @@ export function gatedTool<T extends LangChainToolLike>(
     minReviewSeconds: options.minReviewSeconds,
     riskOverride: options.riskOverride,
     riskHints: options.riskHints,
+    failMode: options.failMode,
+    approvalTimeoutSeconds: options.approvalTimeoutSeconds,
   });
 
   const defaultOnDenied = (result: ApprovalResult): string =>
@@ -143,7 +145,7 @@ export function gatedTool<T extends LangChainToolLike>(
  *
  * ```ts
  * import { StateGraph } from "@langchain/langgraph";
- * import { createGateNode } from "@attesta/core/integrations";
+ * import { createGateNode } from "@kyberon/attesta/integrations";
  *
  * const gateNode = createGateNode({
  *   riskOverride: "high",
@@ -169,6 +171,8 @@ export function createGateNode(
     minReviewSeconds: options.minReviewSeconds,
     riskOverride: options.riskOverride,
     riskHints: options.riskHints,
+    failMode: options.failMode,
+    approvalTimeoutSeconds: options.approvalTimeoutSeconds,
   });
 
   return async (

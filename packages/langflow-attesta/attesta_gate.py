@@ -13,9 +13,34 @@ import asyncio
 import json
 from typing import Any
 
-from lfx.custom.custom_component.component import Component
-from lfx.io import DropdownInput, MessageTextInput, Output
-from lfx.schema import Data
+try:
+    from lfx.custom.custom_component.component import Component
+    from lfx.io import DropdownInput, MessageTextInput, Output
+    from lfx.schema import Data
+except ImportError:
+    # Lightweight local stubs so this module remains importable in OSS CI
+    # without the full Langflow runtime installed.
+    class Component:  # type: ignore[no-redef]
+        def log(self, _message: str) -> None:
+            return None
+
+    class _InputBase:  # type: ignore[no-redef]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            self.args = args
+            self.kwargs = kwargs
+
+    class DropdownInput(_InputBase):  # type: ignore[no-redef]
+        pass
+
+    class MessageTextInput(_InputBase):  # type: ignore[no-redef]
+        pass
+
+    class Output(_InputBase):  # type: ignore[no-redef]
+        pass
+
+    class Data:  # type: ignore[no-redef]
+        def __init__(self, data: dict[str, Any] | None = None) -> None:
+            self.data = data or {}
 
 from attesta.core.gate import Attesta
 from attesta.core.types import ActionContext, RiskLevel, Verdict

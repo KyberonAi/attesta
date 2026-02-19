@@ -41,7 +41,7 @@ Attesta is in early development (v0.1.x). APIs may change between minor releases
 - **CrewAI integration** -- `AttestaCrewAIToolWrapper` for gating CrewAI tool executions.
 - **Vercel AI SDK integration** -- `gatedVercelTool` and `createAttestaMiddleware` for TypeScript (TypeScript only).
 - **No-code nodes** -- n8n (`n8n-nodes-attesta`), Flowise (`flowise-attesta`), Langflow (`langflow-attesta`), and Dify (`dify-attesta`) integration packages.
-- **TypeScript SDK** (`@attesta/core`) -- full implementation with `gate()`, `Attesta`, `evaluate()`, and all core protocols.
+- **TypeScript SDK** (`@kyberon/attesta`) -- full implementation with `gate()`, `Attesta`, `evaluate()`, and all core protocols.
 
 <Tip>
 Run `attesta audit verify` after installation to confirm the audit chain is working. The hash-chained JSONL format is tamper-evident -- modify any entry and every subsequent hash breaks.

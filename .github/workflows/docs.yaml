@@ -1,0 +1,43 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Docs Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Broken links check
+        working-directory: docs
+        run: npx -y mintlify broken-links
+
+  deploy:
+    name: Mintlify Deploy Trigger
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: docs-prod
+    steps:
+      - name: Trigger Mintlify deploy hook
+        env:
+          MINTLIFY_DEPLOY_HOOK_URL: ${{ secrets.MINTLIFY_DEPLOY_HOOK_URL }}
+        run: |
+          if [[ -z "${MINTLIFY_DEPLOY_HOOK_URL}" ]]; then
+            echo "MINTLIFY_DEPLOY_HOOK_URL not configured; skipping deploy trigger."
+            exit 0
+          fi
+          curl -fsSL -X POST "${MINTLIFY_DEPLOY_HOOK_URL}"
+          echo "Mintlify deploy trigger sent."

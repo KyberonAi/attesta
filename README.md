@@ -6,9 +6,9 @@
 <p align="center">
   <a href="https://pypi.org/project/attesta/"><img alt="PyPI" src="https://img.shields.io/pypi/v/attesta?color=blue"></a>
   <a href="https://pypi.org/project/attesta/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/attesta"></a>
-  <a href="https://github.com/KyberonAi/attesta/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green"></a>
-  <a href="https://github.com/KyberonAi/attesta"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/KyberonAi/attesta/ci.yaml?label=tests"></a>
-  <a href="https://github.com/KyberonAi/attesta"><img alt="Status" src="https://img.shields.io/badge/status-early%20release-orange"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green"></a>
+  <a href="./.github/workflows/ci.yaml"><img alt="CI" src="https://img.shields.io/badge/ci-configured-blue"></a>
+  <img alt="Status" src="https://img.shields.io/badge/status-early%20release-orange">
 </p>
 
 ---
@@ -33,7 +33,7 @@ attesta/
     src/attesta/   # Source code
     tests/         # Test suite
     pyproject.toml # Package config
-  typescript/      # TypeScript SDK (npm: @attesta/core)
+  typescript/      # TypeScript SDK (npm: @kyberon/attesta)
     src/           # Source code
     package.json   # Package config
     tsconfig.json  # TS config
@@ -901,10 +901,10 @@ attesta trust revoke compromised-agent
 
 ## TypeScript SDK
 
-The TypeScript package (`@attesta/core`) mirrors the Python API:
+The TypeScript package (`@kyberon/attesta`) mirrors the Python API:
 
 ```typescript
-import { Attesta, TerminalRenderer } from '@attesta/core';
+import { Attesta, TerminalRenderer } from '@kyberon/attesta';
 
 const attesta = new Attesta({
   renderer: new TerminalRenderer(),
@@ -963,6 +963,14 @@ attesta/
 
 All protocols use structural sub-typing (`typing.Protocol`). Bring your own risk scorer, renderer, challenge, or audit backend -- if it matches the protocol, it works.
 
+## Project Resources
+
+- Feature boundary (OSS vs Cloud): `docs/oss-vs-cloud.mdx`
+- Security policy and disclosure process: `SECURITY.md`
+- Support and response expectations: `SUPPORT.md`
+- Maintainer triage runbook: `MAINTAINERS.md`
+- Example apps: `examples/`
+
 ## Contributing
 
 Contributions are welcome. Please open an issue to discuss significant changes before submitting a PR.
@@ -975,11 +983,18 @@ pip install -e ".[dev]"
 # Run tests
 pytest tests/
 
+# No-code package tests
+PYTHONPATH=../python/src pytest ../packages/langflow-attesta/tests ../packages/dify-attesta/tests
+
 # Type checking
 mypy src/attesta
 
 # Linting
 ruff check src/
+
+# Performance benchmark harness
+cd ..
+./scripts/run_benchmarks.sh
 ```
 
 ## License

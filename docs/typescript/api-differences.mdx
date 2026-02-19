@@ -16,6 +16,8 @@ Python uses `snake_case` for all identifiers. TypeScript uses `camelCase` for pr
 | `audit_logger` | `auditLogger` | Constructor / gate option |
 | `risk_hints` | `riskHints` | Gate option |
 | `min_review_seconds` | `minReviewSeconds` | Gate option / policy key |
+| `fail_mode` | `failMode` | Timeout policy option (`deny \| allow \| escalate`) |
+| `timeout_seconds` | `approvalTimeoutSeconds` | Timeout threshold (seconds) |
 | `agent_id` | `agentId` | Gate option / context field |
 | `session_id` | `sessionId` | Gate option / context field |
 | `challenge_map` | `challengeMap` | Policy key |
@@ -64,7 +66,7 @@ The `@gate` decorator in Python has no direct equivalent in TypeScript. Instead,
     TypeScript uses function wrapping:
 
     ```typescript
-    import { gate } from "@attesta/core";
+    import { gate } from "@kyberon/attesta";
 
     // Style 1: Wrap directly
     const readFile = gate(async (path: string) => {
@@ -122,7 +124,7 @@ Python's `asyncio` and TypeScript's `Promise` model have significant differences
     The TypeScript SDK requires all gated functions to be `async`. The `gate()` wrapper always returns a `Promise`, so callers must always use `await`.
 
     ```typescript
-    import { gate } from "@attesta/core";
+    import { gate } from "@kyberon/attesta";
 
     const deploy = gate(async (service: string) => {
       return `Deployed ${service}`;
@@ -167,7 +169,7 @@ In TypeScript, if you wrap a synchronous function with `gate()`, it is automatic
   </Tab>
   <Tab title="TypeScript">
     ```typescript
-    import { Attesta } from "@attesta/core";
+    import { Attesta } from "@kyberon/attesta";
 
     // TypeScript uses the constructor directly (no fromConfig)
     const attesta = new Attesta();
@@ -212,7 +214,7 @@ elif result.verdict == Verdict.DENIED:
 ```
 
 ```typescript TypeScript
-import { Attesta, ActionContext, Verdict } from "@attesta/core";
+import { Attesta, ActionContext, Verdict } from "@kyberon/attesta";
 
 const attesta = new Attesta();
 
@@ -268,7 +270,7 @@ Both SDKs use structural typing for pluggable components (scorers, renderers, lo
     TypeScript uses `interface` definitions. Use `implements` for explicit compliance, or rely on structural typing.
 
     ```typescript
-    import { RiskScorer, ActionContext } from "@attesta/core";
+    import { RiskScorer, ActionContext } from "@kyberon/attesta";
 
     // Explicit implementation
     class MyScorer implements RiskScorer {
@@ -309,7 +311,7 @@ except AttestaDenied as e:
 ```
 
 ```typescript TypeScript
-import { gate, AttestaDenied } from "@attesta/core";
+import { gate, AttestaDenied } from "@kyberon/attesta";
 
 const dangerousAction = gate(
   { risk: "critical" },

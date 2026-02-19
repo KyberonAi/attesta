@@ -495,8 +495,8 @@ def delete_database(database: str, confirm_name: str) -> dict:
 The same pattern works in TypeScript. A single `Attesta` instance is shared across all framework integrations.
 
 ```typescript multi-framework.ts
-import { Attesta, createActionContext, Verdict } from "@attesta/core";
-import { gatedTool } from "@attesta/core/integrations";
+import { Attesta, createActionContext, Verdict } from "@kyberon/attesta";
+import { gatedTool } from "@kyberon/attesta/integrations";
 
 // ─── Shared Attesta instance ──────────────────────────────────────
 const attesta = new Attesta();

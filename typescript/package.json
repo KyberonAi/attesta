@@ -1,5 +1,5 @@
 {
-  "name": "@attesta/core",
+  "name": "@kyberon/attesta",
   "version": "0.1.0",
   "description": "Human-in-the-loop approval framework for AI agent actions",
   "type": "module",
@@ -58,6 +58,7 @@
     "build:cjs": "tsc --project tsconfig.cjs.json",
     "build": "npm run build:esm && npm run build:cjs",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
     "clean": "rm -rf dist"
   },
   "engines": {
@@ -80,8 +81,8 @@
   },
   "peerDependencies": {
     "chalk": "^5.0.0",
-    "@langchain/core": ">=0.1.0",
-    "ai": ">=3.0.0"
+    "@langchain/core": ">=0.3.80",
+    "ai": ">=5.0.52"
   },
   "peerDependenciesMeta": {
     "chalk": {

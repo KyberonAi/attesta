@@ -4,28 +4,28 @@ description: "Install, configure, and use Attesta in TypeScript with full type s
 icon: "js"
 ---
 
-Attesta ships a first-class TypeScript SDK under the `@attesta/core` package. It provides the same approval pipeline as the Python SDK -- risk scoring, escalating challenges, tamper-proof audit trails, and adaptive trust -- with idiomatic TypeScript conventions and full generic type safety.
+Attesta ships a first-class TypeScript SDK under the `@kyberon/attesta` package. It provides the same approval pipeline as the Python SDK -- risk scoring, escalating challenges, tamper-proof audit trails, and adaptive trust -- with idiomatic TypeScript conventions and full generic type safety.
 
 ## Installation
 
 ```bash
-npm install @attesta/core
+npm install @kyberon/attesta
 ```
 
 If you use a specific integration, install the peer dependency alongside it:
 
 <CodeGroup>
 ```bash Vercel AI SDK
-npm install @attesta/core ai
+npm install @kyberon/attesta ai
 ```
 
 ```bash LangChain
-npm install @attesta/core @langchain/core
+npm install @kyberon/attesta @langchain/core
 ```
 </CodeGroup>
 
 <Note>
-The `@attesta/core` package has zero runtime dependencies. Integration modules import peer dependencies lazily, so they are only required if you actually use them.
+The `@kyberon/attesta` package has zero runtime dependencies. Integration modules import peer dependencies lazily, so they are only required if you actually use them.
 </Note>
 
 ---
@@ -37,7 +37,7 @@ The `@attesta/core` package has zero runtime dependencies. Integration modules i
 The `gate` function wraps any async function with the Attesta approval pipeline. When the wrapped function is called, Attesta intercepts the invocation, scores the risk, presents the appropriate challenge, and either allows or blocks execution.
 
 ```typescript
-import { gate } from "@attesta/core";
+import { gate } from "@kyberon/attesta";
 
 const deleteUser = gate(async (userId: string): Promise<string> => {
   // This only executes if Attesta approves
@@ -53,7 +53,7 @@ const result = await deleteUser("usr_12345");
 Provide a configuration object as the first argument to customize risk scoring, hints, and metadata:
 
 ```typescript
-import { gate } from "@attesta/core";
+import { gate } from "@kyberon/attesta";
 
 const deployService = gate(
   {
@@ -74,7 +74,7 @@ const deployService = gate(
 You can also create a pre-configured gate factory and reuse it across multiple functions:
 
 ```typescript
-import { gate } from "@attesta/core";
+import { gate } from "@kyberon/attesta";
 
 const productionGate = gate({
   environment: "production",
@@ -98,7 +98,7 @@ const rollback = productionGate(async (service: string) => {
 For production use, create an `Attesta` instance that holds shared defaults for risk scoring, rendering, audit logging, and trust. All gates created from the instance inherit these defaults.
 
 ```typescript
-import { Attesta, gate } from "@attesta/core";
+import { Attesta, gate } from "@kyberon/attesta";
 
 // Create an Attesta instance with shared defaults
 const attesta = new Attesta();
@@ -119,7 +119,7 @@ const deleteUser = gate(
 Or configure with custom components:
 
 ```typescript
-import { Attesta } from "@attesta/core";
+import { Attesta } from "@kyberon/attesta";
 
 const attesta = new Attesta({
   riskScorer: myCustomScorer,
@@ -158,7 +158,7 @@ import {
   Renderer,
   AuditLogger,
   ChallengeProtocol,
-} from "@attesta/core";
+} from "@kyberon/attesta";
 ```
 
 ### Key Interfaces
@@ -175,7 +175,7 @@ import {
 The `gate` function preserves the original function's type signature using TypeScript generics:
 
 ```typescript
-import { gate } from "@attesta/core";
+import { gate } from "@kyberon/attesta";
 
 // TypeScript infers the full signature
 const add = gate(async (a: number, b: number): Promise<number> => {
@@ -196,7 +196,7 @@ The generic signature ensures that wrapped functions retain their parameter type
 When an operator denies an action or fails a challenge, the wrapped function throws an `AttestaDenied` error. The protected function is never executed.
 
 ```typescript
-import { gate, AttestaDenied } from "@attesta/core";
+import { gate, AttestaDenied } from "@kyberon/attesta";
 
 const dropTable = gate(
   { risk: "critical" },
@@ -222,7 +222,7 @@ try {
 
 | Aspect | Python | TypeScript |
 |--------|--------|------------|
-| Package | `pip install attesta` | `npm install @attesta/core` |
+| Package | `pip install attesta` | `npm install @kyberon/attesta` |
 | Gate syntax | `@gate` decorator | `gate(fn)` wrapper |
 | Naming | `snake_case` | `camelCase` |
 | Async | `asyncio` / `await` | Promises / `await` |

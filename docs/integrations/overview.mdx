@@ -11,12 +11,12 @@ Attesta provides first-class integrations for the most popular AI agent framewor
 | Framework | Language | Integration Class | Hook Point | Install Extra |
 |---|---|---|---|---|
 | [LangChain / LangGraph](/integrations/langchain) | Python | `AttestaToolWrapper`, `attesta_node` | Tool `func`/`coroutine` replacement; LangGraph node | `attesta[langchain]` |
-| [LangChain (TS)](/integrations/langchain) | TypeScript | `gatedTool`, `createGateNode` | Proxy on `invoke`; LangGraph node | `@attesta/core` |
+| [LangChain (TS)](/integrations/langchain) | TypeScript | `gatedTool`, `createGateNode` | Proxy on `invoke`; LangGraph node | `@kyberon/attesta` |
 | [OpenAI Agents SDK](/integrations/openai-agents) | Python | `attesta_approval_handler`, `AttestaGuardrail` | `Runner.run(approval_handler=...)`, `Agent(tool_guardrails=[...])` | `attesta[openai]` |
 | [Anthropic Claude](/integrations/anthropic-claude) | Python | `AttestaToolGate` | `tool_use` content block evaluation | `attesta[anthropic]` |
 | [CrewAI](/integrations/crewai) | Python | `AttestaHumanInput` | `Task(callback=...)` | `attesta[crewai]` |
 | [MCP](/integrations/mcp) | Python | `attesta_tool_handler`, `MCPProxy` | `call_tool` decorator; stdio proxy | `attesta` (core) |
-| [Vercel AI SDK](/integrations/vercel-ai) | TypeScript | `gatedVercelTool`, `createAttestaMiddleware` | Tool `execute` wrapper; `experimental_onToolCall` | `@attesta/core` |
+| [Vercel AI SDK](/integrations/vercel-ai) | TypeScript | `gatedVercelTool`, `createAttestaMiddleware` | Tool `execute` wrapper; `experimental_onToolCall` | `@kyberon/attesta` |
 
 <Tip>
 Not sure which integration to use? If you are building a **Python agent**, start with the framework-specific integration (LangChain, OpenAI, etc.). If you are building a **TypeScript agent**, use the Vercel AI or LangChain TS integration. If you want to gate **any MCP server** without code changes, use the [MCPProxy](/integrations/mcp).
@@ -60,7 +60,7 @@ pip install attesta
 ```
 
 ```bash TypeScript
-npm install @attesta/core
+npm install @kyberon/attesta
 ```
 </CodeGroup>
 
@@ -80,7 +80,7 @@ attesta = Attesta.from_config("attesta.yaml")
 ```
 
 ```typescript TypeScript
-import { Attesta } from "@attesta/core";
+import { Attesta } from "@kyberon/attesta";
 
 // Minimal (all defaults)
 const attesta = new Attesta();

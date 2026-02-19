@@ -1,0 +1,17 @@
+{
+  "benchmark": "attesta-python",
+  "iterations": 500,
+  "warmup": 50,
+  "cases": {
+    "low_risk_auto_approve": {
+      "p50_ms": 0.004291,
+      "p95_ms": 0.004417,
+      "mean_ms": 0.004296
+    },
+    "high_risk_challenge_pass": {
+      "p50_ms": 0.054583,
+      "p95_ms": 0.058708,
+      "mean_ms": 0.055969
+    }
+  }
+}

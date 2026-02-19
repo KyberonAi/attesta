@@ -1,0 +1,35 @@
+---
+title: "Maintainer Operations"
+description: "Triage cadence, ownership, and escalation workflow for OSS maintenance"
+icon: "users"
+---
+
+This guide summarizes the maintainer operating model before public launch.
+
+## Source Documents
+
+- `MAINTAINERS.md`
+- `SUPPORT.md`
+- `SECURITY.md`
+- `security/dependency-exceptions.md`
+- `.github/BRANCH_PROTECTION_CHECKLIST.md`
+
+## Triage SLAs
+
+- issue/PR first response target: 5 business days
+- security advisory acknowledgment: 3 business days
+- high/critical remediation plan: 14 calendar days
+
+## Weekly Maintainer Loop
+
+1. triage open issues and PRs
+2. review dependency exception expiries
+3. review CI security findings and close false positives with rationale
+4. update roadmap labels (`next-patch`, `next-minor`, `backlog`)
+
+## Release-Week Requirements
+
+- complete `RELEASE_CHECKLIST.md`
+- regenerate SBOMs and confirm provenance attestations
+- verify `OSS_SCOPE.md` and `/oss-vs-cloud` still match shipped behavior
+- cut pre-release tags with `scripts/cut_release_candidate.sh`

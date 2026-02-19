@@ -7,7 +7,7 @@ icon: "robot"
 The `flowise-attesta` package provides the **Attesta Approval** tool component for [Flowise](https://flowiseai.com). It registers as a LangChain `DynamicTool` that an agent can invoke during a chatflow to evaluate actions for risk before execution.
 
 <Note>
-**Package:** `flowise-attesta` v0.1.0 | **Language:** TypeScript | **Dependencies:** `@attesta/core ^0.1.0` | **Peers:** `flowise-components >=1.0.0`, `@langchain/core >=0.1.0`
+**Package:** `flowise-attesta` v0.1.0 | **Language:** TypeScript | **Dependencies:** `@kyberon/attesta ^0.1.0` | **Peers:** `flowise-components >=1.0.0`, `@langchain/core >=0.1.0`
 </Note>
 
 ## Installation
@@ -236,7 +236,7 @@ The component requires the following peer dependencies:
 | `flowise-components` | `>=1.0.0` |
 | `@langchain/core` | `>=0.1.0` |
 
-These are typically already available in a Flowise installation. The `@attesta/core` package is bundled as a direct dependency of `flowise-attesta`.
+These are typically already available in a Flowise installation. The `@kyberon/attesta` package is bundled as a direct dependency of `flowise-attesta`.
 
 <Warning>
 The Flowise component creates a new `Attesta` instance for each `init()` call. Trust scores and session state do not persist across conversations. For persistent trust tracking, configure an external audit logger via the Attesta configuration.

@@ -5,8 +5,8 @@ import type {
   INodeTypeDescription,
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
-import { Attesta, createActionContext, Verdict, RiskLevel } from '@attesta/core';
-import type { ApprovalResult } from '@attesta/core';
+import { Attesta, createActionContext, Verdict, RiskLevel } from '@kyberon/attesta';
+import type { ApprovalResult } from '@kyberon/attesta';
 
 export class AttestaGate implements INodeType {
   description: INodeTypeDescription = {

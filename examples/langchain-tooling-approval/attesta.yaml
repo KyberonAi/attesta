@@ -1,0 +1,13 @@
+policy:
+  fail_mode: deny
+  timeout_seconds: 30
+  minimum_review_seconds:
+    medium: 3
+    high: 10
+    critical: 25
+
+audit:
+  path: .attesta/audit.jsonl
+
+trust:
+  initial_score: 0.4

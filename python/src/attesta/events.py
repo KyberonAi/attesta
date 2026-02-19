@@ -41,6 +41,7 @@ class EventType(Enum):
     CHALLENGE_COMPLETED = "challenge_completed"
     APPROVED = "approved"
     DENIED = "denied"
+    ESCALATED = "escalated"
     AUDIT_LOGGED = "audit_logged"
 
 

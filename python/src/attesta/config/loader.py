@@ -186,6 +186,16 @@ class Policy:
         repr=False,
     )
 
+    def __post_init__(self) -> None:
+        self.fail_mode = str(self.fail_mode).strip().lower()
+        if self.fail_mode not in {"deny", "allow", "escalate"}:
+            raise ValueError(
+                "policy.fail_mode must be one of: deny, allow, escalate"
+            )
+        self.timeout_seconds = float(self.timeout_seconds)
+        if self.timeout_seconds <= 0:
+            raise ValueError("policy.timeout_seconds must be > 0")
+
     def challenge_for_risk(self, level: RiskLevel) -> ChallengeType:
         """Determine which challenge type to use for a given risk level.
 
