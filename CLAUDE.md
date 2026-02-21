@@ -1,82 +1,48 @@
 # CLAUDE.md
 
-Project context for Claude Code and AI-assisted development.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-**Attesta** is an open-core Human-in-the-Loop (HITL) approval framework for AI agents. It solves the "rubber-stamping problem" by scoring action risk and selecting verification challenges proportional to that risk. The OSS layer covers the proof pipeline (risk scoring, challenges, audit); the proprietary layer (not in this repo) covers operations (dashboards, analytics, fleet management).
+**Attesta** is an open-core Human-in-the-Loop (HITL) approval framework for AI agents. It scores action risk and selects verification challenges proportional to that risk — from auto-approving safe reads to requiring multi-party sign-off for irreversible operations. The OSS layer (this repo) covers the proof pipeline; the proprietary layer (not here) covers dashboards, analytics, and fleet management.
 
-## Repository Structure
+## Build and Test Commands
 
-```
-attesta/
-  python/             # Python SDK — PyPI: attesta
-    src/attesta/      # Source (core/, challenges/, renderers/, integrations/, domains/, config/, cli/)
-    tests/            # pytest test suite (503+ tests)
-    pyproject.toml    # Hatchling build, zero required deps
-  typescript/         # TypeScript SDK — npm: @kyberon/attesta
-    src/              # Source (mirrors Python: gate, risk, trust, audit, challenges, renderers, integrations)
-    tests/            # Node test runner
-    package.json
-  packages/           # No-code platform integrations
-    dify-attesta/     # Dify plugin
-    flowise-attesta/  # Flowise community node
-    langflow-attesta/ # Langflow component
-    n8n-nodes-attesta/# n8n community node
-  docs/               # Mintlify documentation site (64 .mdx files)
-  scripts/            # Benchmarks, release tooling, SBOM generation
-  examples/           # Working example apps (LangChain, OpenAI Agents, Vercel AI)
-```
-
-## Development Setup
-
-### Python (primary SDK)
+### Python
 
 ```bash
-cd python
-pip install -e ".[dev,yaml,terminal]"
+# Install (from repo root)
+cd python && pip install -e ".[dev,yaml,terminal]"
+
+# Run all tests (use the project venv — system Python may be too old)
+.venv/bin/python -m pytest python/tests/ -q
+
+# Run a single test file
+.venv/bin/python -m pytest python/tests/test_gate.py -q
+
+# Run a single test function
+.venv/bin/python -m pytest python/tests/test_gate.py::TestGateDecorator::test_basic_gate -q
+
+# Lint
+cd python && ruff check src tests
+
+# Type check
+cd python && mypy src/attesta
 ```
 
-Requires Python 3.11+ (venv at `.venv/` uses 3.11 or 3.12).
+Requires Python 3.11+ (venv at `.venv/` uses 3.11 or 3.12). asyncio_mode is "auto" in pyproject.toml.
 
 ### TypeScript
 
 ```bash
 cd typescript
 npm install
-npm run build
-```
-
-Requires Node.js 18+. Use Node v22 (not v25) for docs dev server.
-
-### Documentation
-
-```bash
-npx mintlify@latest dev   # from repo root; runs on port 3000+
-```
-
-## Running Tests
-
-### Python
-
-```bash
-# From repo root — use the project venv
-.venv/bin/python -m pytest python/tests/ -q
-
-# Or if inside the venv
-cd python && pytest tests/ -q
-```
-
-All 503+ tests should pass. asyncio_mode is set to "auto" in pyproject.toml.
-
-### TypeScript
-
-```bash
-cd typescript
 npm run typecheck   # tsc --noEmit
 npm run build       # compile ESM + CJS
 npm test            # node --test
 ```
+
+Requires Node.js 18+.
 
 ### No-code packages
 
@@ -85,59 +51,68 @@ PYTHONPATH=python/src pytest packages/langflow-attesta/tests -q
 PYTHONPATH=python/src pytest packages/dify-attesta/tests -q
 ```
 
-## Key Architecture Concepts
+### Docs (Mintlify)
 
-- **`@gate` decorator** (Python) / `gate()` wrapper (TS): Entry point. Wraps any function with risk-scored HITL approval.
-- **`Attesta` class**: Shared config holder — risk scorer, renderer, audit logger, trust engine, challenge map, policy.
-- **Risk pipeline**: 5-factor scoring (function name 30%, arguments 25%, docstring 20%, hints 15%, novelty 10%) with environment multiplier.
-- **Challenge types**: AUTO_APPROVE, CONFIRM, QUIZ, TEACH_BACK, MULTI_PARTY — selected by risk level.
-- **TrustEngine**: Bayesian-inspired adaptive trust with exponential decay, per-agent/per-domain tracking.
-- **AuditLogger**: SHA-256 hash-chained JSONL; `verify_chain()` detects tampering.
-- **Domain profiles**: Industry-specific risk patterns, sensitive terms, escalation rules (presets: `devops`, `data_pipeline`).
-- **Modes**: `enforce` (default), `shadow` (log but don't block), `audit_only` (log only, no challenges).
+```bash
+npx mintlify@latest dev   # from repo root; requires Node <25 (use nvm use 22)
+```
 
-## Important Types (Python)
+## Architecture
 
-- `ActionContext` — dataclass; `description` is a `@property` (derived from `function_name` + `args`), NOT a constructor param. Use `function_doc=` for docstring text.
-- `RiskLevel` — enum: LOW, MEDIUM, HIGH, CRITICAL
-- `Verdict` — enum: APPROVED, DENIED, TIMED_OUT, MODIFIED, ESCALATED
-- `ChallengeType` — enum: AUTO_APPROVE, CONFIRM, QUIZ, TEACH_BACK, MULTI_PARTY
-- `ChallengeResult` — dataclass: `passed`, `challenge_type`, `details`
-- Protocols: `RiskScorer`, `Renderer`, `AuditLoggerProtocol` — structural subtyping
+### Two Attesta Classes
 
-## Code Style and Conventions
+There are two `Attesta` classes — understanding the distinction is critical:
 
-- **Python**: ruff for linting (`E, F, I, N, UP, B`), mypy strict mode, line length 120, target Python 3.11
-- **TypeScript**: strict mode, dual ESM/CJS output
-- **Security patterns**: All user-facing HTML uses `_esc()` / `escapeHtml()` for XSS prevention. CSRF tokens on all web forms. `execFile()` instead of `exec()` for shell commands. File permissions `0o600` for sensitive files (audit, trust data). `asyncio.wait_for()` for approval timeout.
-- **EOFError handling**: All terminal input uses try/except `(EOFError, KeyboardInterrupt)` returning empty string.
+1. **`attesta/__init__.py:Attesta`** — The public-facing entry point. Holds shared config (policy, scorer, renderer, audit logger, trust engine). Creates and caches a `CoreAttesta` instance on first `evaluate()` call. This is what users import and configure. Has `from_config()` for YAML loading and a `.gate()` decorator factory.
 
-## File Permissions and Security
+2. **`attesta/core/gate.py:Attesta` (aliased as `CoreAttesta`)** — The internal orchestrator that runs the actual pipeline: risk scoring → challenge selection → verification → audit logging. Stateful (tracks novelty). The `@gate` module-level decorator creates a `CoreAttesta` per decorated function.
 
-- Audit log and trust data files are created with `os.open(..., 0o600)` — owner read/write only.
-- Web renderer enforces 64KB POST body limit.
-- CSRF tokens use `secrets.token_urlsafe(32)` (Python) / `crypto.randomBytes(32)` (TS).
-- `risk_override` hints are blocked by default (`allow_hint_override=False`).
+### Request Flow
 
-## Common Gotchas
+```
+@gate decorator or Attesta.evaluate(ctx)
+  → CoreAttesta.evaluate(ActionContext)
+    → RiskScorer.score(ctx) → float [0,1]
+    → TrustEngine.effective_risk() (if configured) → adjusted score
+    → RiskLevel.from_score() → LOW/MEDIUM/HIGH/CRITICAL
+    → challenge_map[risk_level] → ChallengeType
+    → asyncio.wait_for(Renderer.render_challenge(...), timeout)
+    → AuditLogger.log(entry)
+    → ApprovalResult
+```
 
-1. **ActionContext.description**: It's a property, not a constructor param. Tests that need a description should set `function_doc=` instead.
-2. **System Python vs venv**: The project venv is at `.venv/`. System Python may be 3.9 — always use `.venv/bin/python`.
-3. **Node version for docs**: Mintlify requires Node <25. Use `nvm use 22` if needed.
-4. **TypeScript non-TTY behavior**: Defaults to DENY (not auto-approve like Python). This is intentional.
-5. **OSS_SCOPE.md**: Internal strategy doc, gitignored — don't commit or reference in public-facing content.
+### Key Modules
 
-## What NOT to Modify
+- **`core/types.py`** — All enums, dataclasses, and protocols. Zero internal deps. Import-safe from anywhere.
+- **`core/risk.py`** — `DefaultRiskScorer` (5-factor weighted), `CompositeRiskScorer`, `MaxRiskScorer`, `FixedRiskScorer`.
+- **`core/trust.py`** — Bayesian-inspired adaptive trust. Exponential decay, per-agent/per-domain. Persists to JSON.
+- **`core/audit.py`** — SHA-256 hash-chained JSONL. `verify_chain()` detects tampering.
+- **`challenges/`** — `confirm.py`, `quiz.py`, `teach_back.py`, `multi_party.py`. Each challenge is instantiated by the renderer.
+- **`renderers/`** — `terminal.py` (rich), `web.py` (async HTTP). Default renderer auto-approves in non-TTY Python, denies in TS.
+- **`integrations/`** — LangChain, OpenAI Agents SDK, CrewAI, Anthropic, MCP. Each wraps `Attesta.evaluate()`.
+- **`domains/`** — `DomainProfile`, `DomainRiskScorer`, presets (`devops`, `data_pipeline`).
+- **`config/loader.py`** — Parses YAML into a `Policy` dataclass. Supports structured (`policy:`, `risk:`, `trust:`) and legacy flat format.
 
-- **OSS boundary**: The `scripts/check_release_boundary.sh` script validates that proprietary code stays out of the OSS release.
-- **Hash chain format**: The JSONL audit format is a backwards-compatibility contract. Don't change the hashing algorithm or field order.
-- **Zero-dependency core**: The Python core has zero required dependencies. All extras are optional.
+### TypeScript SDK
+
+Mirrors the Python SDK at `typescript/src/`. Dual ESM/CJS output. Key difference: non-TTY defaults to DENY (Python defaults to auto-approve).
+
+## Critical Gotchas
+
+1. **`ActionContext.description` is a property**, not a constructor param. It's derived from `function_name` + `args`. To set docstring text, use `function_doc=`.
+2. **System Python vs venv**: Project venv is at `.venv/`. System Python may be 3.9. Always use `.venv/bin/python`.
+3. **Zero-dependency core**: Python core has zero required deps. All extras (`rich`, `pyyaml`, framework SDKs) are optional. Don't add required deps.
+4. **Hash chain format**: JSONL audit format is a backwards-compatibility contract. Don't change hashing algorithm or field order.
+5. **OSS_SCOPE.md**: Internal strategy doc, gitignored. Don't commit or reference in public-facing content.
+6. **`risk_override` hints**: Blocked by default (`allow_hint_override=False`). Trusted overrides use the `TRUSTED_RISK_OVERRIDE_METADATA_KEY` metadata path instead.
+
+## Code Conventions
+
+- **Python**: ruff (`E, F, I, N, UP, B`), mypy strict, line length 120, target 3.11.
+- **TypeScript**: strict mode, dual ESM/CJS.
+- **Security**: HTML escaping via `_esc()`/`escapeHtml()`. CSRF tokens on all web forms. `execFile()` not `exec()`. File permissions `0o600` for audit/trust files. `asyncio.wait_for()` for approval timeout. All terminal input wrapped in `try/except (EOFError, KeyboardInterrupt)`.
+- **Protocols**: All extensibility uses `typing.Protocol` (structural subtyping). No ABC inheritance required.
 
 ## CI
 
-GitHub Actions workflow at `.github/workflows/ci.yaml` runs:
-- Python tests (3.11, 3.12) with pytest
-- TypeScript typecheck + build + test
-- ruff lint
-- mypy type check
-- Release boundary check
+`.github/workflows/ci.yaml`: Python tests (3.12), TS typecheck + build + test, ruff lint, mypy, release boundary check, dependency review, docs link check.
