@@ -77,7 +77,7 @@ jobs:
           twine check dist/*
           sha256sum dist/* > dist/SHA256SUMS.txt
       - name: Upload Python artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: python-dist
           path: python/dist/*
@@ -99,7 +99,7 @@ jobs:
           npm pack
           sha256sum *.tgz > SHA256SUMS.txt
       - name: Upload npm artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: npm-dist
           path: |
@@ -120,7 +120,7 @@ jobs:
             --output-file security-artifacts/release-sbom-typescript.cdx.json \
             --workspace @kyberon/attesta
       - name: Upload release SBOM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-sbom
           path: security-artifacts/*.cdx.json
