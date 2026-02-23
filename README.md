@@ -83,6 +83,7 @@ The core library has **zero dependencies**. Add what you need:
 ```bash
 pip install attesta[terminal]    # Rich terminal UI
 pip install attesta[yaml]        # YAML config support
+pip install attesta[trailproof]  # TrailProof tamper-evident audit backend
 pip install attesta[langchain]   # LangChain/LangGraph integration
 pip install attesta[openai]      # OpenAI Agents SDK integration
 pip install attesta[anthropic]   # Anthropic Claude integration
@@ -454,6 +455,45 @@ critical_denials = audit.query(risk_level="critical", verdict="denied")
 stamps = audit.find_rubber_stamps(max_review_seconds=5.0, min_risk="high")
 print(f"Found {len(stamps)} suspicious rubber-stamps")
 ```
+
+### TrailProof Backend (Optional)
+
+For enhanced audit capabilities including HMAC signing, multi-tenancy, and trace correlation, use the optional TrailProof backend:
+
+```bash
+pip install attesta[trailproof]
+```
+
+Configure in `attesta.yaml`:
+
+```yaml
+audit:
+  backend: trailproof
+  path: ".attesta/audit.jsonl"
+  signing_key: "your-secret-key"  # Optional: for HMAC signing
+```
+
+Or programmatically:
+
+```python
+from attesta import Attesta
+from attesta.core.audit import TrailProofBackend
+
+audit_backend = TrailProofBackend(
+    path=".attesta/audit.jsonl",
+    signing_key="your-secret-key",
+)
+
+attesta = Attesta(audit_logger=audit_backend)
+```
+
+TrailProof provides:
+- HMAC-signed audit entries for cryptographic provenance
+- Multi-tenancy support with tenant_id isolation
+- Trace and session correlation for distributed workflows
+- Full backwards compatibility with the legacy audit format
+
+Both audit backends are supported. The legacy backend remains the default with zero dependencies.
 
 ## Framework Integrations
 
@@ -971,9 +1011,37 @@ All protocols use structural sub-typing (`typing.Protocol`). Bring your own risk
 - Maintainer triage runbook: `MAINTAINERS.md`
 - Example apps: `examples/`
 
+## Development Workflow
+
+Attesta follows the **Kyberon workflow** for structured development. This ensures consistency across spec → plan → build → review → commit cycles.
+
+### Workflow Overview
+
+1. **Spec**: All features start with a specification in `.claude/specs/`
+2. **Plan**: Specs are decomposed into actionable plans in `.claude/plans/`
+3. **Build**: Implementation follows plans using the `/build` command
+4. **Review**: Independent review via `review-agent` catches spec drift early
+5. **Commit**: Conventional commits are created via the `/commit` command
+6. **ADRs**: Architecture decisions are documented in `.claude/decisions/`
+
+### Multi-Agent Development
+
+The workflow supports parallel development patterns:
+- **parallel-mirror**: Multiple agents work on independent features simultaneously
+- **review-agent**: Independent review agent validates implementations against specs
+- **parallel-build**: Parallel compilation and testing across Python and TypeScript
+
+For more details, see the `.claude/` directory and [ADR-001: Adopt Kyberon Workflow](.claude/decisions/adr-001-adopt-kyberon-workflow.md).
+
 ## Contributing
 
 Contributions are welcome. Please open an issue to discuss significant changes before submitting a PR.
+
+For major features, follow the Kyberon workflow:
+1. Create a spec in `.claude/specs/`
+2. Generate a plan in `.claude/plans/`
+3. Build according to the plan
+4. Submit for review
 
 ```bash
 git clone https://github.com/KyberonAi/attesta.git
