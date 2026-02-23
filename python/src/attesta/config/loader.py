@@ -166,6 +166,12 @@ class Policy:
     # OSS default is fail-fast to prevent silent misconfiguration.
     domain_strict: bool = True
 
+    # Audit backend: "legacy" (default) or "trailproof"
+    audit_backend: str = "legacy"
+    audit_path: str = ".attesta/audit.jsonl"
+    audit_tenant_id: str = "default"
+    audit_hmac_key: str | None = None
+
     # Custom challenge map overrides: risk level name -> challenge type name.
     # Parsed from YAML ``policy.challenge_map``.  When absent,
     # :meth:`challenge_for_risk` falls back to built-in defaults.
@@ -430,5 +436,17 @@ def _parse_config(data: dict) -> Policy:
     domain_strict = data.get("domain_strict")
     if domain_strict is not None:
         kwargs["domain_strict"] = bool(domain_strict)
+
+    # Parse audit backend settings
+    audit_data = data.get("audit", {})
+    if isinstance(audit_data, dict):
+        if "backend" in audit_data:
+            kwargs["audit_backend"] = str(audit_data["backend"]).strip().lower()
+        if "path" in audit_data:
+            kwargs["audit_path"] = str(audit_data["path"])
+        if "tenant_id" in audit_data:
+            kwargs["audit_tenant_id"] = str(audit_data["tenant_id"])
+        if "hmac_key" in audit_data:
+            kwargs["audit_hmac_key"] = str(audit_data["hmac_key"])
 
     return Policy(**kwargs)

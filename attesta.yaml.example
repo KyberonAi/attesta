@@ -90,5 +90,15 @@ trust:
 # Audit Trail
 # ---------------------------------------------------------------------------
 audit:
-  # Path to the JSONL audit log (SHA-256 hash-chained).
+  # Backend: "legacy" (default, built-in SHA-256 JSONL) or "trailproof"
+  # TrailProof requires: pip install attesta[trailproof]
+  backend: legacy
+
+  # Path to the JSONL audit log.
   path: ".attesta/audit.jsonl"
+
+  # Tenant ID for TrailProof backend (multi-tenancy isolation).
+  # tenant_id: "my-org"
+
+  # HMAC signing key for TrailProof backend (optional provenance).
+  # hmac_key: "your-secret-key"
