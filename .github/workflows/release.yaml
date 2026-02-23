@@ -126,20 +126,20 @@ jobs:
           path: security-artifacts/*.cdx.json
 
       - name: Attest Python release artifacts
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
             python/dist/*.tar.gz
             python/dist/*.whl
             python/dist/SHA256SUMS.txt
       - name: Attest npm release artifacts
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
             typescript/*.tgz
             typescript/SHA256SUMS.txt
       - name: Attest release SBOM artifacts
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
             security-artifacts/release-sbom-python.cdx.json

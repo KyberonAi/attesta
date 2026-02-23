@@ -127,10 +127,10 @@ jobs:
           name: sbom-artifacts
           path: security-artifacts/*.cdx.json
       - name: Attest Python SBOM
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: security-artifacts/sbom-python.cdx.json
       - name: Attest TypeScript SBOM
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: security-artifacts/sbom-typescript.cdx.json
