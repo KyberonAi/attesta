@@ -72,6 +72,7 @@ logger = logging.getLogger("attesta.integrations.mcp")
 # Decorator for MCP call_tool handlers
 # ---------------------------------------------------------------------------
 
+
 def attesta_tool_handler(
     attesta: Attesta,
     *,
@@ -125,28 +126,28 @@ def attesta_tool_handler(
             score = result.risk_assessment.score
             logger.info(
                 "Attesta denied MCP tool %r (risk=%s, score=%.2f)",
-                name, risk_label, score,
+                name,
+                risk_label,
+                score,
             )
 
             # Return an MCP-compatible error content block.
             try:
                 from mcp.types import TextContent
 
-                return [TextContent(
-                    type="text",
-                    text=(
-                        f"Action denied by Attesta: {name} "
-                        f"(risk: {risk_label}, score: {score:.2f})"
-                    ),
-                )]
+                return [
+                    TextContent(
+                        type="text",
+                        text=(f"Action denied by Attesta: {name} (risk: {risk_label}, score: {score:.2f})"),
+                    )
+                ]
             except ImportError:
-                return [{
-                    "type": "text",
-                    "text": (
-                        f"Action denied by Attesta: {name} "
-                        f"(risk: {risk_label}, score: {score:.2f})"
-                    ),
-                }]
+                return [
+                    {
+                        "type": "text",
+                        "text": (f"Action denied by Attesta: {name} (risk: {risk_label}, score: {score:.2f})"),
+                    }
+                ]
 
         return wrapper
 
@@ -156,6 +157,7 @@ def attesta_tool_handler(
 # ---------------------------------------------------------------------------
 # MCP Proxy
 # ---------------------------------------------------------------------------
+
 
 class MCPProxy:
     """Stdio proxy that wraps any MCP server with Attesta approval.
@@ -205,14 +207,12 @@ class MCPProxy:
             stderr=sys.stderr,  # upstream stderr passes through to terminal
         )
 
-        _log_stderr(
-            f"Attesta MCP proxy started, wrapping: "
-            f"{' '.join(self.upstream_command)}"
-        )
+        _log_stderr(f"Attesta MCP proxy started, wrapping: {' '.join(self.upstream_command)}")
 
         # Background thread: forward upstream responses → client stdout.
         response_thread = threading.Thread(
-            target=self._forward_responses, daemon=True,
+            target=self._forward_responses,
+            daemon=True,
         )
         response_thread.start()
 
@@ -301,10 +301,7 @@ class MCPProxy:
 
         risk_label = result.risk_assessment.level.value
         score = result.risk_assessment.score
-        _log_stderr(
-            f"  [DENIED]   {tool_name} "
-            f"(risk: {risk_label}, score: {score:.2f})"
-        )
+        _log_stderr(f"  [DENIED]   {tool_name} (risk: {risk_label}, score: {score:.2f})")
 
         denial = {
             "jsonrpc": "2.0",
@@ -346,6 +343,7 @@ class MCPProxy:
 # MCP stdio protocol helpers
 # ---------------------------------------------------------------------------
 
+
 def _decode_message(stream: Any) -> dict | None:
     """Read one JSON-RPC message from an MCP stdio stream.
 
@@ -365,11 +363,7 @@ def _decode_message(stream: Any) -> dict | None:
         if not raw:
             return None
 
-        text = (
-            raw.decode("utf-8", errors="replace")
-            if isinstance(raw, (bytes, bytearray))
-            else raw
-        ).strip()
+        text = (raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else raw).strip()
 
         if not text:
             continue

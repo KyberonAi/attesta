@@ -29,6 +29,7 @@ logger = logging.getLogger("attesta.audit")
 # Protocol
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class AuditBackend(Protocol):
     """Pluggable audit storage backend.
@@ -53,6 +54,7 @@ class AuditBackend(Protocol):
 # ---------------------------------------------------------------------------
 # Legacy backend (wraps existing AuditLogger)
 # ---------------------------------------------------------------------------
+
 
 class LegacyBackend:
     """Wraps the existing :class:`~attesta.core.audit.AuditLogger`.
@@ -83,6 +85,7 @@ class LegacyBackend:
 # TrailProof backend
 # ---------------------------------------------------------------------------
 
+
 class TrailProofBackend:
     """Delegates audit logging to TrailProof.
 
@@ -107,8 +110,7 @@ class TrailProofBackend:
             from trailproof import Trailproof
         except ImportError:
             raise ImportError(
-                "TrailProof is required for the trailproof audit backend. "
-                "Install with: pip install attesta[trailproof]"
+                "TrailProof is required for the trailproof audit backend. Install with: pip install attesta[trailproof]"
             ) from None
 
         kwargs: dict[str, Any] = {"store": "jsonl", "path": path}
@@ -184,6 +186,7 @@ class TrailProofBackend:
 # Factory
 # ---------------------------------------------------------------------------
 
+
 def create_backend(
     backend: str = "legacy",
     *,
@@ -211,6 +214,4 @@ def create_backend(
     elif backend in ("legacy", "default", ""):
         return LegacyBackend(path=path)
     else:
-        raise ValueError(
-            f"Unknown audit backend: {backend!r}. Use 'legacy' or 'trailproof'."
-        )
+        raise ValueError(f"Unknown audit backend: {backend!r}. Use 'legacy' or 'trailproof'.")

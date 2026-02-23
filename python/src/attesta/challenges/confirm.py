@@ -36,9 +36,7 @@ class ConfirmChallenge:
     def challenge_type(self) -> ChallengeType:
         return ChallengeType.CONFIRM
 
-    async def present(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> ChallengeResult:
+    async def present(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
         """Present a simple confirmation prompt.
 
         Enforces minimum review time before accepting input.

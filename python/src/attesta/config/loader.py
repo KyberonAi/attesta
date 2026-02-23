@@ -121,6 +121,7 @@ class Policy:
             teach_back=RiskLevel.CRITICAL,
         )
     """
+
     # Which risk levels get which challenge type
     auto_approve: RiskLevel = RiskLevel.LOW
     confirm: RiskLevel = RiskLevel.MEDIUM
@@ -128,17 +129,21 @@ class Policy:
     teach_back: RiskLevel = RiskLevel.CRITICAL
 
     # Minimum review times (seconds) per risk level
-    minimum_review_seconds: dict[str, float] = field(default_factory=lambda: {
-        "low": 0,
-        "medium": 3,
-        "high": 10,
-        "critical": 30,
-    })
+    minimum_review_seconds: dict[str, float] = field(
+        default_factory=lambda: {
+            "low": 0,
+            "medium": 3,
+            "high": 10,
+            "critical": 30,
+        }
+    )
 
     # Multi-party requirements
-    require_multi_party: dict[str, int] = field(default_factory=lambda: {
-        "critical": 2,
-    })
+    require_multi_party: dict[str, int] = field(
+        default_factory=lambda: {
+            "critical": 2,
+        }
+    )
 
     # Trust engine settings
     trust_influence: float = 0.3
@@ -196,9 +201,7 @@ class Policy:
     def __post_init__(self) -> None:
         self.fail_mode = str(self.fail_mode).strip().lower()
         if self.fail_mode not in {"deny", "allow", "escalate"}:
-            raise ValueError(
-                "policy.fail_mode must be one of: deny, allow, escalate"
-            )
+            raise ValueError("policy.fail_mode must be one of: deny, allow, escalate")
         self.timeout_seconds = float(self.timeout_seconds)
         if self.timeout_seconds <= 0:
             raise ValueError("policy.timeout_seconds must be > 0")
@@ -216,9 +219,9 @@ class Policy:
             if ct is not None:
                 return ct
             import logging
+
             logging.getLogger("attesta").warning(
-                "Unknown challenge type '%s' in challenge_map for %s; "
-                "using default.",
+                "Unknown challenge type '%s' in challenge_map for %s; using default.",
                 override,
                 level.value,
             )
@@ -399,9 +402,7 @@ def _parse_config(data: dict) -> Policy:
     # Parse challenge_map overrides (risk level -> challenge type string)
     challenge_map_raw = policy_data.get("challenge_map") or policy_data.get("challenges")
     if challenge_map_raw and isinstance(challenge_map_raw, dict):
-        kwargs["challenge_map_overrides"] = {
-            k.lower(): str(v) for k, v in challenge_map_raw.items()
-        }
+        kwargs["challenge_map_overrides"] = {k.lower(): str(v) for k, v in challenge_map_raw.items()}
 
     # Parse trust settings
     if trust_data:

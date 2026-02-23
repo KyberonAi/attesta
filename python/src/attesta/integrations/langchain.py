@@ -62,6 +62,7 @@ def _run_coroutine_in_worker_thread(
 # Tool wrapper
 # ---------------------------------------------------------------------------
 
+
 class AttestaToolWrapper:
     """Wraps LangChain tools with Attesta approval.
 
@@ -107,16 +108,13 @@ class AttestaToolWrapper:
             from langchain_core.tools import BaseTool  # noqa: F401
         except ImportError as exc:
             raise ImportError(
-                "langchain-core is required for the LangChain integration. "
-                "Install with: pip install attesta[langchain]"
+                "langchain-core is required for the LangChain integration. Install with: pip install attesta[langchain]"
             ) from exc
 
         wrapped = copy.copy(tool)
 
         original_func = tool.func if hasattr(tool, "func") else tool._run
-        original_afunc: Any | None = (
-            tool.coroutine if hasattr(tool, "coroutine") else None
-        )
+        original_afunc: Any | None = tool.coroutine if hasattr(tool, "coroutine") else None
         gk = self.gk
         risk_override = self.risk_overrides.get(tool.name)
 
@@ -153,12 +151,11 @@ class AttestaToolWrapper:
 
             risk_label = result.risk_assessment.level.value
             logger.info(
-                "Attesta denied tool %r (risk=%s)", tool.name, risk_label,
+                "Attesta denied tool %r (risk=%s)",
+                tool.name,
+                risk_label,
             )
-            return (
-                f"Action denied by Attesta: {tool.name} "
-                f"(risk: {risk_label})"
-            )
+            return f"Action denied by Attesta: {tool.name} (risk: {risk_label})"
 
         wrapped.func = gated_func
         if original_afunc is not None:
@@ -170,6 +167,7 @@ class AttestaToolWrapper:
 # ---------------------------------------------------------------------------
 # LangGraph node
 # ---------------------------------------------------------------------------
+
 
 def attesta_node(attesta: Attesta):
     """Create a LangGraph node that gates tool calls.
@@ -204,7 +202,9 @@ def attesta_node(attesta: Attesta):
 
         # LangChain AI messages expose tool calls via a ``tool_calls`` attr.
         tool_calls: list[dict[str, Any]] | None = getattr(
-            last_msg, "tool_calls", None,
+            last_msg,
+            "tool_calls",
+            None,
         )
         if not tool_calls:
             return state
@@ -220,8 +220,7 @@ def attesta_node(attesta: Attesta):
                 approved_calls.append(call)
             else:
                 logger.info(
-                    "Attesta denied tool call %r in LangGraph node "
-                    "(risk=%s)",
+                    "Attesta denied tool call %r in LangGraph node (risk=%s)",
                     call.get("name"),
                     result.risk_assessment.level.value,
                 )
@@ -238,6 +237,7 @@ def attesta_node(attesta: Attesta):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _build_tool_context(
     tool: Any,

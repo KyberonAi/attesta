@@ -11,6 +11,7 @@ from attesta.core.trust import TrustEngine, TrustProfile, TrustRecord
 # TrustProfile dataclass
 # =========================================================================
 
+
 class TestTrustProfile:
     def test_defaults(self):
         p = TrustProfile(agent_id="agent-1")
@@ -26,6 +27,7 @@ class TestTrustProfile:
 # =========================================================================
 # TrustRecord dataclass
 # =========================================================================
+
 
 class TestTrustRecord:
     def test_creation(self):
@@ -47,6 +49,7 @@ class TestTrustRecord:
 # =========================================================================
 # TrustEngine -- initial trust
 # =========================================================================
+
 
 class TestTrustEngineInitial:
     def test_default_initial_score(self):
@@ -76,6 +79,7 @@ class TestTrustEngineInitial:
 # =========================================================================
 # TrustEngine -- trust increases after success
 # =========================================================================
+
 
 class TestTrustAfterSuccess:
     def test_single_success_increases_trust(self):
@@ -123,6 +127,7 @@ class TestTrustAfterSuccess:
 # TrustEngine -- trust decreases after incident
 # =========================================================================
 
+
 class TestTrustAfterIncident:
     def test_incident_decreases_trust(self):
         engine = TrustEngine(initial_score=0.3)
@@ -169,6 +174,7 @@ class TestTrustAfterIncident:
 # =========================================================================
 # TrustEngine -- trust decays over time (inactivity)
 # =========================================================================
+
 
 class TestTrustDecay:
     def test_decay_reduces_trust_over_time(self):
@@ -230,6 +236,7 @@ class TestTrustDecay:
 # TrustEngine -- revocation
 # =========================================================================
 
+
 class TestTrustRevocation:
     def test_revoke_zeros_overall_score(self):
         engine = TrustEngine()
@@ -270,6 +277,7 @@ class TestTrustRevocation:
 # =========================================================================
 # TrustEngine -- domain-specific trust
 # =========================================================================
+
 
 class TestDomainSpecificTrust:
     def test_domain_trust_differs_from_overall(self):
@@ -323,6 +331,7 @@ class TestDomainSpecificTrust:
 # TrustEngine -- effective_risk
 # =========================================================================
 
+
 class TestEffectiveRisk:
     def test_high_trust_reduces_risk(self):
         engine = TrustEngine(influence=0.3)
@@ -358,6 +367,7 @@ class TestEffectiveRisk:
 # TrustEngine -- trust ceiling
 # =========================================================================
 
+
 class TestTrustCeiling:
     def test_trust_never_exceeds_ceiling(self):
         engine = TrustEngine(ceiling=0.9)
@@ -378,6 +388,7 @@ class TestTrustCeiling:
 # =========================================================================
 # TrustEngine -- record_denial
 # =========================================================================
+
 
 class TestRecordDenial:
     def test_denial_recorded_in_history(self):
@@ -408,6 +419,7 @@ class TestRecordDenial:
 # =========================================================================
 # TrustEngine -- persistence
 # =========================================================================
+
 
 class TestTrustPersistence:
     def test_save_and_load(self, tmp_path):

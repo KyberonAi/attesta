@@ -12,13 +12,12 @@ from attesta.core.types import ActionContext
 # KeywordValidator
 # =========================================================================
 
+
 class TestKeywordValidator:
     async def test_passes_with_enough_words_and_key_terms(self):
         ctx = ActionContext(function_name="deploy_service", args=("web",))
         v = KeywordValidator(min_words=3)
-        passed, notes = await v.validate(
-            "I will deploy the web service to production", ctx
-        )
+        passed, notes = await v.validate("I will deploy the web service to production", ctx)
         assert passed is True
         assert "Matched key terms" in notes
 
@@ -32,9 +31,7 @@ class TestKeywordValidator:
     async def test_fails_no_key_terms(self):
         ctx = ActionContext(function_name="deploy_service")
         v = KeywordValidator(min_words=2)
-        passed, notes = await v.validate(
-            "I will do something unrelated to anything here", ctx
-        )
+        passed, notes = await v.validate("I will do something unrelated to anything here", ctx)
         assert passed is False
         assert "No key terms" in notes
 

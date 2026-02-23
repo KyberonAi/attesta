@@ -72,9 +72,7 @@ def _get_csrf_token(port: int) -> str:
 class _ApproveAllRenderer:
     """Mock renderer that approves every action."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         return Verdict.APPROVED
 
     async def render_challenge(
@@ -92,18 +90,14 @@ class _ApproveAllRenderer:
     async def render_info(self, message: str) -> None:
         pass
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         pass
 
 
 class _SlowRenderer:
     """Mock renderer that never responds (simulates timeout)."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         await asyncio.sleep(9999)
         return Verdict.APPROVED  # pragma: no cover
 
@@ -122,9 +116,7 @@ class _SlowRenderer:
     async def render_info(self, message: str) -> None:
         pass
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         pass
 
 
@@ -177,7 +169,7 @@ class TestXSSEscaping:
         risk = RiskAssessment(score=0.5, level=RiskLevel.MEDIUM)
         html = _confirm_page(ctx, risk)
 
-        assert '<img src=x' not in html
+        assert "<img src=x" not in html
         assert "&lt;img" in html
 
     def test_confirm_page_escapes_risk_factor_names(self):
@@ -195,7 +187,7 @@ class TestXSSEscaping:
             ],
         )
         html = _confirm_page(ctx, risk)
-        assert '<b onmouseover=' not in html
+        assert "<b onmouseover=" not in html
         assert "&lt;b onmouseover=" in html
 
     def test_confirm_page_escapes_risk_factor_descriptions(self):
@@ -208,7 +200,7 @@ class TestXSSEscaping:
                 RiskFactor(
                     name="legitimate_factor",
                     contribution=0.5,
-                    description='<script>document.cookie</script>',
+                    description="<script>document.cookie</script>",
                 ),
             ],
         )
@@ -246,7 +238,7 @@ class TestXSSEscaping:
             ],
         )
         html = _teach_back_page(ctx, risk, min_review=0)
-        assert '<div onclick=' not in html
+        assert "<div onclick=" not in html
         assert '<a href="javascript:' not in html
 
     async def test_xss_escaping_via_live_server(self):
@@ -270,9 +262,7 @@ class TestXSSEscaping:
             csrf = match.group(1) if match else ""
             time.sleep(0.1)
             data = urlencode({"verdict": "approve", "_csrf": csrf}).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/respond", data=data, method="POST"
-            )
+            req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             urlopen(req, timeout=5)
 
         thread = threading.Thread(target=fetch_and_submit, daemon=True)
@@ -305,9 +295,7 @@ class TestCSRFTokenValidation:
             time.sleep(0.5)
             # POST without any CSRF token
             data = urlencode({"verdict": "approve"}).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/respond", data=data, method="POST"
-            )
+            req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             try:
                 urlopen(req, timeout=5)
             except Exception as e:
@@ -317,9 +305,7 @@ class TestCSRFTokenValidation:
             time.sleep(0.2)
             csrf = _get_csrf_token(port)
             data = urlencode({"verdict": "approve", "_csrf": csrf}).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/respond", data=data, method="POST"
-            )
+            req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             urlopen(req, timeout=5)
 
         thread = threading.Thread(target=submit, daemon=True)
@@ -341,12 +327,8 @@ class TestCSRFTokenValidation:
         def submit():
             time.sleep(0.5)
             # POST with a fabricated token
-            data = urlencode(
-                {"verdict": "approve", "_csrf": "forged-token-value"}
-            ).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/respond", data=data, method="POST"
-            )
+            data = urlencode({"verdict": "approve", "_csrf": "forged-token-value"}).encode()
+            req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             try:
                 urlopen(req, timeout=5)
             except Exception as e:
@@ -356,9 +338,7 @@ class TestCSRFTokenValidation:
             time.sleep(0.2)
             csrf = _get_csrf_token(port)
             data = urlencode({"verdict": "approve", "_csrf": csrf}).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/respond", data=data, method="POST"
-            )
+            req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             urlopen(req, timeout=5)
 
         thread = threading.Thread(target=submit, daemon=True)
@@ -379,9 +359,7 @@ class TestCSRFTokenValidation:
             time.sleep(0.5)
             csrf = _get_csrf_token(port)
             data = urlencode({"verdict": "approve", "_csrf": csrf}).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/respond", data=data, method="POST"
-            )
+            req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             urlopen(req, timeout=5)
 
         thread = threading.Thread(target=submit, daemon=True)
@@ -408,17 +386,11 @@ class TestCSRFTokenValidation:
             csrf = _get_csrf_token(port)
             tokens.append(csrf)
             data = urlencode({"verdict": "approve", "_csrf": csrf}).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/respond", data=data, method="POST"
-            )
+            req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             urlopen(req, timeout=5)
 
-        t1 = threading.Thread(
-            target=fetch_token_and_submit, args=(port1,), daemon=True
-        )
-        t2 = threading.Thread(
-            target=fetch_token_and_submit, args=(port2,), daemon=True
-        )
+        t1 = threading.Thread(target=fetch_token_and_submit, args=(port1,), daemon=True)
+        t2 = threading.Thread(target=fetch_token_and_submit, args=(port2,), daemon=True)
 
         t1.start()
         t2.start()
@@ -468,9 +440,7 @@ class TestBodySizeLimit:
             time.sleep(0.2)
             csrf = _get_csrf_token(port)
             data = urlencode({"verdict": "approve", "_csrf": csrf}).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/respond", data=data, method="POST"
-            )
+            req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             urlopen(req, timeout=5)
 
         thread = threading.Thread(target=submit_large_body, daemon=True)
@@ -551,9 +521,7 @@ class TestBodySizeLimit:
             time.sleep(0.2)
             csrf = _get_csrf_token(port)
             data = urlencode({"verdict": "approve", "_csrf": csrf}).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/respond", data=data, method="POST"
-            )
+            req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             urlopen(req, timeout=5)
 
         thread = threading.Thread(target=submit, daemon=True)
@@ -1044,9 +1012,7 @@ class TestAuditFilePermissions:
         # Check the file permissions
         file_stat = log_path.stat()
         mode = stat.S_IMODE(file_stat.st_mode)
-        assert mode == 0o600, (
-            f"Expected file permissions 0o600, got {oct(mode)}"
-        )
+        assert mode == 0o600, f"Expected file permissions 0o600, got {oct(mode)}"
 
     def test_audit_file_not_world_readable(self, tmp_path: Path):
         """The audit file must not be readable by 'other' users."""

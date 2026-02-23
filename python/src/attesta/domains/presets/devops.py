@@ -40,7 +40,6 @@ _DEVOPS_RISK_PATTERNS: list[RiskPattern] = [
             "directory trees with no recovery path unless backups exist."
         ),
     ),
-
     # -- Kubernetes destructive operations --
     RiskPattern(
         pattern=r"\bkubectl\s+delete\b|\bkubectl_delete\b",
@@ -52,7 +51,6 @@ _DEVOPS_RISK_PATTERNS: list[RiskPattern] = [
             "Deleting stateful workloads or namespaces may cause data loss."
         ),
     ),
-
     # -- Terraform destroy --
     RiskPattern(
         pattern=r"\bterraform\s+destroy\b|\btf_destroy\b|\bterraform_destroy\b",
@@ -65,7 +63,6 @@ _DEVOPS_RISK_PATTERNS: list[RiskPattern] = [
             "networks, and compute resources in a single command."
         ),
     ),
-
     # -- Docker container removal --
     RiskPattern(
         pattern=r"\bdocker\s+rm\b|\bdocker_rm\b|\bdocker\s+(?:image\s+)?rmi\b",
@@ -73,11 +70,9 @@ _DEVOPS_RISK_PATTERNS: list[RiskPattern] = [
         risk_contribution=0.60,
         name="docker_remove",
         description=(
-            "docker rm / rmi removes containers or images. Running "
-            "containers with unsaved state will lose their data."
+            "docker rm / rmi removes containers or images. Running containers with unsaved state will lose their data."
         ),
     ),
-
     # -- SQL destructive operations --
     RiskPattern(
         pattern=r"\bDROP\s+TABLE\b|\bdrop_table\b",
@@ -99,7 +94,6 @@ _DEVOPS_RISK_PATTERNS: list[RiskPattern] = [
             "it typically cannot be rolled back and skips row-level triggers."
         ),
     ),
-
     # -- Production access patterns --
     RiskPattern(
         pattern=(
@@ -146,7 +140,6 @@ _DEVOPS_RISK_PATTERNS: list[RiskPattern] = [
             "propagate slowly and are difficult to roll back quickly."
         ),
     ),
-
     # -- Permission changes --
     RiskPattern(
         pattern=r"\bchmod\b|\bchmod_recursive\b",
@@ -184,7 +177,6 @@ _DEVOPS_RISK_PATTERNS: list[RiskPattern] = [
             "legitimate traffic."
         ),
     ),
-
     # -- CI/CD pipeline modifications --
     RiskPattern(
         pattern=(
@@ -263,38 +255,40 @@ _DEVOPS_ESCALATION_RULES: list[EscalationRule] = [
 
 _DEVOPS_CHALLENGE_TEMPLATES: list[DomainChallengeTemplate] = [
     DomainChallengeTemplate(
-        question_template=(
-            "What is the rollback plan if '{function_name}' fails or "
-            "causes an incident?"
-        ),
+        question_template=("What is the rollback plan if '{function_name}' fails or causes an incident?"),
         answer_hints=[
-            "rollback", "revert", "backup", "restore",
-            "previous version", "undo",
+            "rollback",
+            "revert",
+            "backup",
+            "restore",
+            "previous version",
+            "undo",
         ],
         context_vars=["function_name"],
         challenge_type="teach_back",
         min_risk_level="high",
     ),
     DomainChallengeTemplate(
-        question_template=(
-            "Which environment is targeted by '{function_name}'? "
-            "Please confirm."
-        ),
+        question_template=("Which environment is targeted by '{function_name}'? Please confirm."),
         answer_hints=[
-            "production", "staging", "development", "sandbox",
+            "production",
+            "staging",
+            "development",
+            "sandbox",
         ],
         context_vars=["function_name"],
         challenge_type="quiz",
         min_risk_level="medium",
     ),
     DomainChallengeTemplate(
-        question_template=(
-            "Have the changes behind '{function_name}' been tested in "
-            "a non-production environment?"
-        ),
+        question_template=("Have the changes behind '{function_name}' been tested in a non-production environment?"),
         answer_hints=[
-            "yes", "staging", "tested", "passed",
-            "verified", "smoke test",
+            "yes",
+            "staging",
+            "tested",
+            "passed",
+            "verified",
+            "smoke test",
         ],
         context_vars=["function_name"],
         challenge_type="quiz",

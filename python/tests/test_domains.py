@@ -316,9 +316,7 @@ class TestDomainProfile:
 
     def test_get_matching_sensitive_terms_found(self):
         profile = self._make_profile()
-        matches = profile.get_matching_sensitive_terms(
-            "The patient record contains phi data"
-        )
+        matches = profile.get_matching_sensitive_terms("The patient record contains phi data")
         assert len(matches) == 2
         weights = [w for _, w in matches]
         assert 0.7 in weights  # patient
@@ -814,5 +812,3 @@ class TestPresetAPI:
         register_preset(profile)
         loaded = load_preset("CASE-TEST")
         assert loaded.name == "case-test"
-
-

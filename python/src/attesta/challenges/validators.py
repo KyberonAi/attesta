@@ -24,9 +24,7 @@ class TeachBackValidator(Protocol):
     is a human-readable string explaining the verdict.
     """
 
-    async def validate(
-        self, explanation: str, context: ActionContext
-    ) -> tuple[bool, str]:
+    async def validate(self, explanation: str, context: ActionContext) -> tuple[bool, str]:
         """Validate *explanation* against *context*.
 
         Returns
@@ -90,18 +88,14 @@ class KeywordValidator:
     def __init__(self, min_words: int = 15) -> None:
         self.min_words = min_words
 
-    async def validate(
-        self, explanation: str, context: ActionContext
-    ) -> tuple[bool, str]:
+    async def validate(self, explanation: str, context: ActionContext) -> tuple[bool, str]:
         notes: list[str] = []
 
         # Word count check
         word_count = len(explanation.split())
         length_ok = word_count >= self.min_words
         if not length_ok:
-            notes.append(
-                f"Too short: {word_count} words (minimum {self.min_words})."
-            )
+            notes.append(f"Too short: {word_count} words (minimum {self.min_words}).")
 
         # Key-term overlap check
         key_terms = _extract_key_terms(context)
@@ -110,8 +104,7 @@ class KeywordValidator:
         terms_ok = len(matched_terms) >= 1
         if not terms_ok:
             notes.append(
-                "No key terms from the action context found in explanation. "
-                f"Expected at least one of: {key_terms[:6]}"
+                f"No key terms from the action context found in explanation. Expected at least one of: {key_terms[:6]}"
             )
         else:
             notes.append(f"Matched key terms: {matched_terms}")

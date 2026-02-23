@@ -59,6 +59,7 @@ class TeachBackChallenge:
             self._validator = validator
         else:
             from attesta.challenges.validators import KeywordValidator
+
             self._validator = KeywordValidator(min_words=min_words)
 
     @property
@@ -67,9 +68,7 @@ class TeachBackChallenge:
 
     # -- presentation -----------------------------------------------------
 
-    async def present(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> ChallengeResult:
+    async def present(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
         """Present the teach-back challenge to the operator."""
         start = time.monotonic()
         loop = asyncio.get_running_loop()
@@ -102,10 +101,7 @@ class TeachBackChallenge:
             await asyncio.sleep(remaining)
 
         # -- collect free-text explanation --------------------------------
-        print(
-            "\n  In your own words, explain what this action will do and "
-            "what its effects are:"
-        )
+        print("\n  In your own words, explain what this action will do and what its effects are:")
 
         def _read_input() -> str:
             try:

@@ -55,6 +55,7 @@ _ALIASES: dict[str, str] = {}
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def register_preset(
     profile: DomainProfile,
     aliases: list[str] | None = None,
@@ -70,11 +71,10 @@ def register_preset(
     """
     if profile.name in PRESET_PROFILES:
         raise ValueError(
-            f"Preset profile '{profile.name}' is already registered. "
-            f"Remove it first or choose a different name."
+            f"Preset profile '{profile.name}' is already registered. Remove it first or choose a different name."
         )
     PRESET_PROFILES[profile.name] = profile
-    for alias in (aliases or []):
+    for alias in aliases or []:
         _ALIASES[alias.lower().strip()] = profile.name
 
 
@@ -124,6 +124,7 @@ def list_presets() -> list[str]:
 # ---------------------------------------------------------------------------
 # Built-in OSS presets (auto-registered on import)
 # ---------------------------------------------------------------------------
+
 
 def _register_builtin_presets() -> None:
     """Import and register the built-in OSS domain presets.

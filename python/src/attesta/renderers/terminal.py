@@ -67,8 +67,8 @@ _RISK_COLORS: dict[RiskLevel, str] = {
 _RISK_ICONS: dict[RiskLevel, str] = {
     RiskLevel.LOW: "",
     RiskLevel.MEDIUM: "",
-    RiskLevel.HIGH: "\U0001f512",       # lock
-    RiskLevel.CRITICAL: "\u26d4",        # no entry
+    RiskLevel.HIGH: "\U0001f512",  # lock
+    RiskLevel.CRITICAL: "\u26d4",  # no entry
 }
 
 _MIN_REVIEW_SECONDS: dict[RiskLevel, float] = {
@@ -82,6 +82,7 @@ _MIN_REVIEW_SECONDS: dict[RiskLevel, float] = {
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _risk_bar_plain(score: float, width: int = _BAR_WIDTH) -> str:
     """Build a plain-text risk bar like ``████░░░░░░``."""
@@ -133,6 +134,7 @@ async def _countdown(seconds: float, label: str = "Minimum review") -> None:
 # PlainRenderer -- no-dependency fallback
 # ===================================================================
 
+
 class PlainRenderer(BaseRenderer):
     """Minimal renderer using only ``print()`` and ``input()``.
 
@@ -142,20 +144,13 @@ class PlainRenderer(BaseRenderer):
 
     # ---- auto-approved (LOW) ------------------------------------------
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         bar = _risk_bar_plain(risk.score)
-        print(
-            f"  \u2713 AUTO  {_format_call(ctx)}"
-            f"  Risk: {bar} {risk.level.value.upper()} ({risk.score:.2f})"
-        )
+        print(f"  \u2713 AUTO  {_format_call(ctx)}  Risk: {bar} {risk.level.value.upper()} ({risk.score:.2f})")
 
     # ---- approval prompt (MEDIUM) -------------------------------------
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         sep = "=" * 56
         bar = _risk_bar_plain(risk.score)
 
@@ -206,9 +201,7 @@ class PlainRenderer(BaseRenderer):
         # Unknown challenge type -- fall back to quiz
         return await self._render_quiz_challenge(ctx, risk)
 
-    async def _render_quiz_challenge(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> ChallengeResult:
+    async def _render_quiz_challenge(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
         start = time.monotonic()
         sep = "=" * 56
         bar = _risk_bar_plain(risk.score)
@@ -252,9 +245,7 @@ class PlainRenderer(BaseRenderer):
             details={"question": question, "answer": answer.strip()},
         )
 
-    async def _render_teach_back(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> ChallengeResult:
+    async def _render_teach_back(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
         start = time.monotonic()
         sep = "=" * 56
         bar = _risk_bar_plain(risk.score)
@@ -282,10 +273,7 @@ class PlainRenderer(BaseRenderer):
         passed = word_count >= 15
 
         if not passed:
-            print(
-                f"  Insufficient explanation ({word_count} words, need 15). "
-                f"Action DENIED."
-            )
+            print(f"  Insufficient explanation ({word_count} words, need 15). Action DENIED.")
 
         return ChallengeResult(
             passed=passed,
@@ -299,9 +287,7 @@ class PlainRenderer(BaseRenderer):
             },
         )
 
-    async def _render_multi_party(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> ChallengeResult:
+    async def _render_multi_party(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
         """Multi-party approval: requires 2 independent approvers."""
         start = time.monotonic()
         required_approvers = 2
@@ -358,20 +344,12 @@ class PlainRenderer(BaseRenderer):
 
     # ---- helpers ------------------------------------------------------
 
-    def _generate_question(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> str:
+    def _generate_question(self, ctx: ActionContext, risk: RiskAssessment) -> str:
         """Generate a simple comprehension question from the action context."""
         # Check for path-like arguments
         all_vals = list(ctx.args) + list(ctx.kwargs.values())
-        paths = [
-            v for v in all_vals
-            if isinstance(v, str) and ("/" in v or "\\" in v)
-        ]
-        lists_in_args = [
-            v for v in all_vals
-            if isinstance(v, (list, tuple)) and len(v) > 0
-        ]
+        paths = [v for v in all_vals if isinstance(v, str) and ("/" in v or "\\" in v)]
+        lists_in_args = [v for v in all_vals if isinstance(v, (list, tuple)) and len(v) > 0]
 
         if paths:
             return "What paths or directories will be affected?"
@@ -468,9 +446,7 @@ if _RICH_AVAILABLE:
                     parts.append("RISK")
             return " ".join(parts)
 
-        def _build_action_lines(
-            self, ctx: ActionContext, risk: RiskAssessment
-        ) -> Text:
+        def _build_action_lines(self, ctx: ActionContext, risk: RiskAssessment) -> Text:
             """Build the action + risk summary as styled Text."""
             lines = Text()
 
@@ -528,9 +504,7 @@ if _RICH_AVAILABLE:
         # render_auto_approved  (LOW risk -- compact one-liner)
         # ---------------------------------------------------------------
 
-        async def render_auto_approved(
-            self, ctx: ActionContext, risk: RiskAssessment
-        ) -> None:
+        async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
             line = Text()
             line.append("  \u2713 ", style="bold green")
             line.append("AUTO", style="bold green")
@@ -546,9 +520,7 @@ if _RICH_AVAILABLE:
         # render_approval  (MEDIUM risk -- panel + prompt)
         # ---------------------------------------------------------------
 
-        async def render_approval(
-            self, ctx: ActionContext, risk: RiskAssessment
-        ) -> Verdict:
+        async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
             color = _RISK_COLORS[risk.level]
             body = self._build_action_lines(ctx, risk)
 
@@ -599,19 +571,13 @@ if _RICH_AVAILABLE:
             while True:
                 response = (await _async_input("  > ")).strip().lower()
                 if response in ("a", "approve", "y", "yes"):
-                    self._console.print(
-                        "  \u2713 Approved", style="bold green"
-                    )
+                    self._console.print("  \u2713 Approved", style="bold green")
                     return Verdict.APPROVED
                 if response in ("d", "deny", "n", "no"):
-                    self._console.print(
-                        "  \u2717 Denied", style="bold red"
-                    )
+                    self._console.print("  \u2717 Denied", style="bold red")
                     return Verdict.DENIED
                 if response in ("e", "edit"):
-                    self._console.print(
-                        "  \u270e Modification requested", style="bold yellow"
-                    )
+                    self._console.print("  \u270e Modification requested", style="bold yellow")
                     return Verdict.MODIFIED
                 if response == "?":
                     self._print_explanation_rich(ctx, risk)
@@ -647,9 +613,7 @@ if _RICH_AVAILABLE:
 
         # -- quiz / comprehension challenge (HIGH) ----------------------
 
-        async def _render_quiz(
-            self, ctx: ActionContext, risk: RiskAssessment
-        ) -> ChallengeResult:
+        async def _render_quiz(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
             start = time.monotonic()
             color = _RISK_COLORS[risk.level]
 
@@ -701,9 +665,7 @@ if _RICH_AVAILABLE:
             passed = len(answer.strip()) > 0
 
             if passed:
-                self._console.print(
-                    "  \u2713 Challenge passed", style="bold green"
-                )
+                self._console.print("  \u2713 Challenge passed", style="bold green")
             else:
                 self._console.print(
                     "  \u2717 No answer provided -- DENIED",
@@ -721,9 +683,7 @@ if _RICH_AVAILABLE:
 
         # -- teach-back challenge (CRITICAL) ----------------------------
 
-        async def _render_teach_back(
-            self, ctx: ActionContext, risk: RiskAssessment
-        ) -> ChallengeResult:
+        async def _render_teach_back(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
             start = time.monotonic()
             color = _RISK_COLORS[RiskLevel.CRITICAL]
 
@@ -751,8 +711,7 @@ if _RICH_AVAILABLE:
             body.append("  (minimum 15 words)\n", style="dim italic")
             body.append("\n")
             body.append(
-                f"  \u23f1  Minimum review: "
-                f"{int(self._min_review.get(RiskLevel.CRITICAL, 30))}s\n",
+                f"  \u23f1  Minimum review: {int(self._min_review.get(RiskLevel.CRITICAL, 30))}s\n",
                 style="dim",
             )
 
@@ -784,8 +743,7 @@ if _RICH_AVAILABLE:
                 )
             else:
                 self._console.print(
-                    f"  \u2717 Insufficient explanation "
-                    f"({word_count}/15 words) -- DENIED",
+                    f"  \u2717 Insufficient explanation ({word_count}/15 words) -- DENIED",
                     style="bold red",
                 )
 
@@ -803,9 +761,7 @@ if _RICH_AVAILABLE:
 
         # -- multi-party approval challenge --------------------------------
 
-        async def _render_multi_party(
-            self, ctx: ActionContext, risk: RiskAssessment
-        ) -> ChallengeResult:
+        async def _render_multi_party(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
             """Multi-party approval: requires 2 independent approvers."""
             start = time.monotonic()
             required_approvers = 2
@@ -828,8 +784,7 @@ if _RICH_AVAILABLE:
             body.append(_format_call(ctx, max_len=50), style="white")
             body.append("\n\n")
             body.append(
-                f"  This action requires approval from {required_approvers} "
-                f"independent reviewers.\n",
+                f"  This action requires approval from {required_approvers} independent reviewers.\n",
                 style="bold white",
             )
 
@@ -850,19 +805,13 @@ if _RICH_AVAILABLE:
                     f"  --- Reviewer {i + 1} of {required_approvers} ---",
                     style="bold dim",
                 )
-                response = (
-                    await _async_input(f"  Reviewer {i + 1} [a]pprove / [d]eny: ")
-                ).strip().lower()
+                response = (await _async_input(f"  Reviewer {i + 1} [a]pprove / [d]eny: ")).strip().lower()
                 if response in ("a", "approve", "y", "yes"):
                     approvals += 1
-                    self._console.print(
-                        f"  Reviewer {i + 1}: APPROVED", style="bold green"
-                    )
+                    self._console.print(f"  Reviewer {i + 1}: APPROVED", style="bold green")
                 else:
                     denials += 1
-                    self._console.print(
-                        f"  Reviewer {i + 1}: DENIED", style="bold red"
-                    )
+                    self._console.print(f"  Reviewer {i + 1}: DENIED", style="bold red")
 
             elapsed = time.monotonic() - start
             passed = approvals >= required_approvers
@@ -874,8 +823,7 @@ if _RICH_AVAILABLE:
                 )
             else:
                 self._console.print(
-                    f"\n  Multi-party approval FAILED "
-                    f"({approvals}/{required_approvers} approved).",
+                    f"\n  Multi-party approval FAILED ({approvals}/{required_approvers} approved).",
                     style="bold red",
                 )
 
@@ -907,22 +855,14 @@ if _RICH_AVAILABLE:
         # Helpers
         # ---------------------------------------------------------------
 
-        def _generate_question(
-            self, ctx: ActionContext, risk: RiskAssessment
-        ) -> str:
+        def _generate_question(self, ctx: ActionContext, risk: RiskAssessment) -> str:
             """Build a comprehension question from the action context."""
             all_vals = list(ctx.args) + list(ctx.kwargs.values())
 
             # Look for paths
-            paths = [
-                v for v in all_vals
-                if isinstance(v, str) and ("/" in v or "\\" in v)
-            ]
+            paths = [v for v in all_vals if isinstance(v, str) and ("/" in v or "\\" in v)]
             # Look for list/tuple arguments
-            lists_in_args = [
-                v for v in all_vals
-                if isinstance(v, (list, tuple)) and len(v) > 0
-            ]
+            lists_in_args = [v for v in all_vals if isinstance(v, (list, tuple)) and len(v) > 0]
 
             if paths:
                 return "What directories will be affected?"
@@ -930,33 +870,19 @@ if _RICH_AVAILABLE:
                 return "What items will this action operate on?"
             if ctx.kwargs:
                 key = next(iter(ctx.kwargs))
-                return (
-                    f"What is the value of '{key}' and why is it significant?"
-                )
+                return f"What is the value of '{key}' and why is it significant?"
             return f"What will '{ctx.function_name}' do and what are the effects?"
 
-        def _print_explanation_rich(
-            self, ctx: ActionContext, risk: RiskAssessment
-        ) -> None:
+        def _print_explanation_rich(self, ctx: ActionContext, risk: RiskAssessment) -> None:
             """Pretty-print an expanded explanation of the action."""
             self._console.print()
             self._console.print("  [bold dim]--- Explanation ---[/]")
-            self._console.print(
-                f"  [dim]Function:[/] [bold]{ctx.function_name}[/]"
-            )
+            self._console.print(f"  [dim]Function:[/] [bold]{ctx.function_name}[/]")
             if ctx.function_doc:
-                self._console.print(
-                    f"  [dim]Doc:[/]      {rich_escape(ctx.function_doc)}"
-                )
-            self._console.print(
-                f"  [dim]Full call:[/] {rich_escape(ctx.description)}"
-            )
-            self._console.print(
-                f"  [dim]Risk score:[/] {risk.score:.4f}"
-            )
-            self._console.print(
-                f"  [dim]Risk level:[/] {risk.level.value}"
-            )
+                self._console.print(f"  [dim]Doc:[/]      {rich_escape(ctx.function_doc)}")
+            self._console.print(f"  [dim]Full call:[/] {rich_escape(ctx.description)}")
+            self._console.print(f"  [dim]Risk score:[/] {risk.score:.4f}")
+            self._console.print(f"  [dim]Risk level:[/] {risk.level.value}")
             if risk.factors:
                 self._console.print("  [dim]Factors:[/]")
                 for f in risk.factors:
@@ -964,17 +890,11 @@ if _RICH_AVAILABLE:
                     line = Text()
                     line.append(f"    {f.name}: ", style="dim")
                     line.append_text(bar)
-                    line.append(
-                        f"  {f.contribution:.4f} -- {f.description}"
-                    )
+                    line.append(f"  {f.contribution:.4f} -- {f.description}")
                     self._console.print(line)
                     if f.evidence:
-                        self._console.print(
-                            f"      [dim italic]Evidence: {rich_escape(f.evidence)}[/]"
-                        )
-            self._console.print(
-                f"  [dim]Environment:[/] {ctx.environment}"
-            )
+                        self._console.print(f"      [dim italic]Evidence: {rich_escape(f.evidence)}[/]")
+            self._console.print(f"  [dim]Environment:[/] {ctx.environment}")
             self._console.print()
 
 else:

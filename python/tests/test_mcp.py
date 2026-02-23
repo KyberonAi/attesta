@@ -24,6 +24,7 @@ from attesta.integrations.mcp import (
 # Helpers
 # =========================================================================
 
+
 def _make_approval(
     verdict: Verdict = Verdict.APPROVED,
     risk_level: RiskLevel = RiskLevel.LOW,
@@ -51,6 +52,7 @@ def _make_mock_attesta(
 # =========================================================================
 # _encode_message / _decode_message -- protocol helpers
 # =========================================================================
+
 
 class TestEncodeMessage:
     def test_produces_content_length_framing(self):
@@ -112,12 +114,7 @@ class TestDecodeMessage:
         """Handles extra headers between Content-Length and body."""
         msg = {"method": "test"}
         body = json.dumps(msg).encode("utf-8")
-        raw = (
-            f"Content-Length: {len(body)}\r\n".encode()
-            + b"Content-Type: application/json\r\n"
-            + b"\r\n"
-            + body
-        )
+        raw = f"Content-Length: {len(body)}\r\n".encode() + b"Content-Type: application/json\r\n" + b"\r\n" + body
         stream = io.BytesIO(raw)
         decoded = _decode_message(stream)
         assert decoded == msg
@@ -144,6 +141,7 @@ class TestDecodeMessage:
 # attesta_tool_handler -- decorator
 # =========================================================================
 
+
 class TestAttestaToolHandler:
     async def test_approved_calls_through(self):
         """When Attesta approves, the original handler executes."""
@@ -167,7 +165,9 @@ class TestAttestaToolHandler:
     async def test_denied_returns_denial_message(self):
         """When Attesta denies, a denial message is returned instead."""
         mock_attesta = _make_mock_attesta(
-            verdict=Verdict.DENIED, risk_level=RiskLevel.CRITICAL, score=0.92,
+            verdict=Verdict.DENIED,
+            risk_level=RiskLevel.CRITICAL,
+            score=0.92,
         )
 
         handler_called = False
@@ -237,7 +237,9 @@ class TestAttestaToolHandler:
     async def test_timed_out_verdict_returns_denial(self):
         """TIMED_OUT verdict is treated as a denial."""
         mock_attesta = _make_mock_attesta(
-            verdict=Verdict.TIMED_OUT, risk_level=RiskLevel.HIGH, score=0.75,
+            verdict=Verdict.TIMED_OUT,
+            risk_level=RiskLevel.HIGH,
+            score=0.75,
         )
 
         @attesta_tool_handler(mock_attesta)
@@ -252,6 +254,7 @@ class TestAttestaToolHandler:
 # MCPProxy._evaluate -- evaluation logic
 # =========================================================================
 
+
 class TestMCPProxyEvaluate:
     def _make_proxy(
         self,
@@ -261,7 +264,9 @@ class TestMCPProxyEvaluate:
         risk_overrides: dict[str, str] | None = None,
     ) -> MCPProxy:
         mock_attesta = _make_mock_attesta(
-            verdict=verdict, risk_level=risk_level, score=score,
+            verdict=verdict,
+            risk_level=risk_level,
+            score=score,
         )
         return MCPProxy(
             attesta=mock_attesta,
@@ -280,7 +285,9 @@ class TestMCPProxyEvaluate:
 
     def test_denied_returns_false_with_response(self):
         proxy = self._make_proxy(
-            verdict=Verdict.DENIED, risk_level=RiskLevel.CRITICAL, score=0.95,
+            verdict=Verdict.DENIED,
+            risk_level=RiskLevel.CRITICAL,
+            score=0.95,
         )
         request = {"jsonrpc": "2.0", "id": 42, "method": "tools/call"}
 
@@ -320,14 +327,14 @@ class TestMCPProxyEvaluate:
         assert ctx.function_name == "dangerous_tool"
         assert ctx.kwargs == {"arg": "val"}
         assert ctx.metadata["source"] == "mcp_proxy"
-        assert (
-            ctx.metadata.get(TRUSTED_RISK_OVERRIDE_METADATA_KEY) == "critical"
-        )
+        assert ctx.metadata.get(TRUSTED_RISK_OVERRIDE_METADATA_KEY) == "critical"
 
     def test_denial_preserves_request_id(self):
         """The denial response must carry the same id as the request."""
         proxy = self._make_proxy(
-            verdict=Verdict.DENIED, risk_level=RiskLevel.HIGH, score=0.8,
+            verdict=Verdict.DENIED,
+            risk_level=RiskLevel.HIGH,
+            score=0.8,
         )
 
         for req_id in [1, 99, "abc-123", None]:
@@ -338,7 +345,9 @@ class TestMCPProxyEvaluate:
     def test_escalated_verdict_is_denied(self):
         """ESCALATED verdict should be treated as denial."""
         proxy = self._make_proxy(
-            verdict=Verdict.ESCALATED, risk_level=RiskLevel.CRITICAL, score=0.9,
+            verdict=Verdict.ESCALATED,
+            risk_level=RiskLevel.CRITICAL,
+            score=0.9,
         )
         request = {"jsonrpc": "2.0", "id": 5}
 
@@ -352,6 +361,7 @@ class TestMCPProxyEvaluate:
 # =========================================================================
 # MCPProxy -- request routing
 # =========================================================================
+
 
 class TestMCPProxyRouting:
     """Test that the proxy correctly routes messages based on method."""
@@ -400,6 +410,7 @@ class TestMCPProxyRouting:
 # =========================================================================
 # MCPProxy -- write helpers
 # =========================================================================
+
 
 class TestMCPProxyWrite:
     def test_write_to_client(self):

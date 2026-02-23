@@ -31,9 +31,7 @@ class BaseRenderer(ABC):
     """
 
     @abstractmethod
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         """Present an approval prompt and return the operator's verdict."""
         ...
 
@@ -48,9 +46,7 @@ class BaseRenderer(ABC):
         ...
 
     @abstractmethod
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         """Notify the operator that a low-risk action was auto-approved."""
         ...
 

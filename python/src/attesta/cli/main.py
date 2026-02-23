@@ -160,15 +160,13 @@ risk:
 # Subcommand: init
 # ---------------------------------------------------------------------------
 
+
 def _cmd_init(args: argparse.Namespace) -> None:
     """Create an attesta.yaml in the current working directory."""
     dest = Path.cwd() / _DEFAULT_CONFIG_NAME
 
     if dest.exists() and not getattr(args, "force", False):
-        _err(
-            f"{_DEFAULT_CONFIG_NAME} already exists in this directory. "
-            "Use --force to overwrite."
-        )
+        _err(f"{_DEFAULT_CONFIG_NAME} already exists in this directory. Use --force to overwrite.")
 
     dest.write_text(_DEFAULT_CONFIG, encoding="utf-8")
     print(f"{_green('Created')} {dest}")
@@ -178,6 +176,7 @@ def _cmd_init(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 # Subcommand: audit verify
 # ---------------------------------------------------------------------------
+
 
 def _cmd_audit_verify(args: argparse.Namespace) -> None:
     """Verify the integrity of the hash-chained audit log."""
@@ -205,6 +204,7 @@ def _cmd_audit_verify(args: argparse.Namespace) -> None:
 # Subcommand: audit stats
 # ---------------------------------------------------------------------------
 
+
 def _cmd_audit_stats(args: argparse.Namespace) -> None:
     """Print approval statistics from the audit log."""
 
@@ -225,23 +225,15 @@ def _cmd_audit_stats(args: argparse.Namespace) -> None:
     escalated = sum(1 for e in entries if e.verdict == "escalated")
     timed_out = sum(1 for e in entries if e.verdict == "timed_out")
 
-    review_times = [
-        e.review_duration_seconds
-        for e in entries
-        if e.review_duration_seconds > 0
-    ]
-    avg_review = (
-        sum(review_times) / len(review_times) if review_times else 0.0
-    )
+    review_times = [e.review_duration_seconds for e in entries if e.review_duration_seconds > 0]
+    avg_review = sum(review_times) / len(review_times) if review_times else 0.0
 
     # Rubber stamp rate: approved high/critical with fast review
     from attesta.core.audit import AuditLogger as _AuditLogger
 
     audit = _AuditLogger(path=audit_path)
     rubber_stamps = audit.find_rubber_stamps()
-    rubber_stamp_rate = (
-        (len(rubber_stamps) / approved * 100) if approved > 0 else 0.0
-    )
+    rubber_stamp_rate = (len(rubber_stamps) / approved * 100) if approved > 0 else 0.0
 
     # Risk level distribution
     risk_counts: dict[str, int] = {}
@@ -304,6 +296,7 @@ def _colorize_risk(level: str) -> str:
 # Subcommand: audit rubber-stamps
 # ---------------------------------------------------------------------------
 
+
 def _cmd_audit_rubber_stamps(args: argparse.Namespace) -> None:
     """List audit entries flagged as rubber stamps."""
     from attesta.core.audit import AuditLogger
@@ -347,6 +340,7 @@ def _cmd_audit_rubber_stamps(args: argparse.Namespace) -> None:
 # Subcommand: audit export
 # ---------------------------------------------------------------------------
 
+
 def _cmd_audit_export(args: argparse.Namespace) -> None:
     """Export audit entries to CSV or JSON."""
     from attesta.core.audit import AuditLogger
@@ -381,6 +375,7 @@ def _cmd_audit_export(args: argparse.Namespace) -> None:
 # Subcommand: trust show
 # ---------------------------------------------------------------------------
 
+
 def _cmd_trust_show(args: argparse.Namespace) -> None:
     """Show the trust profile for a single agent."""
     from attesta.core.trust import TrustEngine
@@ -408,9 +403,7 @@ def _cmd_trust_show(args: argparse.Namespace) -> None:
     print(f"  Stored score   : {_colorize_score(profile.overall_score)}")
     print(f"  Incidents      : {profile.incidents}")
     print(f"  Created        : {profile.created_at.isoformat()}")
-    last_action = (
-        profile.last_action_at.isoformat() if profile.last_action_at else "never"
-    )
+    last_action = profile.last_action_at.isoformat() if profile.last_action_at else "never"
     print(f"  Last action    : {last_action}")
 
     if profile.domain_scores:
@@ -438,6 +431,7 @@ def _colorize_score(score: float) -> str:
 # ---------------------------------------------------------------------------
 # Subcommand: trust list
 # ---------------------------------------------------------------------------
+
 
 def _cmd_trust_list(args: argparse.Namespace) -> None:
     """List all agents and their trust scores."""
@@ -489,6 +483,7 @@ def _cmd_trust_list(args: argparse.Namespace) -> None:
 # Subcommand: trust revoke
 # ---------------------------------------------------------------------------
 
+
 def _cmd_trust_revoke(args: argparse.Namespace) -> None:
     """Revoke all trust for an agent."""
     from attesta.core.trust import TrustEngine
@@ -505,10 +500,7 @@ def _cmd_trust_revoke(args: argparse.Namespace) -> None:
 
     if not getattr(args, "yes", False):
         try:
-            answer = input(
-                f"Revoke all trust for agent '{agent_id}'? "
-                f"This cannot be undone. [y/N] "
-            )
+            answer = input(f"Revoke all trust for agent '{agent_id}'? This cannot be undone. [y/N] ")
         except (EOFError, KeyboardInterrupt):
             print()
             sys.exit(130)
@@ -525,6 +517,7 @@ def _cmd_trust_revoke(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 # Subcommand: mcp wrap
 # ---------------------------------------------------------------------------
+
 
 def _cmd_mcp_wrap(args: argparse.Namespace) -> None:
     """Wrap any MCP server with Attesta approval (proxy mode).
@@ -556,13 +549,15 @@ def _cmd_mcp_wrap(args: argparse.Namespace) -> None:
         attesta = Attesta.from_config(config_path)
         print(
             f"[attesta] Loaded config from {config_path}",
-            file=sys.stderr, flush=True,
+            file=sys.stderr,
+            flush=True,
         )
     else:
         attesta = Attesta()
         print(
             f"[attesta] No config found ({config_path}), using defaults",
-            file=sys.stderr, flush=True,
+            file=sys.stderr,
+            flush=True,
         )
 
     # Parse risk overrides from --risk-override flags.
@@ -587,6 +582,7 @@ def _cmd_mcp_wrap(args: argparse.Namespace) -> None:
 # Subcommand: version
 # ---------------------------------------------------------------------------
 
+
 def _cmd_version(args: argparse.Namespace) -> None:
     """Print the attesta version."""
     from attesta import __version__
@@ -597,6 +593,7 @@ def _cmd_version(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 # Helpers for reading raw data
 # ---------------------------------------------------------------------------
+
 
 def _read_all_entries(audit_path: Path) -> list:
     """Read all audit entries from the JSONL file."""
@@ -627,6 +624,7 @@ def _load_trust_data(trust_path: Path) -> dict:
 # ---------------------------------------------------------------------------
 # Argument parser construction
 # ---------------------------------------------------------------------------
+
 
 def _build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser with all subcommands."""
@@ -683,13 +681,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Export audit entries to CSV or JSON",
     )
     export_parser.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=("csv", "json"),
         default="csv",
         help="Output format (default: csv)",
     )
     export_parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         default=None,
         metavar="FILE",
         help="Output file (default: stdout)",
@@ -763,7 +763,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     revoke_parser.add_argument("agent_id", help="The agent identifier")
     revoke_parser.add_argument(
-        "-y", "--yes",
+        "-y",
+        "--yes",
         action="store_true",
         help="Skip confirmation prompt",
     )
@@ -788,7 +789,8 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     mcp_wrap_parser.add_argument(
-        "--config", "-c",
+        "--config",
+        "-c",
         default=None,
         metavar="PATH",
         help=f"Path to attesta.yaml (default: {_DEFAULT_CONFIG_NAME})",
@@ -819,6 +821,7 @@ def _build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main(argv: list[str] | None = None) -> None:
     """CLI entry point invoked by the ``attesta`` console script."""

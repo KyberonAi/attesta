@@ -86,16 +86,8 @@ class AttestaToolGate:
         tuple[bool, ApprovalResult]
             A two-tuple of ``(approved, approval_result)``.
         """
-        tool_name = (
-            tool_use_block.name
-            if hasattr(tool_use_block, "name")
-            else tool_use_block.get("name", "unknown")
-        )
-        tool_input = (
-            tool_use_block.input
-            if hasattr(tool_use_block, "input")
-            else tool_use_block.get("input", {})
-        )
+        tool_name = tool_use_block.name if hasattr(tool_use_block, "name") else tool_use_block.get("name", "unknown")
+        tool_input = tool_use_block.input if hasattr(tool_use_block, "input") else tool_use_block.get("input", {})
 
         hints: dict[str, Any] = {}
         metadata: dict[str, Any] = {"source": "anthropic"}

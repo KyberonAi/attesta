@@ -21,12 +21,11 @@ from attesta.core.types import (
 # Mock renderer helpers
 # =========================================================================
 
+
 class ApproveAllRenderer:
     """Mock renderer that approves every action."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         return Verdict.APPROVED
 
     async def render_challenge(
@@ -44,18 +43,14 @@ class ApproveAllRenderer:
     async def render_info(self, message: str) -> None:
         pass
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         pass
 
 
 class DenyAllRenderer:
     """Mock renderer that denies every action."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         return Verdict.DENIED
 
     async def render_challenge(
@@ -73,18 +68,14 @@ class DenyAllRenderer:
     async def render_info(self, message: str) -> None:
         pass
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         pass
 
 
 class SlowRenderer:
     """Mock renderer that never returns challenge responses."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         await asyncio.sleep(9999)
         return Verdict.APPROVED  # pragma: no cover
 
@@ -103,9 +94,7 @@ class SlowRenderer:
     async def render_info(self, message: str) -> None:
         pass
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         pass
 
 
@@ -123,6 +112,7 @@ class RecordingAuditLogger:
 # =========================================================================
 # AttestaDenied exception
 # =========================================================================
+
 
 class TestAttestaDenied:
     def test_default_message(self):
@@ -148,6 +138,7 @@ class TestAttestaDenied:
 # =========================================================================
 # Attesta.evaluate() -- core pipeline
 # =========================================================================
+
 
 class TestAttestaEvaluate:
     async def test_auto_approve_for_low_risk(self):
@@ -275,6 +266,7 @@ class TestAttestaEvaluate:
 # =========================================================================
 # @gate decorator -- sync functions
 # =========================================================================
+
 
 class TestAttestaDecoratorSync:
     def test_bare_decorator(self):
@@ -434,6 +426,7 @@ class TestAttestaDecoratorSync:
 # @gate decorator -- async functions
 # =========================================================================
 
+
 class TestAttestaDecoratorAsync:
     async def test_async_bare_decorator(self):
         """@gate on an async function works."""
@@ -525,6 +518,7 @@ class TestAttestaDecoratorAsync:
 # @gate decorator -- metadata parameters
 # =========================================================================
 
+
 class TestAttestaDecoratorMetadata:
     async def test_agent_id_and_session_id(self):
         """agent_id and session_id are passed through to the context."""
@@ -580,6 +574,7 @@ class TestAttestaDecoratorMetadata:
 # Attesta default challenge map
 # =========================================================================
 
+
 class TestDefaultChallengeMap:
     """Verify the default risk level to challenge type mapping."""
 
@@ -611,6 +606,7 @@ class TestDefaultChallengeMap:
 # =========================================================================
 # Attesta._assess_risk() -- risk override representative scores
 # =========================================================================
+
 
 class TestAssessRiskOverride:
     async def test_low_override_score(self):

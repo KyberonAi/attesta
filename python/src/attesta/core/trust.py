@@ -118,14 +118,12 @@ class TrustEngine:
             recency_factor = 1.0
 
         # Incident penalty
-        penalty = self.incident_penalty ** profile.incidents
+        penalty = self.incident_penalty**profile.incidents
 
         raw_score = weighted_rate * recency_factor * penalty
         return min(raw_score, self.ceiling)
 
-    def effective_risk(
-        self, raw_risk: float, agent_id: str, domain: str | None = None
-    ) -> float:
+    def effective_risk(self, raw_risk: float, agent_id: str, domain: str | None = None) -> float:
         """Adjust risk score based on trust. High trust reduces effective risk."""
         trust = self.compute_trust(agent_id, domain)
         trust_discount = (trust - 0.5) * self.influence
@@ -213,15 +211,12 @@ class TrustEngine:
                 "domain_scores": profile.domain_scores,
                 "incidents": profile.incidents,
                 "created_at": profile.created_at.isoformat(),
-                "last_action_at": (
-                    profile.last_action_at.isoformat()
-                    if profile.last_action_at
-                    else None
-                ),
+                "last_action_at": (profile.last_action_at.isoformat() if profile.last_action_at else None),
                 "history_count": len(profile.history),
             }
         # Use restrictive permissions (owner read/write only) for trust data
         import os
+
         content = json.dumps(data, indent=2)
         if not self.storage_path.exists():
             fd = os.open(str(self.storage_path), os.O_WRONLY | os.O_CREAT, 0o600)
@@ -238,14 +233,6 @@ class TrustEngine:
                 overall_score=info.get("overall_score", self.initial_score),
                 domain_scores=info.get("domain_scores", {}),
                 incidents=info.get("incidents", 0),
-                created_at=(
-                    datetime.fromisoformat(info["created_at"])
-                    if "created_at" in info
-                    else datetime.now()
-                ),
-                last_action_at=(
-                    datetime.fromisoformat(info["last_action_at"])
-                    if info.get("last_action_at")
-                    else None
-                ),
+                created_at=(datetime.fromisoformat(info["created_at"]) if "created_at" in info else datetime.now()),
+                last_action_at=(datetime.fromisoformat(info["last_action_at"]) if info.get("last_action_at") else None),
             )

@@ -134,9 +134,7 @@ def _base_html(title: str, body: str, min_review_seconds: float = 0) -> str:
 def _confirm_page(ctx: ActionContext, risk: RiskAssessment) -> str:
     factors = ""
     if risk.factors:
-        items = "".join(
-            f"<li>{_esc(f.name)}: {_esc(f.description)}</li>" for f in risk.factors
-        )
+        items = "".join(f"<li>{_esc(f.name)}: {_esc(f.description)}</li>" for f in risk.factors)
         factors = f'<div class="factors"><strong>Risk factors:</strong><ul>{items}</ul></div>'
 
     body = f"""
@@ -175,14 +173,10 @@ def _quiz_page(ctx: ActionContext, risk: RiskAssessment) -> str:
     return _base_html("Attesta - Quiz", body)
 
 
-def _teach_back_page(
-    ctx: ActionContext, risk: RiskAssessment, min_review: float
-) -> str:
+def _teach_back_page(ctx: ActionContext, risk: RiskAssessment, min_review: float) -> str:
     factors = ""
     if risk.factors:
-        items = "".join(
-            f"<li>{_esc(f.name)}: {_esc(f.description)}</li>" for f in risk.factors
-        )
+        items = "".join(f"<li>{_esc(f.name)}: {_esc(f.description)}</li>" for f in risk.factors)
         factors = f'<div class="factors"><strong>Risk factors:</strong><ul>{items}</ul></div>'
 
     body = f"""
@@ -247,9 +241,7 @@ class WebRenderer:
         self.min_review_seconds = min_review_seconds
         self._csrf_token: str = ""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         html = _confirm_page(ctx, risk)
         response = await self._serve_and_wait(html)
         verdict_str = response.get("verdict", ["deny"])[0]
@@ -267,8 +259,7 @@ class WebRenderer:
             # Fail closed: this renderer is single-session and cannot reliably
             # enforce independent multi-party approvals.
             logger.warning(
-                "WebRenderer does not support multi-party approval. "
-                "Denying %s by default.",
+                "WebRenderer does not support multi-party approval. Denying %s by default.",
                 ctx.function_name,
             )
             return ChallengeResult(
@@ -332,9 +323,7 @@ class WebRenderer:
     async def render_info(self, message: str) -> None:
         logger.info("[web-renderer] %s", message)
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         logger.debug(
             "[web-renderer] Auto-approved %s (risk=%.2f)",
             ctx.function_name,
@@ -354,7 +343,7 @@ class WebRenderer:
         # Inject CSRF token into all forms
         html = html.replace(
             '<form method="POST" action="/respond">',
-            f'<form method="POST" action="/respond"><input type="hidden" name="_csrf" value="{csrf_token}">'
+            f'<form method="POST" action="/respond"><input type="hidden" name="_csrf" value="{csrf_token}">',
         )
 
         class Handler(BaseHTTPRequestHandler):
@@ -386,9 +375,7 @@ class WebRenderer:
                     return
 
                 # Send result page
-                passed = result.get("verdict", [""])[0] == "approve" or bool(
-                    result.get("explanation")
-                )
+                passed = result.get("verdict", [""])[0] == "approve" or bool(result.get("explanation"))
                 resp_html = _result_page(passed)
                 self_handler.send_response(200)
                 self_handler.send_header("Content-Type", "text/html; charset=utf-8")

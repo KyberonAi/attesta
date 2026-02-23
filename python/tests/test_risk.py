@@ -20,6 +20,7 @@ from attesta.core.types import (
 # Helpers
 # =========================================================================
 
+
 def _ctx(
     name: str = "my_func",
     args: tuple = (),
@@ -42,6 +43,7 @@ def _ctx(
 # =========================================================================
 # DefaultRiskScorer -- function name analysis
 # =========================================================================
+
 
 class TestDefaultRiskScorerFunctionName:
     """Verify that destructive, mutating, and read verbs are scored correctly."""
@@ -119,6 +121,7 @@ class TestDefaultRiskScorerFunctionName:
 # DefaultRiskScorer -- argument analysis
 # =========================================================================
 
+
 class TestDefaultRiskScorerArguments:
     """Verify that sensitive argument patterns are detected."""
 
@@ -179,6 +182,7 @@ class TestDefaultRiskScorerArguments:
 # DefaultRiskScorer -- docstring analysis
 # =========================================================================
 
+
 class TestDefaultRiskScorerDocstring:
     """Verify that docstring keywords influence the score."""
 
@@ -215,6 +219,7 @@ class TestDefaultRiskScorerDocstring:
 # =========================================================================
 # DefaultRiskScorer -- hints analysis
 # =========================================================================
+
 
 class TestDefaultRiskScorerHints:
     """Verify that caller-supplied hints influence the score."""
@@ -256,6 +261,7 @@ class TestDefaultRiskScorerHints:
 # DefaultRiskScorer -- novelty
 # =========================================================================
 
+
 class TestDefaultRiskScorerNovelty:
     """Verify that first calls are scored as more novel (risky)."""
 
@@ -292,6 +298,7 @@ class TestDefaultRiskScorerNovelty:
 # DefaultRiskScorer -- assess() method
 # =========================================================================
 
+
 class TestDefaultRiskScorerAssess:
     """Verify the assess() convenience wrapper."""
 
@@ -325,6 +332,7 @@ class TestDefaultRiskScorerAssess:
 # =========================================================================
 # FixedRiskScorer
 # =========================================================================
+
 
 class TestFixedRiskScorer:
     def test_returns_fixed_value(self):
@@ -380,6 +388,7 @@ class TestFixedRiskScorer:
 # =========================================================================
 # CompositeRiskScorer
 # =========================================================================
+
 
 class TestCompositeRiskScorer:
     def test_weighted_average(self):
@@ -443,6 +452,7 @@ class TestCompositeRiskScorer:
 # MaxRiskScorer
 # =========================================================================
 
+
 class TestMaxRiskScorer:
     def test_takes_maximum(self):
         s1 = FixedRiskScorer(0.2)
@@ -488,6 +498,7 @@ class TestMaxRiskScorer:
 # =========================================================================
 # Score clamping
 # =========================================================================
+
 
 class TestScoreClamping:
     """Ensure scores are always clamped to [0.0, 1.0]."""

@@ -98,6 +98,7 @@ class AttestaHumanInput:
             return "approved"
 
         logger.info(
-            "CrewAI task output denied (risk=%s)", result.risk_assessment.level.value,
+            "CrewAI task output denied (risk=%s)",
+            result.risk_assessment.level.value,
         )
         return "denied"

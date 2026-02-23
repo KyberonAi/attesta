@@ -89,25 +89,17 @@ class TestWebhookDispatcher:
         time.sleep(1.0)
 
         assert len(_WebhookHandler.received) == 1
-        sig_header = _WebhookHandler.received_headers[0].get(
-            "X-Attesta-Signature", ""
-        )
+        sig_header = _WebhookHandler.received_headers[0].get("X-Attesta-Signature", "")
         assert sig_header.startswith("sha256=")
 
         # Verify the signature
-        body = json.dumps(
-            _WebhookHandler.received[0], separators=(",", ":")
-        ).encode("utf-8")
-        expected_sig = hmac.new(
-            secret.encode("utf-8"), body, hashlib.sha256
-        ).hexdigest()
+        body = json.dumps(_WebhookHandler.received[0], separators=(",", ":")).encode("utf-8")
+        expected_sig = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
         assert sig_header == f"sha256={expected_sig}"
 
     def test_filters_by_event_type(self, webhook_server):
         bus = EventBus()
-        config = WebhookConfig(
-            url=webhook_server, events=[EventType.APPROVED]
-        )
+        config = WebhookConfig(url=webhook_server, events=[EventType.APPROVED])
         WebhookDispatcher(bus, [config])
 
         # Emit a DENIED event -- should NOT trigger webhook

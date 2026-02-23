@@ -38,6 +38,7 @@ _GENESIS_HASH = "0" * 64  # SHA-256 zero hash for the first entry in the chain
 # AuditEntry
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AuditEntry:
     """A single, immutable audit record for one attesta decision.
@@ -136,6 +137,7 @@ class AuditEntry:
 # Builder: ActionContext + ApprovalResult -> AuditEntry
 # ---------------------------------------------------------------------------
 
+
 def build_entry(
     ctx: ActionContext,
     result: ApprovalResult,
@@ -177,6 +179,7 @@ def build_entry(
 # ---------------------------------------------------------------------------
 # AuditLogger
 # ---------------------------------------------------------------------------
+
 
 class AuditLogger:
     """Hash-chained JSONL audit logger.
@@ -431,6 +434,7 @@ class AuditLogger:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         # Use restrictive permissions (owner read/write only) for audit files
         import os
+
         if not self.path.exists():
             fd = os.open(str(self.path), os.O_WRONLY | os.O_CREAT, 0o600)
             os.close(fd)
@@ -510,6 +514,7 @@ class AuditLogger:
 # ---------------------------------------------------------------------------
 # Module-level helpers
 # ---------------------------------------------------------------------------
+
 
 def _parse_dt(value: Any) -> datetime | None:
     """Coerce a string or datetime to a ``datetime``, or ``None``."""

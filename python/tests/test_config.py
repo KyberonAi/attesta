@@ -15,6 +15,7 @@ from attesta.core.types import ActionContext, ChallengeType, RiskLevel
 # Policy defaults
 # ---------------------------------------------------------------------------
 
+
 class TestPolicyDefaults:
     def test_default_challenge_map(self):
         policy = Policy()
@@ -47,6 +48,7 @@ class TestPolicyDefaults:
 # Challenge map overrides (P1.1)
 # ---------------------------------------------------------------------------
 
+
 class TestChallengeMapOverrides:
     def test_override_high_to_teach_back(self):
         policy = Policy(challenge_map_overrides={"high": "teach_back"})
@@ -56,20 +58,24 @@ class TestChallengeMapOverrides:
         assert policy.challenge_for_risk(RiskLevel.MEDIUM) == ChallengeType.CONFIRM
 
     def test_kebab_case_tokens_accepted(self):
-        policy = Policy(challenge_map_overrides={
-            "high": "teach-back",
-            "critical": "multi-party",
-        })
+        policy = Policy(
+            challenge_map_overrides={
+                "high": "teach-back",
+                "critical": "multi-party",
+            }
+        )
         assert policy.challenge_for_risk(RiskLevel.HIGH) == ChallengeType.TEACH_BACK
         assert policy.challenge_for_risk(RiskLevel.CRITICAL) == ChallengeType.MULTI_PARTY
 
     def test_snake_case_tokens_accepted(self):
-        policy = Policy(challenge_map_overrides={
-            "low": "auto_approve",
-            "medium": "confirm",
-            "high": "quiz",
-            "critical": "multi_party",
-        })
+        policy = Policy(
+            challenge_map_overrides={
+                "low": "auto_approve",
+                "medium": "confirm",
+                "high": "quiz",
+                "critical": "multi_party",
+            }
+        )
         assert policy.challenge_for_risk(RiskLevel.LOW) == ChallengeType.AUTO_APPROVE
         assert policy.challenge_for_risk(RiskLevel.MEDIUM) == ChallengeType.CONFIRM
         assert policy.challenge_for_risk(RiskLevel.HIGH) == ChallengeType.QUIZ
@@ -92,6 +98,7 @@ class TestChallengeMapOverrides:
 # ---------------------------------------------------------------------------
 # Config parsing (_parse_config)
 # ---------------------------------------------------------------------------
+
 
 class TestParseConfig:
     def test_empty_config(self):
@@ -214,6 +221,7 @@ class TestParseConfig:
 # load_config with YAML files
 # ---------------------------------------------------------------------------
 
+
 class TestLoadConfigYAML:
     def test_missing_file_returns_defaults(self, tmp_path: Path):
         policy = load_config(tmp_path / "nonexistent.yaml")
@@ -260,6 +268,7 @@ class TestLoadConfigYAML:
 # ---------------------------------------------------------------------------
 # Domain scorer strictness
 # ---------------------------------------------------------------------------
+
 
 class TestDomainScorerStrictness:
     def test_missing_domain_raises_by_default(self):

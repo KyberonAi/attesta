@@ -97,6 +97,7 @@ class TestEventBus:
     def test_off(self):
         bus = EventBus()
         received = []
+
         def handler(e):
             received.append(e)
 

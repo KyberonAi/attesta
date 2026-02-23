@@ -21,6 +21,7 @@ from attesta.core.types import (
 # RiskLevel.from_score()
 # =========================================================================
 
+
 class TestRiskLevelFromScore:
     """Boundary-condition tests for the score -> level mapping.
 
@@ -94,6 +95,7 @@ class TestRiskLevelFromScore:
 # RiskLevel enum values
 # =========================================================================
 
+
 class TestRiskLevelEnum:
     def test_values(self):
         assert RiskLevel.LOW.value == "low"
@@ -114,6 +116,7 @@ class TestRiskLevelEnum:
 # Verdict enum
 # =========================================================================
 
+
 class TestVerdictEnum:
     def test_all_values(self):
         assert Verdict.APPROVED.value == "approved"
@@ -130,6 +133,7 @@ class TestVerdictEnum:
 # ChallengeType enum
 # =========================================================================
 
+
 class TestChallengeTypeEnum:
     def test_all_values(self):
         assert ChallengeType.AUTO_APPROVE.value == "auto_approve"
@@ -145,6 +149,7 @@ class TestChallengeTypeEnum:
 # =========================================================================
 # ActionContext
 # =========================================================================
+
 
 class TestActionContext:
     """Tests for ActionContext defaults and .description property."""
@@ -202,6 +207,7 @@ class TestActionContext:
 # RiskFactor
 # =========================================================================
 
+
 class TestRiskFactor:
     def test_defaults(self):
         f = RiskFactor(name="test", contribution=0.3, description="desc")
@@ -223,6 +229,7 @@ class TestRiskFactor:
 # =========================================================================
 # RiskAssessment
 # =========================================================================
+
 
 class TestRiskAssessment:
     def test_valid_assessment(self):
@@ -267,6 +274,7 @@ class TestRiskAssessment:
 # ChallengeResult
 # =========================================================================
 
+
 class TestChallengeResult:
     def test_defaults(self):
         cr = ChallengeResult(passed=True, challenge_type=ChallengeType.CONFIRM)
@@ -295,6 +303,7 @@ class TestChallengeResult:
 # =========================================================================
 # ApprovalResult
 # =========================================================================
+
 
 class TestApprovalResult:
     def test_defaults(self):

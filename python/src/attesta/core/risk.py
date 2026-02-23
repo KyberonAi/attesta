@@ -45,20 +45,24 @@ __all__ = [
 # Pattern constants
 # ---------------------------------------------------------------------------
 
-_DESTRUCTIVE_VERBS: frozenset[str] = frozenset(
-    {"delete", "remove", "drop", "destroy", "purge", "truncate", "kill"}
-)
+_DESTRUCTIVE_VERBS: frozenset[str] = frozenset({"delete", "remove", "drop", "destroy", "purge", "truncate", "kill"})
 
 _MUTATING_VERBS: frozenset[str] = frozenset(
     {
-        "write", "update", "modify", "set", "create", "send",
-        "deploy", "push", "execute", "run",
+        "write",
+        "update",
+        "modify",
+        "set",
+        "create",
+        "send",
+        "deploy",
+        "push",
+        "execute",
+        "run",
     }
 )
 
-_READ_VERBS: frozenset[str] = frozenset(
-    {"read", "get", "list", "fetch", "search", "find", "check"}
-)
+_READ_VERBS: frozenset[str] = frozenset({"read", "get", "list", "fetch", "search", "find", "check"})
 
 _SENSITIVE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"prod(uction)?", re.IGNORECASE),
@@ -109,6 +113,7 @@ _DOCSTRING_MEDIUM: tuple[re.Pattern[str], ...] = (
 # Helper utilities
 # ---------------------------------------------------------------------------
 
+
 def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
     """Clamp *value* to the closed interval [lo, hi]."""
     return max(lo, min(hi, value))
@@ -134,6 +139,7 @@ def _extract_verbs(function_name: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # DefaultRiskScorer
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DefaultRiskScorer:
@@ -201,44 +207,54 @@ class DefaultRiskScorer:
         factors: list[RiskFactor] = []
 
         fn_score, fn_evidence = self._score_function_name(ctx.function_name)
-        factors.append(RiskFactor(
-            name="function_name",
-            contribution=fn_score * self.weight_function,
-            description="Risk inferred from the function name verbs.",
-            evidence=fn_evidence,
-        ))
+        factors.append(
+            RiskFactor(
+                name="function_name",
+                contribution=fn_score * self.weight_function,
+                description="Risk inferred from the function name verbs.",
+                evidence=fn_evidence,
+            )
+        )
 
         arg_score, arg_evidence = self._score_arguments(ctx.args, ctx.kwargs)
-        factors.append(RiskFactor(
-            name="arguments",
-            contribution=arg_score * self.weight_args,
-            description="Risk inferred from argument values.",
-            evidence=arg_evidence,
-        ))
+        factors.append(
+            RiskFactor(
+                name="arguments",
+                contribution=arg_score * self.weight_args,
+                description="Risk inferred from argument values.",
+                evidence=arg_evidence,
+            )
+        )
 
         doc_score, doc_evidence = self._score_docstring(ctx.function_doc)
-        factors.append(RiskFactor(
-            name="docstring",
-            contribution=doc_score * self.weight_docstring,
-            description="Risk inferred from the function docstring.",
-            evidence=doc_evidence,
-        ))
+        factors.append(
+            RiskFactor(
+                name="docstring",
+                contribution=doc_score * self.weight_docstring,
+                description="Risk inferred from the function docstring.",
+                evidence=doc_evidence,
+            )
+        )
 
         hint_score, hint_evidence = self._score_hints(ctx.hints)
-        factors.append(RiskFactor(
-            name="hints",
-            contribution=hint_score * self.weight_hints,
-            description="Risk inferred from caller-supplied hints.",
-            evidence=hint_evidence,
-        ))
+        factors.append(
+            RiskFactor(
+                name="hints",
+                contribution=hint_score * self.weight_hints,
+                description="Risk inferred from caller-supplied hints.",
+                evidence=hint_evidence,
+            )
+        )
 
         nov_score, nov_evidence = self._score_novelty(ctx.function_name)
-        factors.append(RiskFactor(
-            name="novelty",
-            contribution=nov_score * self.weight_novelty,
-            description="Risk due to function call novelty.",
-            evidence=nov_evidence,
-        ))
+        factors.append(
+            RiskFactor(
+                name="novelty",
+                contribution=nov_score * self.weight_novelty,
+                description="Risk due to function call novelty.",
+                evidence=nov_evidence,
+            )
+        )
 
         return factors
 
@@ -417,6 +433,7 @@ class DefaultRiskScorer:
 # CompositeRiskScorer
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CompositeRiskScorer:
     """Combines multiple scorers via a weighted average.
@@ -466,14 +483,13 @@ class CompositeRiskScorer:
             normalised_weight = weight / total_weight
             contribution = child_score * normalised_weight
             weighted_sum += contribution
-            factors.append(RiskFactor(
-                name=f"scorer:{scorer.name}",
-                contribution=contribution,
-                description=(
-                    f"Score {child_score:.3f} from '{scorer.name}' "
-                    f"(weight {normalised_weight:.2f})"
-                ),
-            ))
+            factors.append(
+                RiskFactor(
+                    name=f"scorer:{scorer.name}",
+                    contribution=contribution,
+                    description=(f"Score {child_score:.3f} from '{scorer.name}' (weight {normalised_weight:.2f})"),
+                )
+            )
 
         clamped = _clamp(weighted_sum)
         return RiskAssessment(
@@ -487,6 +503,7 @@ class CompositeRiskScorer:
 # ---------------------------------------------------------------------------
 # MaxRiskScorer
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class MaxRiskScorer:
@@ -528,11 +545,13 @@ class MaxRiskScorer:
             if child_score >= best_score:
                 best_score = child_score
                 best_scorer_name = scorer.name
-            factors.append(RiskFactor(
-                name=f"scorer:{scorer.name}",
-                contribution=child_score,
-                description=f"Score {child_score:.3f} from '{scorer.name}'",
-            ))
+            factors.append(
+                RiskFactor(
+                    name=f"scorer:{scorer.name}",
+                    contribution=child_score,
+                    description=f"Score {child_score:.3f} from '{scorer.name}'",
+                )
+            )
 
         clamped = _clamp(best_score)
         return RiskAssessment(
@@ -546,6 +565,7 @@ class MaxRiskScorer:
 # ---------------------------------------------------------------------------
 # FixedRiskScorer
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class FixedRiskScorer:
@@ -563,9 +583,7 @@ class FixedRiskScorer:
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.fixed_score <= 1.0:
-            raise ValueError(
-                f"fixed_score must be in [0.0, 1.0], got {self.fixed_score}"
-            )
+            raise ValueError(f"fixed_score must be in [0.0, 1.0], got {self.fixed_score}")
 
     @property
     def name(self) -> str:

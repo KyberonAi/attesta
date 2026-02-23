@@ -71,8 +71,7 @@ def detect_environment() -> Environment:
             pass  # Unknown value, continue with auto-detection
 
     # 2. CI markers
-    ci_vars = ("CI", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL",
-               "CIRCLECI", "TRAVIS", "BUILDKITE")
+    ci_vars = ("CI", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "CIRCLECI", "TRAVIS", "BUILDKITE")
     for var in ci_vars:
         if os.environ.get(var):
             return Environment.CI

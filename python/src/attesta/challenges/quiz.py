@@ -26,6 +26,7 @@ from attesta.core.types import (
 # Question model
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Question:
     """A single quiz question presented to the operator.
@@ -80,9 +81,7 @@ _NUMERIC_RE = re.compile(r"^-?\d+(?:\.\d+)?$")
 
 def _flatten_args(ctx: ActionContext) -> list[tuple[str | None, Any]]:
     """Return a flat list of ``(name_or_none, value)`` from args + kwargs."""
-    items: list[tuple[str | None, Any]] = [
-        (None, a) for a in ctx.args
-    ]
+    items: list[tuple[str | None, Any]] = [(None, a) for a in ctx.args]
     items.extend(ctx.kwargs.items())
     return items
 
@@ -148,6 +147,7 @@ def _make_wrong_path(correct: str) -> str:
 # QuizChallenge
 # ---------------------------------------------------------------------------
 
+
 class QuizChallenge:
     """Comprehension quiz for HIGH-risk actions.
 
@@ -181,9 +181,7 @@ class QuizChallenge:
 
     # -- question generation ----------------------------------------------
 
-    def generate_questions(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> list[Question]:
+    def generate_questions(self, ctx: ActionContext, risk: RiskAssessment) -> list[Question]:
         """Build a list of questions from the action context.
 
         Strategy priority:
@@ -298,9 +296,7 @@ class QuizChallenge:
 
     # -- presentation -----------------------------------------------------
 
-    async def present(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> ChallengeResult:
+    async def present(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
         """Present the quiz to the operator and collect answers."""
         start = time.monotonic()
         loop = asyncio.get_running_loop()
@@ -341,9 +337,7 @@ class QuizChallenge:
                 for letter_idx, option in enumerate(question.options):
                     letter = chr(ord("A") + letter_idx)
                     print(f"    {letter}) {option}")
-                raw = await loop.run_in_executor(
-                    None, lambda: _read_input("  Your answer (letter or value): ")
-                )
+                raw = await loop.run_in_executor(None, lambda: _read_input("  Your answer (letter or value): "))
                 # Accept either the letter label or the literal value
                 answer = raw
                 if len(raw) == 1 and raw.upper().isalpha():
@@ -351,9 +345,7 @@ class QuizChallenge:
                     if 0 <= choice_idx < len(question.options):
                         answer = question.options[choice_idx]
             else:
-                raw = await loop.run_in_executor(
-                    None, lambda: _read_input("  Your answer: ")
-                )
+                raw = await loop.run_in_executor(None, lambda: _read_input("  Your answer: "))
                 answer = raw
 
             if answer.lower() == question.correct_answer.lower():
@@ -365,10 +357,7 @@ class QuizChallenge:
         elapsed = time.monotonic() - start
         passed = correct_count >= self.min_correct
 
-        print(
-            f"\n  Result: {correct_count}/{len(questions)} correct "
-            f"-- {'PASSED' if passed else 'FAILED'}"
-        )
+        print(f"\n  Result: {correct_count}/{len(questions)} correct -- {'PASSED' if passed else 'FAILED'}")
 
         return ChallengeResult(
             passed=passed,

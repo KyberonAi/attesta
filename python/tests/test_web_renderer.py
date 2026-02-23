@@ -21,6 +21,7 @@ from attesta.renderers.web import WebRenderer
 def _find_free_port() -> int:
     """Find a free TCP port."""
     import socket
+
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
@@ -104,10 +105,12 @@ class TestWebRenderer:
         def submit():
             time.sleep(0.5)
             csrf = _get_csrf_token(port)
-            data = urlencode({
-                "explanation": "This will permanently drop the users database table and all its data",
-                "_csrf": csrf,
-            }).encode()
+            data = urlencode(
+                {
+                    "explanation": "This will permanently drop the users database table and all its data",
+                    "_csrf": csrf,
+                }
+            ).encode()
             req = Request(f"http://127.0.0.1:{port}/respond", data=data, method="POST")
             urlopen(req, timeout=5)
 
@@ -258,6 +261,6 @@ class TestWebRenderer:
         assert len(html_received) == 1
         # The raw script/img tags should NOT appear -- they must be escaped
         assert "<script>" not in html_received[0]
-        assert '<img src=x' not in html_received[0]
+        assert "<img src=x" not in html_received[0]
         # The escaped versions should appear
         assert "&lt;script&gt;" in html_received[0]

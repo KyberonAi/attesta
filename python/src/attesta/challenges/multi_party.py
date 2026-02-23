@@ -28,6 +28,7 @@ from attesta.core.types import (
 # Per-approver record
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ApproverRecord:
     """Audit record for a single approver within a multi-party challenge."""
@@ -53,6 +54,7 @@ _DEFAULT_SUB_CHALLENGES: list[ConfirmChallenge | QuizChallenge | TeachBackChalle
 # ---------------------------------------------------------------------------
 # MultiPartyChallenge
 # ---------------------------------------------------------------------------
+
 
 class MultiPartyChallenge:
     """Multi-party approval requiring 2+ independent human approvers.
@@ -89,10 +91,7 @@ class MultiPartyChallenge:
         min_review_seconds: float = 0.0,
     ) -> None:
         if required_approvers < 2:
-            raise ValueError(
-                f"Multi-party approval requires at least 2 approvers, "
-                f"got {required_approvers}."
-            )
+            raise ValueError(f"Multi-party approval requires at least 2 approvers, got {required_approvers}.")
         self.required_approvers = required_approvers
         self.sub_challenges = list(sub_challenges or _DEFAULT_SUB_CHALLENGES)
         self.min_review_seconds = min_review_seconds
@@ -138,9 +137,7 @@ class MultiPartyChallenge:
 
         # Enforce optional extra review time
         if self.min_review_seconds > 0:
-            print(
-                f"  [Mandatory review period: {self.min_review_seconds:.0f}s...]"
-            )
+            print(f"  [Mandatory review period: {self.min_review_seconds:.0f}s...]")
             await asyncio.sleep(self.min_review_seconds)
 
         start = time.monotonic()
@@ -166,9 +163,7 @@ class MultiPartyChallenge:
 
     # -- public interface -------------------------------------------------
 
-    async def present(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> ChallengeResult:
+    async def present(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult:
         """Run the full multi-party approval flow.
 
         Returns a :class:`ChallengeResult` where ``passed`` is ``True``
@@ -207,10 +202,7 @@ class MultiPartyChallenge:
         passed_count = sum(1 for r in records if r.passed)
         status = "PASSED" if all_passed else "FAILED"
         print(f"\n{separator}")
-        print(
-            f"  Multi-party result: {status} "
-            f"({passed_count}/{self.required_approvers} approved)"
-        )
+        print(f"  Multi-party result: {status} ({passed_count}/{self.required_approvers} approved)")
         print(f"{separator}")
 
         return ChallengeResult(

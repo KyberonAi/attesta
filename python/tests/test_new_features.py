@@ -23,12 +23,11 @@ from attesta.core.types import (
 # Mock helpers
 # =========================================================================
 
+
 class ApproveAllRenderer:
     """Mock renderer that approves every action."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         return Verdict.APPROVED
 
     async def render_challenge(
@@ -46,18 +45,14 @@ class ApproveAllRenderer:
     async def render_info(self, message: str) -> None:
         pass
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         pass
 
 
 class DenyAllRenderer:
     """Mock renderer that denies every action."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         return Verdict.DENIED
 
     async def render_challenge(
@@ -75,18 +70,14 @@ class DenyAllRenderer:
     async def render_info(self, message: str) -> None:
         pass
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         pass
 
 
 class SlowRenderer:
     """Mock renderer that times out challenge flows."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         await asyncio.sleep(9999)
         return Verdict.APPROVED  # pragma: no cover
 
@@ -105,9 +96,7 @@ class SlowRenderer:
     async def render_info(self, message: str) -> None:
         pass
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
         pass
 
 
@@ -149,6 +138,7 @@ class FakeTrustEngine:
 # =========================================================================
 # 1. Config Unification -- Policy methods
 # =========================================================================
+
 
 class TestPolicyToChallengeMap:
     """Verify Policy.to_challenge_map() produces the correct mapping."""
@@ -241,9 +231,7 @@ class TestPolicyMinReviewTime:
     def test_custom_review_times(self):
         from attesta.config.loader import Policy
 
-        policy = Policy(
-            minimum_review_seconds={"medium": 5, "high": 15}
-        )
+        policy = Policy(minimum_review_seconds={"medium": 5, "high": 15})
         assert policy.min_review_time(RiskLevel.MEDIUM) == 5
         assert policy.min_review_time(RiskLevel.HIGH) == 15
         # Missing keys return 0
@@ -253,6 +241,7 @@ class TestPolicyMinReviewTime:
 # =========================================================================
 # 1b. Attesta.from_config() -- rich and legacy formats
 # =========================================================================
+
 
 @pytest.mark.skipif(
     not __import__("importlib").util.find_spec("yaml"),
@@ -291,12 +280,7 @@ class TestAttestaFromConfig:
         from attesta import Attesta
 
         config = tmp_path / "attesta.yaml"
-        config.write_text(
-            "domain: nonexistent_domain_xyz_123\n"
-            "policy:\n"
-            "  minimum_review_seconds:\n"
-            "    medium: 3\n"
-        )
+        config.write_text("domain: nonexistent_domain_xyz_123\npolicy:\n  minimum_review_seconds:\n    medium: 3\n")
         with pytest.raises(ValueError, match="Configured domain profile was not found"):
             Attesta.from_config(config)
 
@@ -331,13 +315,7 @@ class TestAttestaFromConfig:
         from attesta import Attesta
 
         config = tmp_path / "attesta.yaml"
-        config.write_text(
-            "trust:\n"
-            "  influence: 0.4\n"
-            "  ceiling: 0.85\n"
-            "  initial_score: 0.4\n"
-            "  decay_rate: 0.02\n"
-        )
+        config.write_text("trust:\n  influence: 0.4\n  ceiling: 0.85\n  initial_score: 0.4\n  decay_rate: 0.02\n")
         gk = Attesta.from_config(config)
         assert gk._trust_engine is not None
         assert gk._trust_engine.initial_score == 0.4
@@ -377,12 +355,7 @@ class TestAttestaFromConfig:
         from attesta import Attesta
 
         config = tmp_path / "attesta.yaml"
-        config.write_text(
-            "trust:\n"
-            "  influence: 0.3\n"
-            "policy:\n"
-            "  require_multi_party: {}\n"
-        )
+        config.write_text("trust:\n  influence: 0.3\npolicy:\n  require_multi_party: {}\n")
         gk = Attesta.from_config(config)
         assert gk._challenge_map is not None
         assert gk._challenge_map[RiskLevel.CRITICAL] == ChallengeType.TEACH_BACK
@@ -392,11 +365,7 @@ class TestAttestaFromConfig:
         from attesta import Attesta, AttestaDenied
 
         config = tmp_path / "attesta.yaml"
-        config.write_text(
-            "policy:\n"
-            "  fail_mode: escalate\n"
-            "  timeout_seconds: 0.05\n"
-        )
+        config.write_text("policy:\n  fail_mode: escalate\n  timeout_seconds: 0.05\n")
         gk = Attesta.from_config(config)
 
         @gk.gate(risk="medium", renderer=SlowRenderer())
@@ -417,11 +386,7 @@ class TestAttestaFromConfig:
         from attesta import Attesta
 
         config = tmp_path / "attesta.yaml"
-        config.write_text(
-            "policy:\n"
-            "  fail_mode: allow\n"
-            "  timeout_seconds: 0.05\n"
-        )
+        config.write_text("policy:\n  fail_mode: allow\n  timeout_seconds: 0.05\n")
         gk = Attesta.from_config(config)
 
         @gk.gate(risk="high", renderer=SlowRenderer())
@@ -434,6 +399,7 @@ class TestAttestaFromConfig:
 # =========================================================================
 # 2. Trust Engine Wiring in Attesta.evaluate()
 # =========================================================================
+
 
 class TestTrustEngineInAttesta:
     """Verify that Attesta correctly interacts with the trust engine."""
@@ -544,6 +510,7 @@ class TestTrustEngineInAttesta:
 # 3. Smart Default Renderer Detection
 # =========================================================================
 
+
 class TestDetectRenderer:
     """Verify _detect_renderer() picks the right renderer for the environment."""
 
@@ -579,6 +546,7 @@ class TestDetectRenderer:
 # =========================================================================
 # 4. Configurable sync_timeout
 # =========================================================================
+
 
 class TestSyncTimeout:
     """Verify the sync_timeout parameter is accepted by @gate."""

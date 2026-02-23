@@ -81,9 +81,7 @@ class WebhookDispatcher:
         List of :class:`WebhookConfig` defining where to send events.
     """
 
-    def __init__(
-        self, event_bus: EventBus, configs: list[WebhookConfig]
-    ) -> None:
+    def __init__(self, event_bus: EventBus, configs: list[WebhookConfig]) -> None:
         self._configs = configs
         self._event_bus = event_bus
 
@@ -174,8 +172,6 @@ class WebhookDispatcher:
         """Build the JSON payload for a webhook delivery."""
         return {
             "event": event.type.value.upper(),
-            "timestamp": datetime.fromtimestamp(
-                event.timestamp, tz=UTC
-            ).isoformat(),
+            "timestamp": datetime.fromtimestamp(event.timestamp, tz=UTC).isoformat(),
             "data": event.data,
         }

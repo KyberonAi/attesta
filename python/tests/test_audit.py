@@ -24,6 +24,7 @@ from attesta.core.types import (
 # Helpers
 # =========================================================================
 
+
 def _make_ctx(
     name: str = "test_action",
     agent_id: str = "agent-1",
@@ -82,6 +83,7 @@ async def _log_n_entries(
 # =========================================================================
 # AuditEntry -- serialisation
 # =========================================================================
+
 
 class TestAuditEntry:
     def test_to_dict_roundtrip(self):
@@ -143,6 +145,7 @@ class TestAuditEntry:
 # AuditEntry -- hash computation
 # =========================================================================
 
+
 class TestAuditEntryHash:
     def test_compute_hash_is_deterministic(self):
         entry = AuditEntry(action_name="deploy", risk_score=0.5)
@@ -174,6 +177,7 @@ class TestAuditEntryHash:
 # =========================================================================
 # build_entry()
 # =========================================================================
+
 
 class TestBuildEntry:
     def test_populates_fields(self):
@@ -220,6 +224,7 @@ class TestBuildEntry:
 # =========================================================================
 # AuditLogger -- writing entries to JSONL
 # =========================================================================
+
 
 class TestAuditLoggerWriting:
     async def test_log_creates_file(self, tmp_path):
@@ -280,6 +285,7 @@ class TestAuditLoggerWriting:
 # =========================================================================
 # AuditLogger -- hash chain verification
 # =========================================================================
+
 
 class TestAuditLoggerVerification:
     async def test_intact_chain(self, tmp_path):
@@ -381,6 +387,7 @@ class TestAuditLoggerVerification:
 # AuditLogger -- log_entry() (direct entry logging)
 # =========================================================================
 
+
 class TestAuditLoggerLogEntry:
     def test_log_entry_writes_to_file(self, tmp_path):
         path = tmp_path / "audit.jsonl"
@@ -418,19 +425,16 @@ class TestAuditLoggerLogEntry:
 # AuditLogger -- query filtering
 # =========================================================================
 
+
 class TestAuditLoggerQuery:
     async def test_query_by_verdict(self, tmp_path):
         path = tmp_path / "audit.jsonl"
         logger = AuditLogger(path=path)
         # Log some approved and some denied
         for _ in range(3):
-            await logger.log(
-                _make_ctx(), _make_result(verdict=Verdict.APPROVED)
-            )
+            await logger.log(_make_ctx(), _make_result(verdict=Verdict.APPROVED))
         for _ in range(2):
-            await logger.log(
-                _make_ctx(), _make_result(verdict=Verdict.DENIED)
-            )
+            await logger.log(_make_ctx(), _make_result(verdict=Verdict.DENIED))
 
         approved = logger.query(verdict="approved")
         denied = logger.query(verdict="denied")
@@ -517,13 +521,15 @@ class TestAuditLoggerQuery:
 # AuditLogger -- find_rubber_stamps
 # =========================================================================
 
+
 class TestFindRubberStamps:
     async def test_finds_fast_high_risk_approvals(self, tmp_path):
         path = tmp_path / "audit.jsonl"
         logger = AuditLogger(path=path)
         # Fast approval on high risk (rubber stamp)
         await _log_n_entries(
-            logger, 2,
+            logger,
+            2,
             verdict=Verdict.APPROVED,
             score=0.7,
             level=RiskLevel.HIGH,
@@ -531,7 +537,8 @@ class TestFindRubberStamps:
         )
         # Slow approval on high risk (legitimate)
         await _log_n_entries(
-            logger, 1,
+            logger,
+            1,
             verdict=Verdict.APPROVED,
             score=0.7,
             level=RiskLevel.HIGH,
@@ -545,7 +552,8 @@ class TestFindRubberStamps:
         logger = AuditLogger(path=path)
         # Fast approval on low risk (not a rubber stamp)
         await _log_n_entries(
-            logger, 3,
+            logger,
+            3,
             verdict=Verdict.APPROVED,
             score=0.1,
             level=RiskLevel.LOW,
@@ -559,7 +567,8 @@ class TestFindRubberStamps:
         logger = AuditLogger(path=path)
         # Fast denial on high risk (not a rubber stamp since it was denied)
         await _log_n_entries(
-            logger, 2,
+            logger,
+            2,
             verdict=Verdict.DENIED,
             score=0.7,
             level=RiskLevel.HIGH,
@@ -572,7 +581,8 @@ class TestFindRubberStamps:
         path = tmp_path / "audit.jsonl"
         logger = AuditLogger(path=path)
         await _log_n_entries(
-            logger, 1,
+            logger,
+            1,
             verdict=Verdict.APPROVED,
             score=0.9,
             level=RiskLevel.CRITICAL,
@@ -585,7 +595,8 @@ class TestFindRubberStamps:
         path = tmp_path / "audit.jsonl"
         logger = AuditLogger(path=path)
         await _log_n_entries(
-            logger, 2,
+            logger,
+            2,
             verdict=Verdict.APPROVED,
             score=0.45,
             level=RiskLevel.MEDIUM,
@@ -598,7 +609,8 @@ class TestFindRubberStamps:
         path = tmp_path / "audit.jsonl"
         logger = AuditLogger(path=path)
         await _log_n_entries(
-            logger, 1,
+            logger,
+            1,
             verdict=Verdict.APPROVED,
             score=0.7,
             level=RiskLevel.HIGH,
@@ -621,6 +633,7 @@ class TestFindRubberStamps:
 # =========================================================================
 # AuditLogger -- resume from existing log
 # =========================================================================
+
 
 class TestAuditLoggerResume:
     async def test_resume_continues_chain(self, tmp_path):

@@ -56,6 +56,7 @@ __all__ = [
 # Data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RiskPattern:
     """A domain-specific pattern that affects risk scoring.
@@ -82,21 +83,15 @@ class RiskPattern:
     description: str  # why this pattern is risky in this domain
     compliance_refs: list[str] = field(default_factory=list)
 
-    _VALID_TARGETS: frozenset[str] = frozenset(
-        {"function_name", "args", "kwargs", "docstring", "any"}
-    )
+    _VALID_TARGETS: frozenset[str] = frozenset({"function_name", "args", "kwargs", "docstring", "any"})
 
     def __post_init__(self) -> None:
         if self.target not in self._VALID_TARGETS:
             raise ValueError(
-                f"Invalid RiskPattern target '{self.target}'. "
-                f"Must be one of {sorted(self._VALID_TARGETS)}"
+                f"Invalid RiskPattern target '{self.target}'. Must be one of {sorted(self._VALID_TARGETS)}"
             )
         if not 0.0 <= self.risk_contribution <= 1.0:
-            raise ValueError(
-                f"risk_contribution must be in [0.0, 1.0], "
-                f"got {self.risk_contribution}"
-            )
+            raise ValueError(f"risk_contribution must be in [0.0, 1.0], got {self.risk_contribution}")
         # Compile the pattern if it is still a plain string.
         if isinstance(self.pattern, str):
             self.pattern = re.compile(self.pattern, re.IGNORECASE)
@@ -138,20 +133,16 @@ class EscalationRule:
     description: str = ""
 
     _VALID_ACTIONS: frozenset[str] = frozenset(
-        {"require_multi_party", "notify_compliance", "block", "require_teach_back",
-         "require_confirmation"}
+        {"require_multi_party", "notify_compliance", "block", "require_teach_back", "require_confirmation"}
     )
 
     def __post_init__(self) -> None:
         if self.action not in self._VALID_ACTIONS:
             raise ValueError(
-                f"Invalid EscalationRule action '{self.action}'. "
-                f"Must be one of {sorted(self._VALID_ACTIONS)}"
+                f"Invalid EscalationRule action '{self.action}'. Must be one of {sorted(self._VALID_ACTIONS)}"
             )
         if self.required_approvers < 1:
-            raise ValueError(
-                f"required_approvers must be >= 1, got {self.required_approvers}"
-            )
+            raise ValueError(f"required_approvers must be >= 1, got {self.required_approvers}")
 
 
 @dataclass
@@ -174,20 +165,16 @@ class DomainChallengeTemplate:
     min_risk_level: str = "high"
 
     _VALID_CHALLENGE_TYPES: frozenset[str] = frozenset({"quiz", "teach_back"})
-    _VALID_RISK_LEVELS: frozenset[str] = frozenset(
-        {"low", "medium", "high", "critical"}
-    )
+    _VALID_RISK_LEVELS: frozenset[str] = frozenset({"low", "medium", "high", "critical"})
 
     def __post_init__(self) -> None:
         if self.challenge_type not in self._VALID_CHALLENGE_TYPES:
             raise ValueError(
-                f"Invalid challenge_type '{self.challenge_type}'. "
-                f"Must be one of {sorted(self._VALID_CHALLENGE_TYPES)}"
+                f"Invalid challenge_type '{self.challenge_type}'. Must be one of {sorted(self._VALID_CHALLENGE_TYPES)}"
             )
         if self.min_risk_level not in self._VALID_RISK_LEVELS:
             raise ValueError(
-                f"Invalid min_risk_level '{self.min_risk_level}'. "
-                f"Must be one of {sorted(self._VALID_RISK_LEVELS)}"
+                f"Invalid min_risk_level '{self.min_risk_level}'. Must be one of {sorted(self._VALID_RISK_LEVELS)}"
             )
 
 
@@ -247,12 +234,8 @@ class DomainProfile:
     required_vocabulary: list[str] = field(default_factory=list)
 
     # Internal: compiled patterns for critical/safe action matching.
-    _critical_patterns: list[re.Pattern[str]] = field(
-        default_factory=list, repr=False, compare=False
-    )
-    _safe_patterns: list[re.Pattern[str]] = field(
-        default_factory=list, repr=False, compare=False
-    )
+    _critical_patterns: list[re.Pattern[str]] = field(default_factory=list, repr=False, compare=False)
+    _safe_patterns: list[re.Pattern[str]] = field(default_factory=list, repr=False, compare=False)
     _sensitive_term_patterns: list[tuple[re.Pattern[str], float]] = field(
         default_factory=list, repr=False, compare=False
     )
@@ -265,16 +248,10 @@ class DomainProfile:
                 rp.pattern = re.compile(rp.pattern, re.IGNORECASE)
 
         # Compile critical action patterns (fnmatch-style globs -> regex).
-        self._critical_patterns = [
-            re.compile(self._glob_to_regex(p), re.IGNORECASE)
-            for p in self.critical_actions
-        ]
+        self._critical_patterns = [re.compile(self._glob_to_regex(p), re.IGNORECASE) for p in self.critical_actions]
 
         # Compile safe action patterns.
-        self._safe_patterns = [
-            re.compile(self._glob_to_regex(p), re.IGNORECASE)
-            for p in self.safe_actions
-        ]
+        self._safe_patterns = [re.compile(self._glob_to_regex(p), re.IGNORECASE) for p in self.safe_actions]
 
         # Compile sensitive term patterns.
         self._sensitive_term_patterns = [
@@ -284,17 +261,11 @@ class DomainProfile:
 
         # Validate base_risk_floor.
         if not 0.0 <= self.base_risk_floor <= 1.0:
-            raise ValueError(
-                f"base_risk_floor must be in [0.0, 1.0], "
-                f"got {self.base_risk_floor}"
-            )
+            raise ValueError(f"base_risk_floor must be in [0.0, 1.0], got {self.base_risk_floor}")
 
         # Validate production_multiplier.
         if self.production_multiplier < 0.0:
-            raise ValueError(
-                f"production_multiplier must be non-negative, "
-                f"got {self.production_multiplier}"
-            )
+            raise ValueError(f"production_multiplier must be non-negative, got {self.production_multiplier}")
 
     @staticmethod
     def _glob_to_regex(pattern: str) -> str:
@@ -336,15 +307,13 @@ class DomainProfile:
         """
         level_order = {"low": 0, "medium": 1, "high": 2, "critical": 3}
         requested = level_order.get(risk_level, 0)
-        return [
-            t for t in self.challenge_templates
-            if level_order.get(t.min_risk_level, 0) <= requested
-        ]
+        return [t for t in self.challenge_templates if level_order.get(t.min_risk_level, 0) <= requested]
 
 
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
+
 
 class DomainRegistry:
     """Registry of available domain profiles.
@@ -375,10 +344,7 @@ class DomainRegistry:
         Use :meth:`replace` to overwrite an existing profile.
         """
         if profile.name in self._profiles:
-            raise ValueError(
-                f"Domain profile '{profile.name}' is already registered. "
-                f"Use replace() to overwrite."
-            )
+            raise ValueError(f"Domain profile '{profile.name}' is already registered. Use replace() to overwrite.")
         self._profiles[profile.name] = profile
 
     def replace(self, profile: DomainProfile) -> None:
@@ -394,10 +360,7 @@ class DomainRegistry:
             return self._profiles[name]
         except KeyError:
             available = ", ".join(sorted(self._profiles)) or "(none)"
-            raise KeyError(
-                f"Domain profile '{name}' not found. "
-                f"Available profiles: {available}"
-            ) from None
+            raise KeyError(f"Domain profile '{name}' not found. Available profiles: {available}") from None
 
     def list_domains(self) -> list[str]:
         """Return a sorted list of all registered domain names."""

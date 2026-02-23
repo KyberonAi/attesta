@@ -32,6 +32,7 @@ logger = logging.getLogger("attesta.integrations.openai_sdk")
 # Approval handler (Runner-level)
 # ---------------------------------------------------------------------------
 
+
 def attesta_approval_handler(attesta: Attesta):
     """Create an approval handler for the OpenAI Agents SDK.
 
@@ -85,6 +86,7 @@ def attesta_approval_handler(attesta: Attesta):
 # ---------------------------------------------------------------------------
 # Tool guardrail (Agent-level)
 # ---------------------------------------------------------------------------
+
 
 class AttestaGuardrail:
     """Use as a tool guardrail in the OpenAI Agents SDK.

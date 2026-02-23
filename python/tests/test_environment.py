@@ -84,10 +84,20 @@ class TestDetectEnvironment:
 
     def test_default_is_development(self, monkeypatch):
         # Clear all env vars that could trigger detection
-        for var in ("ATTESTA_ENV", "CI", "GITHUB_ACTIONS", "GITLAB_CI",
-                     "JENKINS_URL", "CIRCLECI", "TRAVIS", "BUILDKITE",
-                     "NODE_ENV", "FLASK_ENV", "DJANGO_SETTINGS_MODULE",
-                     "RAILS_ENV"):
+        for var in (
+            "ATTESTA_ENV",
+            "CI",
+            "GITHUB_ACTIONS",
+            "GITLAB_CI",
+            "JENKINS_URL",
+            "CIRCLECI",
+            "TRAVIS",
+            "BUILDKITE",
+            "NODE_ENV",
+            "FLASK_ENV",
+            "DJANGO_SETTINGS_MODULE",
+            "RAILS_ENV",
+        ):
             monkeypatch.delenv(var, raising=False)
         result = detect_environment()
         # May be development or something else based on hostname
@@ -120,10 +130,20 @@ class TestEnvironmentMultiplierInGate:
 
     async def test_development_environment_detected(self, monkeypatch):
         """When no environment is passed, auto-detect should be used."""
-        for var in ("ATTESTA_ENV", "CI", "GITHUB_ACTIONS", "GITLAB_CI",
-                     "JENKINS_URL", "NODE_ENV", "FLASK_ENV",
-                     "DJANGO_SETTINGS_MODULE", "RAILS_ENV",
-                     "CIRCLECI", "TRAVIS", "BUILDKITE"):
+        for var in (
+            "ATTESTA_ENV",
+            "CI",
+            "GITHUB_ACTIONS",
+            "GITLAB_CI",
+            "JENKINS_URL",
+            "NODE_ENV",
+            "FLASK_ENV",
+            "DJANGO_SETTINGS_MODULE",
+            "RAILS_ENV",
+            "CIRCLECI",
+            "TRAVIS",
+            "BUILDKITE",
+        ):
             monkeypatch.delenv(var, raising=False)
 
         from attesta.core.gate import _build_context

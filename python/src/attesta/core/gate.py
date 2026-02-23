@@ -49,6 +49,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 # Exception
 # ---------------------------------------------------------------------------
 
+
 class AttestaDenied(Exception):  # noqa: N818
     """Raised when a gated function call is denied by the reviewer."""
 
@@ -66,6 +67,7 @@ class AttestaDenied(Exception):  # noqa: N818
 # Default implementations (used when no external components are supplied)
 # ---------------------------------------------------------------------------
 
+
 def _get_default_risk_scorer() -> RiskScorer:
     """Return the full 5-factor :class:`DefaultRiskScorer` from ``attesta.core.risk``.
 
@@ -81,9 +83,7 @@ def _get_default_risk_scorer() -> RiskScorer:
 class _DefaultRenderer:
     """Auto-approves everything -- suitable for CI / non-interactive use."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict:
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict:
         return Verdict.APPROVED
 
     async def render_challenge(
@@ -101,12 +101,8 @@ class _DefaultRenderer:
     async def render_info(self, message: str) -> None:
         logger.info(message)
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None:
-        logger.debug(
-            "Auto-approved %s (risk=%.2f)", ctx.function_name, risk.score
-        )
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None:
+        logger.debug("Auto-approved %s (risk=%.2f)", ctx.function_name, risk.score)
 
 
 def _detect_renderer() -> Renderer:
@@ -170,6 +166,7 @@ def _select_challenge(
 # Attesta class
 # ---------------------------------------------------------------------------
 
+
 class Attesta:
     """Orchestrates the full approval pipeline for a single gated action.
 
@@ -225,19 +222,11 @@ class Attesta:
         approval_timeout_seconds: float = 600.0,
     ) -> None:
         if mode not in self._VALID_MODES:
-            raise ValueError(
-                f"Invalid mode '{mode}'. Must be one of "
-                f"{sorted(self._VALID_MODES)}"
-            )
+            raise ValueError(f"Invalid mode '{mode}'. Must be one of {sorted(self._VALID_MODES)}")
         if fail_mode not in self._VALID_FAIL_MODES:
-            raise ValueError(
-                f"Invalid fail_mode '{fail_mode}'. Must be one of "
-                f"{sorted(self._VALID_FAIL_MODES)}"
-            )
+            raise ValueError(f"Invalid fail_mode '{fail_mode}'. Must be one of {sorted(self._VALID_FAIL_MODES)}")
         if approval_timeout_seconds <= 0:
-            raise ValueError(
-                f"approval_timeout_seconds must be > 0, got {approval_timeout_seconds}"
-            )
+            raise ValueError(f"approval_timeout_seconds must be > 0, got {approval_timeout_seconds}")
 
         self._scorer: RiskScorer = risk_scorer or _get_default_risk_scorer()
         self._renderer: Renderer = renderer or _detect_renderer()
@@ -265,6 +254,7 @@ class Attesta:
         if self._event_bus is None:
             return
         from attesta.events import Event, EventType
+
         try:
             event = Event(type=EventType(event_type), data=data)
             await self._event_bus.async_emit(event)
@@ -285,6 +275,7 @@ class Attesta:
         # 2a. Environment risk multiplier (skip if risk was manually overridden).
         if self._risk_override is None:
             from attesta.environment import RISK_MULTIPLIERS
+
             env_multiplier = RISK_MULTIPLIERS.get(ctx.environment, 1.0)
             if env_multiplier != 1.0:
                 adjusted_score = min(1.0, max(0.0, risk.score * env_multiplier))
@@ -292,7 +283,8 @@ class Attesta:
                 risk = RiskAssessment(
                     score=adjusted_score,
                     level=adjusted_level,
-                    factors=risk.factors + [
+                    factors=risk.factors
+                    + [
                         RiskFactor(
                             name="environment_multiplier",
                             contribution=adjusted_score - risk.score,
@@ -306,11 +298,14 @@ class Attesta:
                     scorer_name=risk.scorer_name,
                 )
 
-        await self._emit("risk_scored", {
-            "action_name": ctx.function_name,
-            "risk_score": risk.score,
-            "risk_level": risk.level.value,
-        })
+        await self._emit(
+            "risk_scored",
+            {
+                "action_name": ctx.function_name,
+                "risk_score": risk.score,
+                "risk_level": risk.level.value,
+            },
+        )
 
         # 2b. Trust-based risk adjustment.
         #     If a trust engine is available and the action has an agent_id,
@@ -319,9 +314,7 @@ class Attesta:
         original_level = risk.level
         if self._trust_engine is not None and ctx.agent_id:
             domain = ctx.hints.get("domain") or ctx.environment or "general"
-            adjusted_score = self._trust_engine.effective_risk(
-                risk.score, ctx.agent_id, domain
-            )
+            adjusted_score = self._trust_engine.effective_risk(risk.score, ctx.agent_id, domain)
             adjusted_score = max(0.0, min(1.0, adjusted_score))
             adjusted_level = RiskLevel.from_score(adjusted_score)
 
@@ -330,14 +323,12 @@ class Attesta:
                 risk = RiskAssessment(
                     score=adjusted_score,
                     level=adjusted_level,
-                    factors=risk.factors + [
+                    factors=risk.factors
+                    + [
                         RiskFactor(
                             name="trust_adjustment",
                             contribution=adjusted_score - risk.score,
-                            description=(
-                                f"Trust engine adjusted risk from "
-                                f"{risk.score:.2f} to {adjusted_score:.2f}"
-                            ),
+                            description=(f"Trust engine adjusted risk from {risk.score:.2f} to {adjusted_score:.2f}"),
                         )
                     ],
                     scorer_name=risk.scorer_name,
@@ -360,8 +351,7 @@ class Attesta:
             challenge_result: ChallengeResult | None = None
             mode_metadata["skipped_challenge"] = challenge_type.value
             logger.info(
-                "[audit_only] Auto-approved %s (risk=%.2f, level=%s, "
-                "would_challenge=%s)",
+                "[audit_only] Auto-approved %s (risk=%.2f, level=%s, would_challenge=%s)",
                 ctx.function_name,
                 risk.score,
                 risk.level.value,
@@ -376,23 +366,24 @@ class Attesta:
                 enforce_verdict = Verdict.APPROVED
                 await self._renderer.render_auto_approved(ctx, risk)
             else:
-                await self._emit("challenge_issued", {
-                    "action_name": ctx.function_name,
-                    "challenge_type": challenge_type.value,
-                    "risk_level": risk.level.value,
-                })
-                challenge_result = await self._renderer.render_challenge(
-                    ctx, risk, challenge_type
+                await self._emit(
+                    "challenge_issued",
+                    {
+                        "action_name": ctx.function_name,
+                        "challenge_type": challenge_type.value,
+                        "risk_level": risk.level.value,
+                    },
                 )
-                enforce_verdict = (
-                    Verdict.APPROVED if challenge_result.passed
-                    else Verdict.DENIED
+                challenge_result = await self._renderer.render_challenge(ctx, risk, challenge_type)
+                enforce_verdict = Verdict.APPROVED if challenge_result.passed else Verdict.DENIED
+                await self._emit(
+                    "challenge_completed",
+                    {
+                        "action_name": ctx.function_name,
+                        "challenge_type": challenge_type.value,
+                        "passed": challenge_result.passed,
+                    },
                 )
-                await self._emit("challenge_completed", {
-                    "action_name": ctx.function_name,
-                    "challenge_type": challenge_type.value,
-                    "passed": challenge_result.passed,
-                })
 
             # Always approve in shadow mode, but log the enforce outcome.
             verdict = Verdict.APPROVED
@@ -401,8 +392,7 @@ class Attesta:
             if challenge_result is not None:
                 mode_metadata["challenge_passed"] = challenge_result.passed
             logger.info(
-                "[shadow] %s -> approved (enforce would have: %s, "
-                "risk=%.2f, level=%s)",
+                "[shadow] %s -> approved (enforce would have: %s, risk=%.2f, level=%s)",
                 ctx.function_name,
                 enforce_verdict.value,
                 risk.score,
@@ -416,16 +406,17 @@ class Attesta:
                 verdict = Verdict.APPROVED
                 await self._renderer.render_auto_approved(ctx, risk)
             else:
-                await self._emit("challenge_issued", {
-                    "action_name": ctx.function_name,
-                    "challenge_type": challenge_type.value,
-                    "risk_level": risk.level.value,
-                })
+                await self._emit(
+                    "challenge_issued",
+                    {
+                        "action_name": ctx.function_name,
+                        "challenge_type": challenge_type.value,
+                        "risk_level": risk.level.value,
+                    },
+                )
                 try:
                     challenge_result = await asyncio.wait_for(
-                        self._renderer.render_challenge(
-                            ctx, risk, challenge_type
-                        ),
+                        self._renderer.render_challenge(ctx, risk, challenge_type),
                         timeout=self._approval_timeout,
                     )
                 except TimeoutError:
@@ -434,9 +425,7 @@ class Attesta:
                         self._approval_timeout,
                         ctx.function_name,
                     )
-                    timeout_reason = (
-                        f"Approval timed out after {self._approval_timeout:.0f}s"
-                    )
+                    timeout_reason = f"Approval timed out after {self._approval_timeout:.0f}s"
                     if self._fail_mode == "allow":
                         verdict = Verdict.APPROVED
                     elif self._fail_mode == "escalate":
@@ -456,11 +445,14 @@ class Attesta:
                     mode_metadata["timeout_reason"] = timeout_reason
                 else:
                     verdict = Verdict.APPROVED if challenge_result.passed else Verdict.DENIED
-                await self._emit("challenge_completed", {
-                    "action_name": ctx.function_name,
-                    "challenge_type": challenge_type.value,
-                    "passed": challenge_result.passed if challenge_result else False,
-                })
+                await self._emit(
+                    "challenge_completed",
+                    {
+                        "action_name": ctx.function_name,
+                        "challenge_type": challenge_type.value,
+                        "passed": challenge_result.passed if challenge_result else False,
+                    },
+                )
 
         # 5. Enforce minimum review time.
         elapsed = time.monotonic() - review_start
@@ -486,12 +478,15 @@ class Attesta:
             verdict_event = "escalated"
         else:
             verdict_event = "denied"
-        await self._emit(verdict_event, {
-            "action_name": ctx.function_name,
-            "risk_score": risk.score,
-            "risk_level": risk.level.value,
-            "verdict": verdict.value,
-        })
+        await self._emit(
+            verdict_event,
+            {
+                "action_name": ctx.function_name,
+                "risk_score": risk.score,
+                "risk_level": risk.level.value,
+                "verdict": verdict.value,
+            },
+        )
 
         # 7. Audit.
         try:
@@ -500,11 +495,14 @@ class Attesta:
             logger.exception("Audit logging failed for %s", ctx.description)
 
         if result.audit_entry_id:
-            await self._emit("audit_logged", {
-                "action_name": ctx.function_name,
-                "audit_entry_id": result.audit_entry_id,
-                "verdict": verdict.value,
-            })
+            await self._emit(
+                "audit_logged",
+                {
+                    "action_name": ctx.function_name,
+                    "audit_entry_id": result.audit_entry_id,
+                    "verdict": verdict.value,
+                },
+            )
 
         # 8. Update trust engine with the outcome.
         if self._trust_engine is not None and ctx.agent_id:
@@ -529,9 +527,7 @@ class Attesta:
                         risk_score=risk.score,
                     )
             except Exception:
-                logger.exception(
-                    "Trust engine update failed for %s", ctx.function_name
-                )
+                logger.exception("Trust engine update failed for %s", ctx.function_name)
 
         return result
 
@@ -561,9 +557,7 @@ class Attesta:
                     elif isinstance(trusted_override, str):
                         override = RiskLevel(trusted_override)
                     else:
-                        raise TypeError(
-                            f"Unsupported trusted override type: {type(trusted_override).__name__}"
-                        )
+                        raise TypeError(f"Unsupported trusted override type: {type(trusted_override).__name__}")
                 except (ValueError, TypeError):
                     logger.warning(
                         "Ignoring invalid trusted risk override for %s: %r",
@@ -582,9 +576,7 @@ class Attesta:
                     elif isinstance(hint_override, str):
                         override = RiskLevel(hint_override)
                     else:
-                        raise TypeError(
-                            f"Unsupported hint override type: {type(hint_override).__name__}"
-                        )
+                        raise TypeError(f"Unsupported hint override type: {type(hint_override).__name__}")
                 except (ValueError, TypeError):
                     logger.warning(
                         "Ignoring invalid hint risk_override for %s: %r",
@@ -629,10 +621,10 @@ class Attesta:
         )
 
 
-
 # ---------------------------------------------------------------------------
 # @gate decorator
 # ---------------------------------------------------------------------------
+
 
 def _build_context(
     fn: Callable[..., Any],
@@ -655,6 +647,7 @@ def _build_context(
     # Auto-detect environment if not explicitly provided.
     if environment is None:
         from attesta.environment import detect_environment
+
         environment = detect_environment().value
 
     return ActionContext(
@@ -692,9 +685,7 @@ def _run_coroutine_in_worker_thread(
     This avoids deadlocks when a synchronous ``@gate`` wrapper is invoked
     from inside an already-running event loop (for example in notebooks).
     """
-    result_future: concurrent.futures.Future[TResult] = (
-        concurrent.futures.Future()
-    )
+    result_future: concurrent.futures.Future[TResult] = concurrent.futures.Future()
 
     def _runner() -> None:
         try:
@@ -714,6 +705,7 @@ def _run_coroutine_in_worker_thread(
 
 
 # Overloads let type-checkers understand each calling convention.
+
 
 @overload
 def gate(fn: F, /) -> F: ...  # @gate without parens
@@ -850,13 +842,9 @@ def gate(
                 result = await gate_instance.evaluate(ctx)
 
                 if result.verdict == Verdict.DENIED:
-                    raise AttestaDenied(
-                        f"Action denied: {ctx.description}", result=result
-                    )
+                    raise AttestaDenied(f"Action denied: {ctx.description}", result=result)
                 if result.verdict == Verdict.TIMED_OUT:
-                    raise AttestaDenied(
-                        f"Action timed out: {ctx.description}", result=result
-                    )
+                    raise AttestaDenied(f"Action timed out: {ctx.description}", result=result)
                 if result.verdict == Verdict.ESCALATED:
                     raise AttestaDenied(
                         f"Action escalated (not yet resolved): {ctx.description}",
@@ -900,13 +888,9 @@ def gate(
                     result = asyncio.run(gate_instance.evaluate(ctx))
 
                 if result.verdict == Verdict.DENIED:
-                    raise AttestaDenied(
-                        f"Action denied: {ctx.description}", result=result
-                    )
+                    raise AttestaDenied(f"Action denied: {ctx.description}", result=result)
                 if result.verdict == Verdict.TIMED_OUT:
-                    raise AttestaDenied(
-                        f"Action timed out: {ctx.description}", result=result
-                    )
+                    raise AttestaDenied(f"Action timed out: {ctx.description}", result=result)
                 if result.verdict == Verdict.ESCALATED:
                     raise AttestaDenied(
                         f"Action escalated (not yet resolved): {ctx.description}",

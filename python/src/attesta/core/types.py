@@ -17,13 +17,14 @@ from typing import Any, Protocol, runtime_checkable
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class RiskLevel(Enum):
     """Discrete risk classification derived from a continuous 0-1 score."""
 
-    LOW = "low"           # 0.0 - 0.3
-    MEDIUM = "medium"     # 0.3 - 0.6
-    HIGH = "high"         # 0.6 - 0.8
-    CRITICAL = "critical" # 0.8 - 1.0
+    LOW = "low"  # 0.0 - 0.3
+    MEDIUM = "medium"  # 0.3 - 0.6
+    HIGH = "high"  # 0.6 - 0.8
+    CRITICAL = "critical"  # 0.8 - 1.0
 
     @classmethod
     def from_score(cls, score: float) -> RiskLevel:
@@ -62,6 +63,7 @@ class ChallengeType(Enum):
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ActionContext:
@@ -147,6 +149,7 @@ class ApprovalResult:
 # Protocols (structural sub-typing)
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class RiskScorer(Protocol):
     """Anything that can assign a 0-1 risk score to an action."""
@@ -161,9 +164,7 @@ class RiskScorer(Protocol):
 class ChallengeProtocol(Protocol):
     """Anything that can present a verification challenge."""
 
-    async def present(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> ChallengeResult: ...
+    async def present(self, ctx: ActionContext, risk: RiskAssessment) -> ChallengeResult: ...
 
     @property
     def challenge_type(self) -> ChallengeType: ...
@@ -173,9 +174,7 @@ class ChallengeProtocol(Protocol):
 class Renderer(Protocol):
     """UI / UX layer for presenting gates to the operator."""
 
-    async def render_approval(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> Verdict: ...
+    async def render_approval(self, ctx: ActionContext, risk: RiskAssessment) -> Verdict: ...
 
     async def render_challenge(
         self,
@@ -186,18 +185,14 @@ class Renderer(Protocol):
 
     async def render_info(self, message: str) -> None: ...
 
-    async def render_auto_approved(
-        self, ctx: ActionContext, risk: RiskAssessment
-    ) -> None: ...
+    async def render_auto_approved(self, ctx: ActionContext, risk: RiskAssessment) -> None: ...
 
 
 @runtime_checkable
 class TeachBackValidator(Protocol):
     """Anything that can validate a teach-back explanation."""
 
-    async def validate(
-        self, explanation: str, context: ActionContext
-    ) -> tuple[bool, str]:
+    async def validate(self, explanation: str, context: ActionContext) -> tuple[bool, str]:
         """Validate *explanation* and return ``(passed, notes)``."""
         ...
 

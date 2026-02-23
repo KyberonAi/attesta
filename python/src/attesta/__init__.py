@@ -101,6 +101,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 # Attesta -- the recommended high-level entry point
 # ---------------------------------------------------------------------------
 
+
 class Attesta:
     """Central configuration object for attesta-ai.
 
@@ -157,25 +158,19 @@ class Attesta:
         self._trust_engine: _TrustEngine | None = trust_engine
         self._event_bus: EventBus | None = event_bus
         if allow_hint_override is None:
-            self._allow_hint_override = bool(
-                self._policy.get("allow_hint_override", False)
-            )
+            self._allow_hint_override = bool(self._policy.get("allow_hint_override", False))
         else:
             self._allow_hint_override = bool(allow_hint_override)
         self._fail_mode = str(fail_mode or self._policy.get("fail_mode", "deny"))
         self._timeout_seconds = float(
-            timeout_seconds
-            if timeout_seconds is not None
-            else self._policy.get("timeout_seconds", 600.0)
+            timeout_seconds if timeout_seconds is not None else self._policy.get("timeout_seconds", 600.0)
         )
         self._core_instance: CoreAttesta | None = None
         self._policy_obj: Any | None = None  # stores Policy for introspection
 
         # Pre-parse the challenge map from the policy if present.
         # Support both "challenge_map" and "challenges" (README uses "challenges").
-        raw_map = self._policy.get("challenge_map") or self._policy.get(
-            "challenges"
-        )
+        raw_map = self._policy.get("challenge_map") or self._policy.get("challenges")
         self._challenge_map = self._parse_challenge_map(raw_map)
 
     # -- public API --------------------------------------------------------
@@ -285,10 +280,7 @@ class Attesta:
             data = json.loads(raw)
 
         if not isinstance(data, dict):
-            raise TypeError(
-                f"Expected a mapping at the top level of {filepath}, "
-                f"got {type(data).__name__}"
-            )
+            raise TypeError(f"Expected a mapping at the top level of {filepath}, got {type(data).__name__}")
 
         # Detect whether this is a rich config (structured sections or
         # top-level advanced keys) or a simple legacy flat dict.
@@ -326,10 +318,7 @@ class Attesta:
                 "domain_strict: false to continue without domain scoring."
             ) from exc
         except Exception:
-            logger.warning(
-                "Failed to initialise domain risk scorer from config; "
-                "continuing with default scorer."
-            )
+            logger.warning("Failed to initialise domain risk scorer from config; continuing with default scorer.")
 
         # Build a TrustEngine if trust settings are present in the YAML.
         trust_engine: Any | None = None
@@ -339,10 +328,7 @@ class Attesta:
 
                 trust_engine = TrustEngine(**policy_obj.to_trust_engine_kwargs())
             except Exception:
-                logger.warning(
-                    "Failed to initialise TrustEngine from config; "
-                    "continuing without trust."
-                )
+                logger.warning("Failed to initialise TrustEngine from config; continuing without trust.")
 
         # Build an audit backend from config settings.
         audit_logger_inst: AuditLogger | None = None
@@ -367,15 +353,9 @@ class Attesta:
 
                 audit_logger_inst = _AuditLogger(path=policy_obj.audit_path)
             except Exception:
-                logger.warning(
-                    "Failed to initialise AuditLogger from config; "
-                    "continuing without persistent audit."
-                )
+                logger.warning("Failed to initialise AuditLogger from config; continuing without persistent audit.")
         except Exception:
-            logger.warning(
-                "Failed to initialise audit backend from config; "
-                "continuing without persistent audit."
-            )
+            logger.warning("Failed to initialise audit backend from config; continuing without persistent audit.")
 
         # Try to use a TerminalRenderer if `rich` is available.
         renderer_inst: Renderer | None = None
@@ -441,19 +421,13 @@ class Attesta:
         resolved_renderer = renderer or self._renderer
         resolved_audit = audit_logger or self._audit_logger
         resolved_challenge_map = challenge_map or self._challenge_map
-        resolved_env = environment or self._policy.get(
-            "default_environment", "development"
-        )
+        resolved_env = environment or self._policy.get("default_environment", "development")
         resolved_min_review = (
-            min_review_seconds
-            if min_review_seconds is not None
-            else self._policy.get("min_review_seconds", 0.0)
+            min_review_seconds if min_review_seconds is not None else self._policy.get("min_review_seconds", 0.0)
         )
         resolved_fail_mode = str(fail_mode or self._fail_mode)
         resolved_timeout_seconds = (
-            approval_timeout_seconds
-            if approval_timeout_seconds is not None
-            else self._timeout_seconds
+            approval_timeout_seconds if approval_timeout_seconds is not None else self._timeout_seconds
         )
 
         def decorator(func: F) -> F:
@@ -473,11 +447,7 @@ class Attesta:
                 environment=resolved_env,
                 metadata=metadata,
                 trust_engine=self._trust_engine,
-                allow_hint_override=(
-                    self._allow_hint_override
-                    if allow_hint_override is None
-                    else allow_hint_override
-                ),
+                allow_hint_override=(self._allow_hint_override if allow_hint_override is None else allow_hint_override),
                 fail_mode=resolved_fail_mode,
                 approval_timeout_seconds=resolved_timeout_seconds,
             )
@@ -510,9 +480,7 @@ class Attesta:
             try:
                 challenge = ChallengeType(challenge_str)
             except ValueError:
-                logger.warning(
-                    "Unknown challenge type in challenge_map: %s", challenge_str
-                )
+                logger.warning("Unknown challenge type in challenge_map: %s", challenge_str)
                 continue
             result[level] = challenge
         return result or None

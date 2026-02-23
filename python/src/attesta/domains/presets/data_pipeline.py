@@ -50,8 +50,7 @@ _DATA_PIPELINE_RISK_PATTERNS: list[RiskPattern] = [
         risk_contribution=0.90,
         name="table_truncation",
         description=(
-            "TRUNCATE removes all rows from a table without row-level "
-            "logging. Recovery requires a full backup restore."
+            "TRUNCATE removes all rows from a table without row-level logging. Recovery requires a full backup restore."
         ),
     ),
     RiskPattern(
@@ -64,7 +63,6 @@ _DATA_PIPELINE_RISK_PATTERNS: list[RiskPattern] = [
             "and data. This is irreversible without a backup."
         ),
     ),
-
     # -- Schema migration --
     RiskPattern(
         pattern=(
@@ -98,7 +96,6 @@ _DATA_PIPELINE_RISK_PATTERNS: list[RiskPattern] = [
             "affect running pipelines and query performance."
         ),
     ),
-
     # -- PII handling --
     RiskPattern(
         pattern=(
@@ -133,7 +130,6 @@ _DATA_PIPELINE_RISK_PATTERNS: list[RiskPattern] = [
             "environments."
         ),
     ),
-
     # -- Production database access --
     RiskPattern(
         pattern=(
@@ -164,7 +160,6 @@ _DATA_PIPELINE_RISK_PATTERNS: list[RiskPattern] = [
             "data or introduce inconsistencies visible to end users."
         ),
     ),
-
     # -- ETL job modifications --
     RiskPattern(
         pattern=(
@@ -195,7 +190,6 @@ _DATA_PIPELINE_RISK_PATTERNS: list[RiskPattern] = [
             "and may produce duplicate data."
         ),
     ),
-
     # -- Data export / dump --
     RiskPattern(
         pattern=(
@@ -228,7 +222,6 @@ _DATA_PIPELINE_RISK_PATTERNS: list[RiskPattern] = [
             "Bucket permissions and encryption must be verified."
         ),
     ),
-
     # -- Backup / restore --
     RiskPattern(
         pattern=(
@@ -283,8 +276,7 @@ _DATA_PIPELINE_ESCALATION_RULES: list[EscalationRule] = [
         required_approvers=1,
         notify_roles=["data_engineering_lead", "ops_lead"],
         description=(
-            "Backup deletion is blocked by default to preserve recovery "
-            "options. Requires explicit authorization."
+            "Backup deletion is blocked by default to preserve recovery options. Requires explicit authorization."
         ),
     ),
     EscalationRule(
@@ -304,8 +296,7 @@ _DATA_PIPELINE_ESCALATION_RULES: list[EscalationRule] = [
         required_approvers=2,
         notify_roles=["data_engineering_lead", "on_call_engineer"],
         description=(
-            "High-risk data operations require dual approval from "
-            "the data engineering lead and on-call engineer."
+            "High-risk data operations require dual approval from the data engineering lead and on-call engineer."
         ),
     ),
 ]
@@ -318,12 +309,16 @@ _DATA_PIPELINE_ESCALATION_RULES: list[EscalationRule] = [
 _DATA_PIPELINE_CHALLENGE_TEMPLATES: list[DomainChallengeTemplate] = [
     DomainChallengeTemplate(
         question_template=(
-            "Does '{function_name}' affect production data? If so, "
-            "has a backup been taken and verified?"
+            "Does '{function_name}' affect production data? If so, has a backup been taken and verified?"
         ),
         answer_hints=[
-            "yes", "backup", "snapshot", "verified",
-            "no", "staging", "development",
+            "yes",
+            "backup",
+            "snapshot",
+            "verified",
+            "no",
+            "staging",
+            "development",
         ],
         context_vars=["function_name"],
         challenge_type="quiz",
@@ -335,8 +330,13 @@ _DATA_PIPELINE_CHALLENGE_TEMPLATES: list[DomainChallengeTemplate] = [
             "Describe the data classification and handling procedures."
         ),
         answer_hints=[
-            "pii", "personal", "masked", "anonymized",
-            "encrypted", "tokenized", "no pii",
+            "pii",
+            "personal",
+            "masked",
+            "anonymized",
+            "encrypted",
+            "tokenized",
+            "no pii",
         ],
         context_vars=["function_name"],
         challenge_type="teach_back",
@@ -349,8 +349,13 @@ _DATA_PIPELINE_CHALLENGE_TEMPLATES: list[DomainChallengeTemplate] = [
             "if the operation fails?"
         ),
         answer_hints=[
-            "downstream", "dashboard", "consumer",
-            "rollback", "restore", "revert", "backfill",
+            "downstream",
+            "dashboard",
+            "consumer",
+            "rollback",
+            "restore",
+            "revert",
+            "backfill",
         ],
         context_vars=["function_name"],
         challenge_type="teach_back",
@@ -358,12 +363,15 @@ _DATA_PIPELINE_CHALLENGE_TEMPLATES: list[DomainChallengeTemplate] = [
     ),
     DomainChallengeTemplate(
         question_template=(
-            "Has the schema migration been tested against a copy of "
-            "production data? Provide the test reference."
+            "Has the schema migration been tested against a copy of production data? Provide the test reference."
         ),
         answer_hints=[
-            "tested", "staging", "pre-production",
-            "passed", "verified", "dry run",
+            "tested",
+            "staging",
+            "pre-production",
+            "passed",
+            "verified",
+            "dry run",
         ],
         context_vars=["function_name"],
         challenge_type="quiz",
