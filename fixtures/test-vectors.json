@@ -1,0 +1,299 @@
+{
+  "version": "1.0",
+  "description": "Cross-SDK parity test vectors for Attesta. Both the Python and TypeScript SDKs must produce identical results for the same inputs. Field names differ by convention (Python: snake_case, TypeScript: camelCase) but the algorithms, boundaries, and hash mechanics are the same.",
+
+  "risk_level_boundaries": [
+    {
+      "score": 0.0,
+      "expected_level": "low",
+      "note": "Minimum score maps to LOW"
+    },
+    {
+      "score": 0.29,
+      "expected_level": "low",
+      "note": "Just below the LOW/MEDIUM boundary (< 0.3)"
+    },
+    {
+      "score": 0.3,
+      "expected_level": "medium",
+      "note": "Exact LOW/MEDIUM boundary (>= 0.3)"
+    },
+    {
+      "score": 0.59,
+      "expected_level": "medium",
+      "note": "Just below the MEDIUM/HIGH boundary (< 0.6)"
+    },
+    {
+      "score": 0.6,
+      "expected_level": "high",
+      "note": "Exact MEDIUM/HIGH boundary (>= 0.6)"
+    },
+    {
+      "score": 0.79,
+      "expected_level": "high",
+      "note": "Just below the HIGH/CRITICAL boundary (< 0.8)"
+    },
+    {
+      "score": 0.8,
+      "expected_level": "critical",
+      "note": "Exact HIGH/CRITICAL boundary (>= 0.8)"
+    },
+    {
+      "score": 1.0,
+      "expected_level": "critical",
+      "note": "Maximum score maps to CRITICAL"
+    }
+  ],
+
+  "risk_scoring": {
+    "description": "DefaultRiskScorer test vectors. Weights: function_name=0.30, arguments=0.25, docstring=0.20, hints=0.15, novelty=0.10. All tests assume first call (novelty count=0, novelty score=0.9). Scorer must be freshly constructed (or reset) before each test.",
+    "cases": [
+      {
+        "name": "read_operation_low_risk",
+        "input": {
+          "function_name": "get_users",
+          "args": [],
+          "kwargs": {},
+          "function_doc": null,
+          "hints": {},
+          "environment": "development"
+        },
+        "expected": {
+          "factor_scores": {
+            "function_name": 0.1,
+            "arguments": 0.0,
+            "docstring": 0.1,
+            "hints": 0.0,
+            "novelty": 0.9
+          },
+          "weighted_contributions": {
+            "function_name": 0.03,
+            "arguments": 0.0,
+            "docstring": 0.02,
+            "hints": 0.0,
+            "novelty": 0.09
+          },
+          "risk_score": 0.14,
+          "risk_level": "low"
+        },
+        "note": "Read verb 'get' scores 0.1. No args = 0.0. No docstring = 0.1. No hints = 0.0. First call novelty = 0.9. Total = 0.14 (LOW)."
+      },
+      {
+        "name": "write_operation_medium_risk",
+        "input": {
+          "function_name": "update_config",
+          "args": [],
+          "kwargs": {"url": "https://api.example.com/config"},
+          "function_doc": null,
+          "hints": {},
+          "environment": "development"
+        },
+        "expected": {
+          "factor_scores": {
+            "function_name": 0.55,
+            "arguments": 0.5,
+            "docstring": 0.1,
+            "hints": 0.0,
+            "novelty": 0.9
+          },
+          "weighted_contributions": {
+            "function_name": 0.165,
+            "arguments": 0.125,
+            "docstring": 0.02,
+            "hints": 0.0,
+            "novelty": 0.09
+          },
+          "risk_score": 0.4,
+          "risk_level": "medium"
+        },
+        "note": "Mutating verb 'update' scores 0.55. Arg URL 'https://...' matches network pattern = 0.5. No docstring = 0.1. No hints = 0.0. Total = 0.4 (MEDIUM)."
+      },
+      {
+        "name": "destructive_operation_high_risk",
+        "input": {
+          "function_name": "delete_database",
+          "args": ["production"],
+          "kwargs": {},
+          "function_doc": "Permanently deletes the specified database. This action is irreversible.",
+          "hints": {},
+          "environment": "production"
+        },
+        "expected": {
+          "factor_scores": {
+            "function_name": 0.95,
+            "arguments": 0.9,
+            "docstring": 0.85,
+            "hints": 0.0,
+            "novelty": 0.9
+          },
+          "weighted_contributions": {
+            "function_name": 0.285,
+            "arguments": 0.225,
+            "docstring": 0.17,
+            "hints": 0.0,
+            "novelty": 0.09
+          },
+          "risk_score": 0.77,
+          "risk_level": "high"
+        },
+        "note": "Destructive verb 'delete' scores 0.95. Arg 'production' matches sensitive pattern 'prod(uction)?' = 0.9. Docstring contains 'Permanent' and 'irreversible' (both high-risk keywords) = 0.85. No hints = 0.0. Total = 0.77 (HIGH)."
+      },
+      {
+        "name": "deploy_production_critical_risk",
+        "input": {
+          "function_name": "deploy_production",
+          "args": ["production"],
+          "kwargs": {},
+          "function_doc": "Irreversible deployment to production. This is a critical operation.",
+          "hints": {"critical": true, "damage_estimate": 10000},
+          "environment": "production"
+        },
+        "expected": {
+          "factor_scores": {
+            "function_name": 0.55,
+            "arguments": 0.9,
+            "docstring": 0.85,
+            "hints": 1.0,
+            "novelty": 0.9
+          },
+          "weighted_contributions": {
+            "function_name": 0.165,
+            "arguments": 0.225,
+            "docstring": 0.17,
+            "hints": 0.15,
+            "novelty": 0.09
+          },
+          "risk_score": 0.8,
+          "risk_level": "critical"
+        },
+        "note": "Mutating verb 'deploy' scores 0.55. Arg 'production' matches sensitive pattern = 0.9. Docstring contains 'Irreversible', 'production', 'critical' = 0.85. Hints: critical=true (+0.3) + damage_estimate=10000 (+0.8) = 1.1, clamped to 1.0. Total = 0.8 (CRITICAL, exactly at boundary)."
+      }
+    ]
+  },
+
+  "action_context_description": {
+    "description": "The ActionContext.description property (Python) / describeAction() function (TypeScript) formats the function call as a human-readable string. Python uses repr() for values (single-quoted strings), TypeScript uses JSON.stringify() (double-quoted strings).",
+    "cases": [
+      {
+        "input": {
+          "function_name": "deploy",
+          "args": ["prod"],
+          "kwargs": {"version": "2.0"}
+        },
+        "expected": {
+          "python": "deploy('prod', version='2.0')",
+          "typescript": "deploy(\"prod\", version=\"2.0\")"
+        }
+      },
+      {
+        "input": {
+          "function_name": "get_users",
+          "args": [],
+          "kwargs": {}
+        },
+        "expected": {
+          "python": "get_users()",
+          "typescript": "get_users()"
+        }
+      },
+      {
+        "input": {
+          "function_name": "delete_records",
+          "args": ["table_a", 100],
+          "kwargs": {"cascade": true, "dry_run": false}
+        },
+        "expected": {
+          "python": "delete_records('table_a', 100, cascade=True, dry_run=False)",
+          "typescript": "delete_records(\"table_a\", 100, cascade=true, dry_run=false)"
+        }
+      },
+      {
+        "input": {
+          "function_name": "send_email",
+          "args": [],
+          "kwargs": {"to": "user@example.com", "subject": "Hello"}
+        },
+        "expected": {
+          "python": "send_email(to='user@example.com', subject='Hello')",
+          "typescript": "send_email(to=\"user@example.com\", subject=\"Hello\")"
+        }
+      }
+    ]
+  },
+
+  "audit_hash_chain": {
+    "description": "SHA-256 hash-chained audit log test vectors. Hash algorithm: sha256(previous_hash + canonical_json_without_chain_hash). Canonical JSON uses sorted keys and compact separators (no spaces). Python uses snake_case field names; TypeScript uses camelCase. Both SDKs must produce the expected hash for their respective format. Float values like 1.5, 0.15, 60.5, 0.95 serialize identically in both languages; integer-valued floats (e.g. Python's 0.0) differ (Python: '0.0', JS: '0'), so all test vectors use non-integer float values to avoid this divergence.",
+    "genesis_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "entries": [
+      {
+        "sequence": 1,
+        "note": "First entry in chain. previous_hash = genesis hash. A low-risk approved action.",
+        "fields": {
+          "entry_id": "abc123",
+          "action_name": "test_action",
+          "action_description": "test_action()",
+          "agent_id": "agent-001",
+          "risk_score": 0.15,
+          "risk_level": "low",
+          "challenge_type": "",
+          "challenge_passed": null,
+          "approver_ids": [],
+          "verdict": "approved",
+          "review_duration_seconds": 1.5,
+          "min_review_met": true,
+          "intercepted_at": "2025-01-15T10:00:00",
+          "decided_at": "2025-01-15T10:00:01",
+          "executed_at": "",
+          "session_id": "session-001",
+          "environment": "testing",
+          "metadata": {}
+        },
+        "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "expected": {
+          "python": {
+            "chain_hash": "9635e545a233fc896074a61ff5cc90bca6fa7fcf939a0257e1314562e5fbd75b",
+            "canonical_json_without_chain_hash": "{\"action_description\":\"test_action()\",\"action_name\":\"test_action\",\"agent_id\":\"agent-001\",\"approver_ids\":[],\"challenge_passed\":null,\"challenge_type\":\"\",\"decided_at\":\"2025-01-15T10:00:01\",\"entry_id\":\"abc123\",\"environment\":\"testing\",\"executed_at\":\"\",\"intercepted_at\":\"2025-01-15T10:00:00\",\"metadata\":{},\"min_review_met\":true,\"previous_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"review_duration_seconds\":1.5,\"risk_level\":\"low\",\"risk_score\":0.15,\"session_id\":\"session-001\",\"verdict\":\"approved\"}"
+          },
+          "typescript": {
+            "chain_hash": "c87ef3822b3dd31b2b69bd6af31cf787a63f44cff5ecdaf30319135ba69e2c5d",
+            "canonical_json_without_chain_hash": "{\"actionDescription\":\"test_action()\",\"actionName\":\"test_action\",\"agentId\":\"agent-001\",\"approverIds\":[],\"challengePassed\":null,\"challengeType\":\"\",\"decidedAt\":\"2025-01-15T10:00:01\",\"entryId\":\"abc123\",\"environment\":\"testing\",\"executedAt\":\"\",\"interceptedAt\":\"2025-01-15T10:00:00\",\"metadata\":{},\"minReviewMet\":true,\"previousHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"reviewDurationSeconds\":1.5,\"riskLevel\":\"low\",\"riskScore\":0.15,\"sessionId\":\"session-001\",\"verdict\":\"approved\"}"
+          }
+        }
+      },
+      {
+        "sequence": 2,
+        "note": "Second entry, chained from entry 1. A critical-risk approved action with multi-party challenge.",
+        "fields": {
+          "entry_id": "def456",
+          "action_name": "delete_database",
+          "action_description": "delete_database()",
+          "agent_id": "agent-001",
+          "risk_score": 0.95,
+          "risk_level": "critical",
+          "challenge_type": "multi_party",
+          "challenge_passed": true,
+          "approver_ids": ["admin-1", "admin-2"],
+          "verdict": "approved",
+          "review_duration_seconds": 60.5,
+          "min_review_met": true,
+          "intercepted_at": "2025-01-15T10:04:00",
+          "decided_at": "2025-01-15T10:05:00",
+          "executed_at": "2025-01-15T10:05:01",
+          "session_id": "session-001",
+          "environment": "production",
+          "metadata": {}
+        },
+        "expected": {
+          "python": {
+            "previous_hash": "9635e545a233fc896074a61ff5cc90bca6fa7fcf939a0257e1314562e5fbd75b",
+            "chain_hash": "202337cca301ff4093aeed17ad29cf76d0c858e9df0cf8434d952bdc38365973"
+          },
+          "typescript": {
+            "previous_hash": "c87ef3822b3dd31b2b69bd6af31cf787a63f44cff5ecdaf30319135ba69e2c5d",
+            "chain_hash": "43332778b409daf59c13785976f9e7c7f472d5c8add243f608e337f848ad9992"
+          }
+        }
+      }
+    ]
+  }
+}
