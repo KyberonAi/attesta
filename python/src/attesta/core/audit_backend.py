@@ -107,7 +107,7 @@ class TrailProofBackend:
         hmac_key: str | None = None,
     ) -> None:
         try:
-            from trailproof import Trailproof
+            from trailproof import Trailproof  # type: ignore[import-not-found]
         except ImportError:
             raise ImportError(
                 "TrailProof is required for the trailproof audit backend. Install with: pip install attesta[trailproof]"
@@ -156,7 +156,7 @@ class TrailProofBackend:
             session_id=ctx.session_id or None,
         )
 
-        return event.event_id
+        return str(event.event_id)
 
     def verify(self) -> tuple[bool, int, list[int]]:
         """Verify the TrailProof chain integrity."""

@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     )
 
 
-def __getattr__(name: str):  # noqa: C901
+def __getattr__(name: str) -> object:  # noqa: C901
     """Lazy-load integration symbols on first access."""
     if name == "AttestaToolWrapper":
         from attesta.integrations.langchain import AttestaToolWrapper

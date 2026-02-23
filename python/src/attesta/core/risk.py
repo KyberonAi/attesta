@@ -119,7 +119,7 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, value))
 
 
-def _flatten_args(args: tuple, kwargs: dict[str, Any]) -> list[str]:
+def _flatten_args(args: tuple[Any, ...], kwargs: dict[str, Any]) -> list[str]:
     """Recursively stringify all positional and keyword arguments."""
     parts: list[str] = []
     for a in args:
@@ -286,7 +286,7 @@ class DefaultRiskScorer:
         return 0.4, "no known verb category matched"
 
     @staticmethod
-    def _score_arguments(args: tuple, kwargs: dict[str, Any]) -> tuple[float, str]:
+    def _score_arguments(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[float, str]:
         """Scan stringified arguments for sensitive patterns.
 
         Returns:

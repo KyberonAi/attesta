@@ -42,7 +42,7 @@ class _AmplifiedRiskScorer:
                 logger.warning("Ignoring risk amplifier with non-string pattern: %r", amp)
                 continue
             try:
-                boost_val = float(boost)
+                boost_val = float(boost)  # type: ignore[arg-type]
             except (TypeError, ValueError):
                 logger.warning("Ignoring risk amplifier with invalid boost: %r", amp)
                 continue
@@ -78,6 +78,7 @@ class _OverrideRiskScorer:
             if not key:
                 continue
             try:
+                level: RiskLevel
                 if isinstance(level_value, RiskLevel):
                     level = level_value
                 else:
@@ -372,7 +373,7 @@ def _load_toml(path: Path) -> Policy:
         import tomllib
     except ImportError:
         try:
-            import tomli as tomllib
+            import tomli as tomllib  # type: ignore[no-redef]
         except ImportError as err:
             raise ImportError("tomli is required for Python <3.11 TOML support") from err
 
@@ -380,7 +381,7 @@ def _load_toml(path: Path) -> Policy:
     return _parse_config(data)
 
 
-def _parse_config(data: dict) -> Policy:
+def _parse_config(data: dict[str, Any]) -> Policy:
     """Parse configuration dictionary into a Policy."""
     if not data:
         return Policy()

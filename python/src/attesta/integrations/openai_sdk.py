@@ -16,6 +16,7 @@ Install the optional dependency with::
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from attesta.core.types import ActionContext, Verdict
@@ -33,7 +34,7 @@ logger = logging.getLogger("attesta.integrations.openai_sdk")
 # ---------------------------------------------------------------------------
 
 
-def attesta_approval_handler(attesta: Attesta):
+def attesta_approval_handler(attesta: Attesta) -> Callable[..., Any]:
     """Create an approval handler for the OpenAI Agents SDK.
 
     The returned coroutine matches the ``approval_handler`` signature

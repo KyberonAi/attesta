@@ -83,7 +83,7 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, value))
 
 
-def _stringify_args(args: tuple, kwargs: dict[str, Any]) -> tuple[str, str]:
+def _stringify_args(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[str, str]:
     """Return stringified representations of positional and keyword args."""
     args_str = " ".join(str(a) for a in args) if args else ""
     kwargs_str = " ".join(f"{k}={v}" for k, v in kwargs.items()) if kwargs else ""

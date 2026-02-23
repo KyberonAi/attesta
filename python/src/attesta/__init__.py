@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 if TYPE_CHECKING:
     from attesta.core.trust import TrustEngine as _TrustEngine
@@ -204,7 +204,7 @@ class Attesta:
                 trust_engine=self._trust_engine,
                 event_bus=self._event_bus,
                 allow_hint_override=self._allow_hint_override,
-                fail_mode=self._fail_mode,
+                fail_mode=cast(Literal["deny", "allow", "escalate"], self._fail_mode),
                 approval_timeout_seconds=self._timeout_seconds,
             )
         return await self._core_instance.evaluate(ctx)
@@ -264,7 +264,7 @@ class Attesta:
         # of JSON), falling back to stdlib json if PyYAML is unavailable.
         data: dict[str, Any]
         try:
-            import yaml  # type: ignore[import-untyped]
+            import yaml
 
             data = yaml.safe_load(raw) or {}
         except ImportError:
@@ -433,7 +433,7 @@ class Attesta:
         def decorator(func: F) -> F:
             from attesta.core.gate import gate as _raw_gate
 
-            return _raw_gate(
+            return _raw_gate(  # type: ignore[call-overload,no-any-return,misc]
                 func,
                 risk=risk,
                 risk_hints=risk_hints,
@@ -454,7 +454,7 @@ class Attesta:
 
         if fn is not None:
             return decorator(fn)
-        return decorator  # type: ignore[return-value]
+        return decorator
 
     @property
     def policy(self) -> dict[str, Any]:

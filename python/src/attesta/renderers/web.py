@@ -24,6 +24,7 @@ import threading
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any
 from urllib.parse import parse_qs
 
 from attesta.core.types import (
@@ -347,13 +348,13 @@ class WebRenderer:
         )
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self_handler):  # noqa: N805
+            def do_GET(self_handler: Handler) -> None:  # noqa: N805
                 self_handler.send_response(200)
                 self_handler.send_header("Content-Type", "text/html; charset=utf-8")
                 self_handler.end_headers()
                 self_handler.wfile.write(html.encode("utf-8"))
 
-            def do_POST(self_handler):  # noqa: N805
+            def do_POST(self_handler: Handler) -> None:  # noqa: N805
                 nonlocal result
                 length = int(self_handler.headers.get("Content-Length", 0))
                 if length > 65536:  # 64KB limit
@@ -383,7 +384,7 @@ class WebRenderer:
                 self_handler.wfile.write(resp_html.encode("utf-8"))
                 event.set()
 
-            def log_message(self_handler, format, *args):  # noqa: N805
+            def log_message(self_handler: Handler, format: str, *args: Any) -> None:  # noqa: N805
                 pass  # Suppress HTTP logs
 
         server = HTTPServer((self.host, self.port), Handler)

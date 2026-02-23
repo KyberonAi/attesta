@@ -20,6 +20,7 @@ import copy
 import functools
 import logging
 import threading
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY
@@ -169,7 +170,7 @@ class AttestaToolWrapper:
 # ---------------------------------------------------------------------------
 
 
-def attesta_node(attesta: Attesta):
+def attesta_node(attesta: Attesta) -> Callable[..., Any]:
     """Create a LangGraph node that gates tool calls.
 
     Insert this node between the agent node and the tool-execution node so

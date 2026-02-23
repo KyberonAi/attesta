@@ -628,7 +628,7 @@ class Attesta:
 
 def _build_context(
     fn: Callable[..., Any],
-    args: tuple,
+    args: tuple[Any, ...],
     kwargs: dict[str, Any],
     *,
     risk_hints: dict[str, Any] | None = None,
@@ -904,4 +904,4 @@ def gate(
     # Handle @gate (bare, no parentheses) vs @gate(...).
     if fn is not None:
         return decorator(fn)
-    return decorator  # type: ignore[return-value]
+    return decorator

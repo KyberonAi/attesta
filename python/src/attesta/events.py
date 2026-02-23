@@ -72,7 +72,7 @@ class EventBus:
         self._async_handlers: dict[EventType, list[Callable[[Event], Any]]] = {}
         self._lock = threading.Lock()
 
-    def on(self, event_type: EventType, callback: EventHandler | None = None) -> Callable:
+    def on(self, event_type: EventType, callback: EventHandler | None = None) -> Callable[..., Any]:
         """Subscribe *callback* to *event_type*.
 
         Can be used as a decorator::
@@ -95,7 +95,7 @@ class EventBus:
             return callback
         return decorator
 
-    def async_on(self, event_type: EventType, callback: Callable[[Event], Any] | None = None) -> Callable:
+    def async_on(self, event_type: EventType, callback: Callable[[Event], Any] | None = None) -> Callable[..., Any]:
         """Subscribe an async callback to *event_type*.
 
         Usage::

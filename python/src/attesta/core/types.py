@@ -74,7 +74,7 @@ class ActionContext:
     """
 
     function_name: str
-    args: tuple = ()
+    args: tuple[Any, ...] = ()
     kwargs: dict[str, Any] = field(default_factory=dict)
     function_doc: str | None = None
     hints: dict[str, Any] = field(default_factory=dict)

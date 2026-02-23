@@ -77,7 +77,7 @@ def attesta_tool_handler(
     attesta: Attesta,
     *,
     risk_overrides: dict[str, str] | None = None,
-) -> Callable:
+) -> Callable[..., Any]:
     """Decorator that wraps an MCP ``call_tool`` handler with Attesta approval.
 
     Place this between ``@server.call_tool()`` and your handler function so
@@ -98,9 +98,9 @@ def attesta_tool_handler(
     """
     overrides = risk_overrides or {}
 
-    def decorator(handler: Callable) -> Callable:
+    def decorator(handler: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(handler)
-        async def wrapper(name: str, arguments: dict | None = None) -> Any:
+        async def wrapper(name: str, arguments: dict[str, Any] | None = None) -> Any:
             arguments = arguments or {}
 
             hints: dict[str, Any] = {}
@@ -193,7 +193,7 @@ class MCPProxy:
         self.attesta = attesta
         self.upstream_command = upstream_command
         self.risk_overrides = risk_overrides or {}
-        self._process: subprocess.Popen | None = None
+        self._process: subprocess.Popen[bytes] | None = None
         self._stdout_lock = threading.Lock()
 
     def run(self) -> None:
@@ -266,10 +266,10 @@ class MCPProxy:
 
     def _evaluate(
         self,
-        request: dict,
+        request: dict[str, Any],
         tool_name: str,
-        arguments: dict,
-    ) -> tuple[bool, dict | None]:
+        arguments: dict[str, Any],
+    ) -> tuple[bool, dict[str, Any] | None]:
         """Evaluate a tool call with Attesta.
 
         Returns ``(should_forward, denial_response_or_none)``.
@@ -324,14 +324,14 @@ class MCPProxy:
 
         return False, denial
 
-    def _write_to_client(self, msg: dict) -> None:
+    def _write_to_client(self, msg: dict[str, Any]) -> None:
         """Write a JSON-RPC message to our stdout (→ client)."""
         data = _encode_message(msg)
         with self._stdout_lock:
             sys.stdout.buffer.write(data)
             sys.stdout.buffer.flush()
 
-    def _write_to_upstream(self, msg: dict) -> None:
+    def _write_to_upstream(self, msg: dict[str, Any]) -> None:
         """Write a JSON-RPC message to upstream stdin."""
         assert self._process and self._process.stdin
         data = _encode_message(msg)
@@ -344,7 +344,7 @@ class MCPProxy:
 # ---------------------------------------------------------------------------
 
 
-def _decode_message(stream: Any) -> dict | None:
+def _decode_message(stream: Any) -> dict[str, Any] | None:
     """Read one JSON-RPC message from an MCP stdio stream.
 
     Auto-detects the framing format:
@@ -397,21 +397,23 @@ def _decode_message(stream: Any) -> dict | None:
             if isinstance(body_raw, (bytes, bytearray)):
                 body_raw = body_raw.decode("utf-8", errors="replace")
             try:
-                return json.loads(body_raw)
+                result: dict[str, Any] = json.loads(body_raw)
+                return result
             except json.JSONDecodeError:
                 return None
 
         # Newline-delimited JSON fallback.
         if text.startswith("{"):
             try:
-                return json.loads(text)
+                result = json.loads(text)
+                return result
             except json.JSONDecodeError:
                 continue
 
         # Unknown line -- skip and try the next one.
 
 
-def _encode_message(msg: dict) -> bytes:
+def _encode_message(msg: dict[str, Any]) -> bytes:
     """Encode a JSON-RPC message with Content-Length framing."""
     body = json.dumps(msg).encode("utf-8")
     header = f"Content-Length: {len(body)}\r\n\r\n".encode()

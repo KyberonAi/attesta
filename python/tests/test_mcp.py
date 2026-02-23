@@ -182,9 +182,10 @@ class TestAttestaToolHandler:
 
         assert handler_called is False
         assert len(result) == 1
-        assert "denied" in result[0]["text"].lower()
-        assert "drop_database" in result[0]["text"]
-        assert "critical" in result[0]["text"]
+        text = result[0].text if hasattr(result[0], "text") else result[0]["text"]
+        assert "denied" in text.lower()
+        assert "drop_database" in text
+        assert "critical" in text
 
     async def test_risk_overrides_applied(self):
         """Risk overrides are passed as hints to Attesta."""
@@ -247,7 +248,8 @@ class TestAttestaToolHandler:
             return [{"type": "text", "text": "should not reach"}]
 
         result = await call_tool("deploy", {})
-        assert "denied" in result[0]["text"].lower()
+        text = result[0].text if hasattr(result[0], "text") else result[0]["text"]
+        assert "denied" in text.lower()
 
 
 # =========================================================================

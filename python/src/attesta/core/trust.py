@@ -136,7 +136,7 @@ class TrustEngine:
         action_name: str,
         domain: str = "general",
         risk_score: float = 0.5,
-    ):
+    ) -> None:
         profile = self.get_profile(agent_id)
         record = TrustRecord(
             timestamp=datetime.now(),
@@ -158,7 +158,7 @@ class TrustEngine:
         action_name: str,
         domain: str = "general",
         risk_score: float = 0.5,
-    ):
+    ) -> None:
         profile = self.get_profile(agent_id)
         record = TrustRecord(
             timestamp=datetime.now(),
@@ -178,7 +178,7 @@ class TrustEngine:
         domain: str = "general",
         severity: str = "medium",
         description: str = "",
-    ):
+    ) -> None:
         profile = self.get_profile(agent_id)
         profile.incidents += 1
         record = TrustRecord(
@@ -192,7 +192,7 @@ class TrustEngine:
         profile.overall_score = self.compute_trust(agent_id)
         self._save()
 
-    def revoke(self, agent_id: str):
+    def revoke(self, agent_id: str) -> None:
         """Instantly revoke all trust for an agent."""
         profile = self.get_profile(agent_id)
         profile.overall_score = 0.0
@@ -200,7 +200,7 @@ class TrustEngine:
         profile.incidents += 3  # heavy penalty
         self._save()
 
-    def _save(self):
+    def _save(self) -> None:
         if not self.storage_path:
             return
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
@@ -223,7 +223,7 @@ class TrustEngine:
             os.close(fd)
         self.storage_path.write_text(content)
 
-    def _load(self):
+    def _load(self) -> None:
         if not self.storage_path or not self.storage_path.exists():
             return
         data = json.loads(self.storage_path.read_text())

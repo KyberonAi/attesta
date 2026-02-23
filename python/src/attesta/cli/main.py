@@ -22,7 +22,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 # ---------------------------------------------------------------------------
 # ANSI colour helpers (no external deps)
@@ -595,7 +595,7 @@ def _cmd_version(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _read_all_entries(audit_path: Path) -> list:
+def _read_all_entries(audit_path: Path) -> list[Any]:
     """Read all audit entries from the JSONL file."""
     from attesta.core.audit import AuditEntry
 
@@ -612,10 +612,11 @@ def _read_all_entries(audit_path: Path) -> list:
     return entries
 
 
-def _load_trust_data(trust_path: Path) -> dict:
+def _load_trust_data(trust_path: Path) -> dict[str, Any]:
     """Load raw trust data from the JSON store."""
     try:
-        return json.loads(trust_path.read_text(encoding="utf-8"))
+        result: dict[str, Any] = json.loads(trust_path.read_text(encoding="utf-8"))
+        return result
     except (json.JSONDecodeError, OSError) as exc:
         _err(f"Failed to read trust store {trust_path}: {exc}")
         return {}  # unreachable, _err calls sys.exit
