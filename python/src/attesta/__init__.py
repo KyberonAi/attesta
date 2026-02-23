@@ -344,20 +344,38 @@ class Attesta:
                     "continuing without trust."
                 )
 
-        # Build an AuditLogger if audit settings are present.
+        # Build an audit backend from config settings.
         audit_logger_inst: AuditLogger | None = None
-        audit_data = data.get("audit")
-        if audit_data and isinstance(audit_data, dict):
+        try:
+            from attesta.core.audit_backend import create_backend
+
+            audit_logger_inst = create_backend(
+                backend=policy_obj.audit_backend,
+                path=policy_obj.audit_path,
+                tenant_id=policy_obj.audit_tenant_id,
+                hmac_key=policy_obj.audit_hmac_key,
+            )
+        except ImportError:
+            # TrailProof not installed -- fall back to legacy
+            if policy_obj.audit_backend == "trailproof":
+                logger.warning(
+                    "TrailProof not installed; falling back to legacy audit backend. "
+                    "Install with: pip install attesta[trailproof]"
+                )
             try:
                 from attesta.core.audit import AuditLogger as _AuditLogger
 
-                audit_path = audit_data.get("path", ".attesta/audit.jsonl")
-                audit_logger_inst = _AuditLogger(path=audit_path)
+                audit_logger_inst = _AuditLogger(path=policy_obj.audit_path)
             except Exception:
                 logger.warning(
                     "Failed to initialise AuditLogger from config; "
                     "continuing without persistent audit."
                 )
+        except Exception:
+            logger.warning(
+                "Failed to initialise audit backend from config; "
+                "continuing without persistent audit."
+            )
 
         # Try to use a TerminalRenderer if `rich` is available.
         renderer_inst: Renderer | None = None

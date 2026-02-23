@@ -113,6 +113,16 @@ export type {
   AuditQueryFilters,
 } from "./audit.js";
 
+// -- Audit Backends ---------------------------------------------------------
+
+export {
+  LegacyBackend,
+  TrailProofBackend,
+  createBackend,
+} from "./audit-backend.js";
+
+export type { AuditBackend } from "./audit-backend.js";
+
 // -- Challenges (re-exported for convenience) --------------------------------
 
 export {
