@@ -1,0 +1,53 @@
+name: Publish n8n-nodes-attesta to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test n8n package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build @kyberon/attesta
+        run: npm run --workspace @kyberon/attesta build
+      - name: Build n8n-nodes-attesta
+        run: npm run --workspace n8n-nodes-attesta build
+      - name: Run tests
+        run: npm run --workspace n8n-nodes-attesta test
+
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: test
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build @kyberon/attesta
+        run: npm run --workspace @kyberon/attesta build
+      - name: Build n8n-nodes-attesta
+        run: npm run --workspace n8n-nodes-attesta build
+      - name: Publish to npm
+        run: npm --workspace n8n-nodes-attesta publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

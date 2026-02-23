@@ -1,0 +1,65 @@
+name: Publish @kyberon/attesta to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run --workspace @kyberon/attesta typecheck
+      - name: Build
+        run: npm run --workspace @kyberon/attesta build
+      - name: Run tests
+        run: npm run --workspace @kyberon/attesta test
+
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: test
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run --workspace @kyberon/attesta build
+      - name: Check pack output for proprietary leaks
+        run: |
+          set -euo pipefail
+          sudo apt-get update && sudo apt-get install -y ripgrep
+          PACK_LOG="$(npm --workspace @kyberon/attesta pack --dry-run 2>&1 || true)"
+          echo "$PACK_LOG"
+          if echo "$PACK_LOG" | rg -i '(attesta-proprietary|llm_scorer|domains/presets/(healthcare|finance|infrastructure|legal)\.py)'; then
+            echo "Detected proprietary markers in npm pack output."
+            exit 1
+          fi
+      - name: Publish to npm
+        run: npm --workspace @kyberon/attesta publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
