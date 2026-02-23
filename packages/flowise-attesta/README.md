@@ -73,7 +73,7 @@ npm test
 
 ## License
 
-MIT
+Apache 2.0
 
 ## Links
 

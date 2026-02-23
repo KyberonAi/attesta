@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "n8n community node for Attesta human-in-the-loop approval gates",
   "keywords": ["n8n-community-node-package"],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "main": "dist/nodes/AttestaGate/AttestaGate.node.js",
   "n8n": {
     "n8nNodesApiVersion": 1,

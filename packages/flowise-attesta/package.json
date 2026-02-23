@@ -34,7 +34,7 @@
     "@langchain/core": "^0.3.80"
   },
   "keywords": ["flowise", "attesta", "human-in-the-loop", "ai-safety"],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "files": ["dist"],
   "engines": {
     "node": ">=18"
