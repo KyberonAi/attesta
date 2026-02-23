@@ -1,0 +1,63 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q '\\.py'; then cd python && ruff check --fix \"$TOOL_INPUT\" 2>/dev/null; ruff format \"$TOOL_INPUT\" 2>/dev/null; fi; exit 0"
+          },
+          {
+            "type": "command",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q '\\.ts'; then cd typescript && npx eslint --fix \"$TOOL_INPUT\" 2>/dev/null; fi; exit 0"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(make *)",
+      "Bash(npm run *)",
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(mypy *)",
+      "Bash(tsc *)",
+      "Bash(python *)",
+      "Bash(uv *)",
+      "Bash(pip install *)",
+      "Bash(npm install *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git diff *)",
+      "Bash(git status)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Bash(git switch *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(mkdir -p *)",
+      "Bash(touch *)",
+      "Bash(cp *)",
+      "Bash(mv *)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(git reset --hard *)",
+      "Bash(git rebase *)",
+      "Bash(rm -rf *)",
+      "Bash(npm publish *)",
+      "Bash(twine upload *)",
+      "Bash(curl *)",
+      "Bash(wget *)"
+    ]
+  }
+}

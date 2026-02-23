@@ -1,71 +1,48 @@
-# CLAUDE.md
+# Attesta
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**Attesta** is an open-core Human-in-the-Loop (HITL) approval framework for AI agents. It scores action risk and selects verification challenges proportional to that risk — from auto-approving safe reads to requiring multi-party sign-off for irreversible operations.
 
-## Project Overview
+## Stack
 
-**Attesta** is an open-core Human-in-the-Loop (HITL) approval framework for AI agents. It scores action risk and selects verification challenges proportional to that risk — from auto-approving safe reads to requiring multi-party sign-off for irreversible operations. The OSS layer (this repo) covers the proof pipeline; the proprietary layer (not here) covers dashboards, analytics, and fleet management.
+- Python 3.11+ / TypeScript 5 / Node.js 18+
+- Zero runtime dependencies in both SDKs (stdlib/built-ins only)
+- Build: hatchling (Python), tsup ESM+CJS (TypeScript)
+- Audit: TrailProof for tamper-evident hash-chained event logging
 
-## Build and Test Commands
+## Project Structure
 
-### Python
-
-```bash
-# Install (from repo root)
-cd python && pip install -e ".[dev,yaml,terminal]"
-
-# Run all tests (use the project venv — system Python may be too old)
-.venv/bin/python -m pytest python/tests/ -q
-
-# Run a single test file
-.venv/bin/python -m pytest python/tests/test_gate.py -q
-
-# Run a single test function
-.venv/bin/python -m pytest python/tests/test_gate.py::TestGateDecorator::test_basic_gate -q
-
-# Lint
-cd python && ruff check src tests
-
-# Type check
-cd python && mypy src/attesta
+```
+attesta/
+├── .claude/           commands, agents, templates, skills, specs, plans, decisions
+├── python/            Python SDK (built first)
+│   ├── src/attesta/
+│   └── tests/
+├── typescript/        TypeScript SDK (mirrors Python)
+│   ├── src/
+│   └── tests/
+├── packages/          No-code integrations (n8n, Flowise, Langflow, Dify)
+├── fixtures/          Shared cross-SDK test vectors (JSON)
+├── docs/              Mintlify documentation site
+├── .github/workflows/ CI/CD
+└── CLAUDE.md
 ```
 
-Requires Python 3.11+ (venv at `.venv/` uses 3.11 or 3.12). asyncio_mode is "auto" in pyproject.toml.
+## Core Concepts
 
-### TypeScript
+- **Risk Scoring** — 5-factor weighted scorer assigns 0-1 risk to every action
+- **Challenge System** — confirm, quiz, teach-back, multi-party challenges proportional to risk
+- **Trust Engine** — Bayesian adaptive trust per-agent/per-domain, decays over time
+- **Audit Trail** — TrailProof-backed tamper-evident hash-chained event log
+- **Two Attesta Classes** — `attesta/__init__.py:Attesta` (public API) vs `core/gate.py:CoreAttesta` (internal orchestrator)
 
-```bash
-cd typescript
-npm install
-npm run typecheck   # tsc --noEmit
-npm run build       # compile ESM + CJS
-npm test            # node --test
-```
+## Commands
 
-Requires Node.js 18+.
-
-### No-code packages
-
-```bash
-PYTHONPATH=python/src pytest packages/langflow-attesta/tests -q
-PYTHONPATH=python/src pytest packages/dify-attesta/tests -q
-```
-
-### Docs (Mintlify)
-
-```bash
-npx mintlify@latest dev   # from repo root; requires Node <25 (use nvm use 22)
-```
+- Python: see `python/CLAUDE.md` for test/lint/typecheck commands
+- TypeScript: see `typescript/CLAUDE.md` for npm scripts
+- No-code packages: `PYTHONPATH=python/src pytest packages/{pkg}/tests -q`
+- Docs: `cd docs && npx mintlify dev` (requires Node LTS 22, NOT 25+)
 
 ## Architecture
-
-### Two Attesta Classes
-
-There are two `Attesta` classes — understanding the distinction is critical:
-
-1. **`attesta/__init__.py:Attesta`** — The public-facing entry point. Holds shared config (policy, scorer, renderer, audit logger, trust engine). Creates and caches a `CoreAttesta` instance on first `evaluate()` call. This is what users import and configure. Has `from_config()` for YAML loading and a `.gate()` decorator factory.
-
-2. **`attesta/core/gate.py:Attesta` (aliased as `CoreAttesta`)** — The internal orchestrator that runs the actual pipeline: risk scoring → challenge selection → verification → audit logging. Stateful (tracks novelty). The `@gate` module-level decorator creates a `CoreAttesta` per decorated function.
 
 ### Request Flow
 
@@ -77,42 +54,76 @@ There are two `Attesta` classes — understanding the distinction is critical:
     → RiskLevel.from_score() → LOW/MEDIUM/HIGH/CRITICAL
     → challenge_map[risk_level] → ChallengeType
     → asyncio.wait_for(Renderer.render_challenge(...), timeout)
-    → AuditLogger.log(entry)
+    → AuditLogger.log(entry) → TrailProof tp.emit()
     → ApprovalResult
 ```
 
 ### Key Modules
 
-- **`core/types.py`** — All enums, dataclasses, and protocols. Zero internal deps. Import-safe from anywhere.
-- **`core/risk.py`** — `DefaultRiskScorer` (5-factor weighted), `CompositeRiskScorer`, `MaxRiskScorer`, `FixedRiskScorer`.
-- **`core/trust.py`** — Bayesian-inspired adaptive trust. Exponential decay, per-agent/per-domain. Persists to JSON.
-- **`core/audit.py`** — SHA-256 hash-chained JSONL. `verify_chain()` detects tampering.
-- **`challenges/`** — `confirm.py`, `quiz.py`, `teach_back.py`, `multi_party.py`. Each challenge is instantiated by the renderer.
-- **`renderers/`** — `terminal.py` (rich), `web.py` (async HTTP). Default renderer auto-approves in non-TTY Python, denies in TS.
-- **`integrations/`** — LangChain, OpenAI Agents SDK, CrewAI, Anthropic, MCP. Each wraps `Attesta.evaluate()`.
-- **`domains/`** — `DomainProfile`, `DomainRiskScorer`, presets (`devops`, `data_pipeline`).
-- **`config/loader.py`** — Parses YAML into a `Policy` dataclass. Supports structured (`policy:`, `risk:`, `trust:`) and legacy flat format.
+- **`core/types.py`** — All enums, dataclasses, and protocols. Zero internal deps.
+- **`core/risk.py`** — DefaultRiskScorer (5-factor), CompositeRiskScorer, MaxRiskScorer, FixedRiskScorer.
+- **`core/trust.py`** — Bayesian adaptive trust. Exponential decay, per-agent/per-domain.
+- **`core/audit.py`** — SHA-256 hash-chained JSONL (legacy). TrailProof backend available.
+- **`challenges/`** — confirm, quiz, teach_back, multi_party.
+- **`renderers/`** — terminal (rich), web (async HTTP). Non-TTY: auto-approve (Python), deny (TS).
+- **`integrations/`** — LangChain, OpenAI Agents, CrewAI, Anthropic, MCP.
+- **`domains/`** — DomainProfile, DomainRiskScorer, presets (devops, data_pipeline).
+- **`config/loader.py`** — YAML → Policy dataclass.
 
-### TypeScript SDK
+## SDK Parity Rules
 
-Mirrors the Python SDK at `typescript/src/`. Dual ESM/CJS output. Key difference: non-TTY defaults to DENY (Python defaults to auto-approve).
+1. Both SDKs produce identical output for the same input data
+2. Same algorithms in both SDKs
+3. Pass the same test vectors from `fixtures/test-vectors.json`
+4. Same public API (snake_case in Python, camelCase in TypeScript)
+5. Same error types: AttestaDenied, ValidationError
+6. Same interface contracts in both SDKs
+
+## Conventions
+
+### Error Messages
+```
+Attesta: {what went wrong} — {context}
+```
+
+### Commit Messages
+- Use conventional commits (feat:, fix:, chore:, docs:, test:)
+- Present tense, explain "why" not just "what"
+- Do NOT append "Co-Authored-By" trailers
+
+### Build Order
+Python first, TypeScript mirrors after. Each step: Python → TypeScript → shared test vectors → commit.
+
+### Security
+- HTML escaping via `_esc()`/`escapeHtml()`
+- CSRF tokens on all web forms
+- `execFile()` not `exec()` for shell operations
+- File permissions `0o600` for audit/trust files
+- `asyncio.wait_for()` for approval timeout
+- Terminal input wrapped in `try/except (EOFError, KeyboardInterrupt)`
+- All extensibility uses `typing.Protocol` (structural subtyping)
 
 ## Critical Gotchas
 
-1. **`ActionContext.description` is a property**, not a constructor param. It's derived from `function_name` + `args`. To set docstring text, use `function_doc=`.
-2. **System Python vs venv**: Project venv is at `.venv/`. System Python may be 3.9. Always use `.venv/bin/python`.
-3. **Zero-dependency core**: Python core has zero required deps. All extras (`rich`, `pyyaml`, framework SDKs) are optional. Don't add required deps.
-4. **Hash chain format**: JSONL audit format is a backwards-compatibility contract. Don't change hashing algorithm or field order.
-5. **OSS_SCOPE.md**: Internal strategy doc, gitignored. Don't commit or reference in public-facing content.
-6. **`risk_override` hints**: Blocked by default (`allow_hint_override=False`). Trusted overrides use the `TRUSTED_RISK_OVERRIDE_METADATA_KEY` metadata path instead.
+1. **`ActionContext.description` is a property**, not a constructor param. Derived from `function_name` + `args`. Use `function_doc=` for docstring text.
+2. **System Python vs venv**: Project venv is at `.venv/`. Always use `.venv/bin/python`.
+3. **Zero-dependency core**: Don't add required deps to either SDK.
+4. **Hash chain format**: JSONL audit format is a backwards-compatibility contract.
+5. **OSS_SCOPE.md**: Internal strategy doc, gitignored. Don't reference publicly.
+6. **`risk_override` hints**: Blocked by default (`allow_hint_override=False`).
 
-## Code Conventions
+## Workflow Rules
 
-- **Python**: ruff (`E, F, I, N, UP, B`), mypy strict, line length 120, target 3.11.
-- **TypeScript**: strict mode, dual ESM/CJS.
-- **Security**: HTML escaping via `_esc()`/`escapeHtml()`. CSRF tokens on all web forms. `execFile()` not `exec()`. File permissions `0o600` for audit/trust files. `asyncio.wait_for()` for approval timeout. All terminal input wrapped in `try/except (EOFError, KeyboardInterrupt)`.
-- **Protocols**: All extensibility uses `typing.Protocol` (structural subtyping). No ABC inheritance required.
+1. No code without an approved spec in `.claude/specs/`
+2. Spec → Plan → Build → Test → Review → Commit
+3. One task = one commit
+4. Run tests before every commit
+5. Update plan files to reflect state after each session
 
-## CI
+## What NOT To Do
 
-`.github/workflows/ci.yaml`: Python tests (3.12), TS typecheck + build + test, ruff lint, mypy, release boundary check, dependency review, docs link check.
+- Do not write code without an approved spec
+- Do not modify pyproject.toml or package.json without asking
+- Do not add dependencies without asking (both SDKs must stay zero-dep at runtime)
+- Do not continue to the next task without stopping for review
+- Do not commit or reference OSS_SCOPE.md in public content
