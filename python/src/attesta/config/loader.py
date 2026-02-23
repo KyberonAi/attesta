@@ -1,13 +1,14 @@
 """Configuration loader for Attesta."""
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+
 import logging
-from pathlib import Path
 import re
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
-from attesta.core.types import RiskLevel, ChallengeType
+from attesta.core.types import ChallengeType, RiskLevel
 
 logger = logging.getLogger("attesta")
 
@@ -355,8 +356,8 @@ def _load_yaml(path: Path) -> Policy:
     """Load config from YAML file."""
     try:
         import yaml
-    except ImportError:
-        raise ImportError("PyYAML is required to load YAML config. Install with: pip install attesta[yaml]")
+    except ImportError as err:
+        raise ImportError("PyYAML is required to load YAML config. Install with: pip install attesta[yaml]") from err
 
     data = yaml.safe_load(path.read_text())
     return _parse_config(data)
@@ -369,8 +370,8 @@ def _load_toml(path: Path) -> Policy:
     except ImportError:
         try:
             import tomli as tomllib
-        except ImportError:
-            raise ImportError("tomli is required for Python <3.11 TOML support")
+        except ImportError as err:
+            raise ImportError("tomli is required for Python <3.11 TOML support") from err
 
     data = tomllib.loads(path.read_text())
     return _parse_config(data)

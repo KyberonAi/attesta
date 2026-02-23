@@ -10,20 +10,19 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
+from attesta.challenges.confirm import ConfirmChallenge
+from attesta.challenges.quiz import QuizChallenge
+from attesta.challenges.teach_back import TeachBackChallenge
 from attesta.core.types import (
     ActionContext,
     ChallengeResult,
     ChallengeType,
     RiskAssessment,
 )
-
-from attesta.challenges.confirm import ConfirmChallenge
-from attesta.challenges.quiz import QuizChallenge
-from attesta.challenges.teach_back import TeachBackChallenge
-
 
 # ---------------------------------------------------------------------------
 # Per-approver record
@@ -179,7 +178,7 @@ class MultiPartyChallenge:
 
         separator = "=" * 60
         print(f"\n{separator}")
-        print(f"  MULTI-PARTY APPROVAL  --  CRITICAL+ RISK ACTION")
+        print("  MULTI-PARTY APPROVAL  --  CRITICAL+ RISK ACTION")
         print(f"  Requires {self.required_approvers} independent approvals")
         print(f"{separator}")
         print(f"  Action: {ctx.function_name}")

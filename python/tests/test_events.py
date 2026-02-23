@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from attesta.events import Event, EventBus, EventType
 
 
@@ -99,7 +97,8 @@ class TestEventBus:
     def test_off(self):
         bus = EventBus()
         received = []
-        handler = lambda e: received.append(e)
+        def handler(e):
+            received.append(e)
 
         bus.on(EventType.APPROVED, handler)
         bus.emit(Event(type=EventType.APPROVED))

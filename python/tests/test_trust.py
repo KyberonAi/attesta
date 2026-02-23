@@ -5,10 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 
-import pytest
-
 from attesta.core.trust import TrustEngine, TrustProfile, TrustRecord
-
 
 # =========================================================================
 # TrustProfile dataclass

@@ -132,8 +132,8 @@ def _register_builtin_presets() -> None:
     :data:`~attesta.domains.profile.registry`.  Here we also register
     them in the preset lookup table with convenient aliases.
     """
-    from attesta.domains.presets.devops import DEVOPS_PROFILE
     from attesta.domains.presets.data_pipeline import DATA_PIPELINE_PROFILE
+    from attesta.domains.presets.devops import DEVOPS_PROFILE
 
     if DEVOPS_PROFILE.name not in PRESET_PROFILES:
         register_preset(DEVOPS_PROFILE, aliases=["devops", "ops"])

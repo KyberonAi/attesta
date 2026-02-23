@@ -39,12 +39,12 @@ _RICH_AVAILABLE = False
 
 try:
     if not os.environ.get("NO_COLOR"):
+        from rich.align import Align
         from rich.console import Console
         from rich.markup import escape as rich_escape
         from rich.panel import Panel
         from rich.table import Table
         from rich.text import Text
-        from rich.align import Align
 
         _RICH_AVAILABLE = True
 except ImportError:
@@ -161,19 +161,19 @@ class PlainRenderer(BaseRenderer):
 
         print()
         print(f"  {sep}")
-        print(f"  ATTESTA")
+        print("  ATTESTA")
         print(f"  {sep}")
         print(f"  Action: {ctx.function_name}")
         print(f"  Risk:   {bar} {risk.level.value.upper()} ({risk.score:.2f})")
         print(f"  Call:   {_format_call(ctx)}")
         if risk.factors:
             print()
-            print(f"  Risk Factors:")
+            print("  Risk Factors:")
             for f in risk.factors:
                 fbar = _risk_bar_plain(f.contribution)
                 print(f"    {f.name:<20s} {fbar} {f.contribution:.2f}")
         print()
-        print(f"  [a] Approve  [d] Deny  [e] Edit  [?] Explain")
+        print("  [a] Approve  [d] Deny  [e] Edit  [?] Explain")
         print(f"  {sep}")
 
         while True:
@@ -222,7 +222,7 @@ class PlainRenderer(BaseRenderer):
         print(f"  Call:   {_format_call(ctx)}")
         if risk.factors:
             print()
-            print(f"  Risk Factors:")
+            print("  Risk Factors:")
             for f in risk.factors:
                 fbar = _risk_bar_plain(f.contribution)
                 print(f"    {f.name:<20s} {fbar} {f.contribution:.2f}")
@@ -236,7 +236,7 @@ class PlainRenderer(BaseRenderer):
         # Comprehension question
         question = self._generate_question(ctx, risk)
         print()
-        print(f"  Comprehension Check:")
+        print("  Comprehension Check:")
         print(f"  {question}")
         answer = await _async_input("  > ")
 
@@ -261,7 +261,7 @@ class PlainRenderer(BaseRenderer):
 
         print()
         print(f"  {sep}")
-        print(f"  ATTESTA -- CRITICAL")
+        print("  ATTESTA -- CRITICAL")
         print(f"  {sep}")
         print(f"  Action: {ctx.function_name}")
         print(f"  Risk:   {bar} CRITICAL ({risk.score:.2f})")
@@ -273,8 +273,8 @@ class PlainRenderer(BaseRenderer):
         await _countdown(min_review)
 
         print()
-        print(f"  Explain what this action will do and its effects:")
-        print(f"  (minimum 15 words)")
+        print("  Explain what this action will do and its effects:")
+        print("  (minimum 15 words)")
         explanation = await _async_input("  > ")
 
         elapsed = time.monotonic() - start
@@ -311,7 +311,7 @@ class PlainRenderer(BaseRenderer):
 
         print()
         print(f"  {sep}")
-        print(f"  ATTESTA -- MULTI-PARTY APPROVAL REQUIRED")
+        print("  ATTESTA -- MULTI-PARTY APPROVAL REQUIRED")
         print(f"  {sep}")
         print(f"  Action: {ctx.function_name}")
         print(f"  Risk:   {_risk_bar_plain(risk.score)} {risk.level.value.upper()} ({risk.score:.2f})")
@@ -383,7 +383,7 @@ class PlainRenderer(BaseRenderer):
     def _print_explanation(ctx: ActionContext, risk: RiskAssessment) -> None:
         """Print a verbose explanation of the action and risk."""
         print()
-        print(f"  --- Explanation ---")
+        print("  --- Explanation ---")
         print(f"  Function: {ctx.function_name}")
         if ctx.function_doc:
             print(f"  Doc:      {ctx.function_doc}")
@@ -391,7 +391,7 @@ class PlainRenderer(BaseRenderer):
         print(f"  Risk score: {risk.score:.4f}")
         print(f"  Risk level: {risk.level.value}")
         if risk.factors:
-            print(f"  Factors:")
+            print("  Factors:")
             for f in risk.factors:
                 print(f"    - {f.name}: {f.contribution:.4f} -- {f.description}")
                 if f.evidence:
@@ -472,7 +472,6 @@ if _RICH_AVAILABLE:
             self, ctx: ActionContext, risk: RiskAssessment
         ) -> Text:
             """Build the action + risk summary as styled Text."""
-            color = _RISK_COLORS[risk.level]
             lines = Text()
 
             # Action line

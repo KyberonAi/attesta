@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
-
-import pytest
 
 from attesta.core.audit import (
+    _GENESIS_HASH,
     AuditEntry,
     AuditLogger,
-    _GENESIS_HASH,
     build_entry,
 )
 from attesta.core.types import (
@@ -22,7 +19,6 @@ from attesta.core.types import (
     RiskLevel,
     Verdict,
 )
-
 
 # =========================================================================
 # Helpers
@@ -239,7 +235,7 @@ class TestAuditLoggerWriting:
         path = tmp_path / "audit.jsonl"
         logger = AuditLogger(path=path)
         await _log_n_entries(logger, 3)
-        lines = [l for l in path.read_text().strip().split("\n") if l.strip()]
+        lines = [line for line in path.read_text().strip().split("\n") if line.strip()]
         assert len(lines) == 3
 
     async def test_each_line_is_valid_json(self, tmp_path):

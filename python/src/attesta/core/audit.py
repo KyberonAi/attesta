@@ -24,8 +24,6 @@ from typing import Any
 from attesta.core.types import (
     ActionContext,
     ApprovalResult,
-    ChallengeType,
-    RiskLevel,
     Verdict,
 )
 
@@ -337,6 +335,7 @@ class AuditLogger:
             Passed to :meth:`query` to filter entries before export.
         """
         import sys
+
         from attesta.exporters import CSVExporter, JSONExporter
 
         if output is None:
@@ -476,7 +475,7 @@ class AuditLogger:
     ) -> bool:
         """Return ``True`` if *entry* matches all *filters*."""
         # Simple equality filters.
-        _SIMPLE_KEYS = (
+        simple_keys = (
             "risk_level",
             "verdict",
             "agent_id",
@@ -485,7 +484,7 @@ class AuditLogger:
             "action_name",
             "challenge_type",
         )
-        for key in _SIMPLE_KEYS:
+        for key in simple_keys:
             if key in filters and filters[key] is not None:
                 if getattr(entry, key, None) != filters[key]:
                     return False

@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
 from attesta.challenges.validators import (
     KeywordValidator,
     TeachBackValidator,
 )
 from attesta.core.types import ActionContext
-
 
 # =========================================================================
 # KeywordValidator

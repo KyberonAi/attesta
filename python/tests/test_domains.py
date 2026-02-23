@@ -9,12 +9,16 @@ import re
 
 import pytest
 
-from attesta.core.risk import DefaultRiskScorer, FixedRiskScorer
+from attesta.core.risk import FixedRiskScorer
 from attesta.core.types import (
     ActionContext,
     RiskAssessment,
-    RiskFactor,
     RiskLevel,
+)
+from attesta.domains.presets import (
+    list_presets,
+    load_preset,
+    register_preset,
 )
 from attesta.domains.profile import (
     DomainChallengeTemplate,
@@ -22,16 +26,8 @@ from attesta.domains.profile import (
     DomainRegistry,
     EscalationRule,
     RiskPattern,
-    registry,
 )
 from attesta.domains.scorer import DomainRiskScorer
-from attesta.domains.presets import (
-    list_presets,
-    load_preset,
-    register_preset,
-    PRESET_PROFILES,
-)
-
 
 # =========================================================================
 # RiskPattern

@@ -14,7 +14,6 @@ from attesta.core.types import (
     ChallengeResult,
     ChallengeType,
     RiskAssessment,
-    RiskLevel,
     Verdict,
 )
 

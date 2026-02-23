@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -14,12 +12,10 @@ from attesta.core.types import (
     ApprovalResult,
     ChallengeResult,
     ChallengeType,
-    Renderer,
     RiskAssessment,
     RiskLevel,
     Verdict,
 )
-
 
 # =========================================================================
 # Mock renderer helpers

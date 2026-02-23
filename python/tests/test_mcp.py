@@ -4,17 +4,11 @@ from __future__ import annotations
 
 import io
 import json
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY
 from attesta.core.types import (
-    ActionContext,
     ApprovalResult,
-    ChallengeResult,
-    ChallengeType,
     RiskAssessment,
     RiskLevel,
     Verdict,
@@ -25,7 +19,6 @@ from attesta.integrations.mcp import (
     _encode_message,
     attesta_tool_handler,
 )
-
 
 # =========================================================================
 # Helpers
@@ -87,7 +80,7 @@ class TestDecodeMessage:
         """Reads a message with standard Content-Length framing."""
         msg = {"jsonrpc": "2.0", "method": "tools/list", "id": 1}
         body = json.dumps(msg).encode("utf-8")
-        raw = f"Content-Length: {len(body)}\r\n\r\n".encode("utf-8") + body
+        raw = f"Content-Length: {len(body)}\r\n\r\n".encode() + body
 
         stream = io.BytesIO(raw)
         decoded = _decode_message(stream)
@@ -120,7 +113,7 @@ class TestDecodeMessage:
         msg = {"method": "test"}
         body = json.dumps(msg).encode("utf-8")
         raw = (
-            f"Content-Length: {len(body)}\r\n".encode("utf-8")
+            f"Content-Length: {len(body)}\r\n".encode()
             + b"Content-Type: application/json\r\n"
             + b"\r\n"
             + body

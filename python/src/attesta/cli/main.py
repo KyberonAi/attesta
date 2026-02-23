@@ -24,7 +24,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TextIO
 
-
 # ---------------------------------------------------------------------------
 # ANSI colour helpers (no external deps)
 # ---------------------------------------------------------------------------
@@ -173,7 +172,7 @@ def _cmd_init(args: argparse.Namespace) -> None:
 
     dest.write_text(_DEFAULT_CONFIG, encoding="utf-8")
     print(f"{_green('Created')} {dest}")
-    print(f"Edit the file to customise policies, trust settings, and risk overrides.")
+    print("Edit the file to customise policies, trust settings, and risk overrides.")
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +207,6 @@ def _cmd_audit_verify(args: argparse.Namespace) -> None:
 
 def _cmd_audit_stats(args: argparse.Namespace) -> None:
     """Print approval statistics from the audit log."""
-    from attesta.core.audit import AuditEntry
 
     audit_path = _resolve_audit_path(args)
     if not audit_path.exists():
@@ -237,9 +235,9 @@ def _cmd_audit_stats(args: argparse.Namespace) -> None:
     )
 
     # Rubber stamp rate: approved high/critical with fast review
-    from attesta.core.audit import AuditLogger as _AL
+    from attesta.core.audit import AuditLogger as _AuditLogger
 
-    audit = _AL(path=audit_path)
+    audit = _AuditLogger(path=audit_path)
     rubber_stamps = audit.find_rubber_stamps()
     rubber_stamp_rate = (
         (len(rubber_stamps) / approved * 100) if approved > 0 else 0.0

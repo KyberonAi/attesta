@@ -18,14 +18,12 @@ from __future__ import annotations
 
 import asyncio
 import html as _html
-import json
 import logging
 import secrets
 import threading
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any
 from urllib.parse import parse_qs
 
 from attesta.core.types import (
@@ -33,7 +31,6 @@ from attesta.core.types import (
     ChallengeResult,
     ChallengeType,
     RiskAssessment,
-    RiskLevel,
     Verdict,
 )
 
@@ -168,8 +165,8 @@ def _quiz_page(ctx: ActionContext, risk: RiskAssessment) -> str:
 </div>
 <form method="POST" action="/respond">
     <p><strong>What will this action do?</strong></p>
-    <label class="quiz-option"><input type="radio" name="answer" value="approve"> I understand the action and approve</label>
-    <label class="quiz-option"><input type="radio" name="answer" value="deny"> I do not understand or want to deny</label>
+    <label class="quiz-option"><input type="radio" name="answer" value="approve"> I understand and approve</label>
+    <label class="quiz-option"><input type="radio" name="answer" value="deny"> I do not understand or deny</label>
     <br>
     <button class="btn btn-approve" type="submit" id="submit-btn">Submit</button>
 </form>
@@ -361,13 +358,13 @@ class WebRenderer:
         )
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self_handler):
+            def do_GET(self_handler):  # noqa: N805
                 self_handler.send_response(200)
                 self_handler.send_header("Content-Type", "text/html; charset=utf-8")
                 self_handler.end_headers()
                 self_handler.wfile.write(html.encode("utf-8"))
 
-            def do_POST(self_handler):
+            def do_POST(self_handler):  # noqa: N805
                 nonlocal result
                 length = int(self_handler.headers.get("Content-Length", 0))
                 if length > 65536:  # 64KB limit
@@ -399,7 +396,7 @@ class WebRenderer:
                 self_handler.wfile.write(resp_html.encode("utf-8"))
                 event.set()
 
-            def log_message(self_handler, format, *args):
+            def log_message(self_handler, format, *args):  # noqa: N805
                 pass  # Suppress HTTP logs
 
         server = HTTPServer((self.host, self.port), Handler)

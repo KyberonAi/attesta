@@ -5,10 +5,8 @@ from __future__ import annotations
 import io
 import json
 
-import pytest
-
 from attesta.core.audit import AuditEntry
-from attesta.exporters import CSVExporter, JSONExporter, AuditExporter
+from attesta.exporters import AuditExporter, CSVExporter, JSONExporter
 
 
 def _make_entry(**kwargs) -> AuditEntry:
@@ -57,7 +55,7 @@ class TestCSVExporter:
         buf = io.StringIO()
         exporter.export([entry], buf)
         output = buf.getvalue()
-        lines = [l.strip() for l in output.strip().split("\n")]
+        lines = [line.strip() for line in output.strip().split("\n")]
         assert lines[0] == "action_name,verdict"
         assert "deploy_service,approved" in lines[1]
 

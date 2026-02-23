@@ -5,23 +5,19 @@ renderer detection, and configurable sync_timeout.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-from attesta.core.gate import Attesta, _detect_renderer, _DefaultRenderer, gate
+from attesta.core.gate import Attesta, _DefaultRenderer, _detect_renderer, gate
 from attesta.core.types import (
     ActionContext,
-    ApprovalResult,
     ChallengeResult,
     ChallengeType,
-    Renderer,
     RiskAssessment,
     RiskLevel,
     Verdict,
 )
-
 
 # =========================================================================
 # Mock helpers

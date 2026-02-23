@@ -70,7 +70,6 @@ from attesta.domains.profile import (
     RiskPattern,
 )
 
-
 __all__ = ["DomainRiskScorer"]
 
 

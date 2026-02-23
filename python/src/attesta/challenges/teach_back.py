@@ -11,13 +11,13 @@ import asyncio
 import time
 from typing import Any
 
+from attesta.challenges.validators import _extract_key_terms
 from attesta.core.types import (
     ActionContext,
     ChallengeResult,
     ChallengeType,
     RiskAssessment,
 )
-from attesta.challenges.validators import _extract_key_terms
 
 
 class TeachBackChallenge:
@@ -77,7 +77,7 @@ class TeachBackChallenge:
         # -- render full action details -----------------------------------
         separator = "=" * 60
         print(f"\n{separator}")
-        print(f"  TEACH-BACK CHALLENGE  --  CRITICAL RISK ACTION")
+        print("  TEACH-BACK CHALLENGE  --  CRITICAL RISK ACTION")
         print(f"{separator}")
         print(f"  Action:      {ctx.function_name}")
         print(f"  Risk:        {risk.level.value.upper()} ({risk.score:.2f})")
@@ -89,7 +89,7 @@ class TeachBackChallenge:
         if ctx.kwargs:
             print(f"  Keyword:     {ctx.kwargs!r}")
         if risk.factors:
-            print(f"  Risk factors:")
+            print("  Risk factors:")
             for factor in risk.factors:
                 print(f"    - {factor.name}: {factor.description}")
         print(f"{separator}")

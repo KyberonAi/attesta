@@ -11,7 +11,6 @@ from attesta.config.loader import Policy, _parse_config, load_config
 from attesta.core.risk import DefaultRiskScorer
 from attesta.core.types import ActionContext, ChallengeType, RiskLevel
 
-
 # ---------------------------------------------------------------------------
 # Policy defaults
 # ---------------------------------------------------------------------------

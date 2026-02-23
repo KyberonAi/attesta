@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import csv
 import json
-from typing import IO, Any, Protocol, runtime_checkable
+from typing import IO, Protocol, runtime_checkable
 
 from attesta.core.audit import AuditEntry
 

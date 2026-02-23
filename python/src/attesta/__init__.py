@@ -21,16 +21,16 @@ For richer configuration use the :class:`Attesta` entry point::
 
 from __future__ import annotations
 
-import asyncio
-import functools
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from attesta.core.trust import TrustEngine as _TrustEngine
 
-from attesta.core.gate import Attesta as CoreAttesta, AttestaDenied, gate
+from attesta.core.gate import Attesta as CoreAttesta
+from attesta.core.gate import AttestaDenied, gate
 from attesta.core.types import (
     ActionContext,
     ApprovalResult,

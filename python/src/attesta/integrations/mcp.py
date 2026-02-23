@@ -54,7 +54,8 @@ import logging
 import subprocess
 import sys
 import threading
-from typing import Any, Callable, TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY
 from attesta.core.types import ActionContext, Verdict
@@ -419,7 +420,7 @@ def _decode_message(stream: Any) -> dict | None:
 def _encode_message(msg: dict) -> bytes:
     """Encode a JSON-RPC message with Content-Length framing."""
     body = json.dumps(msg).encode("utf-8")
-    header = f"Content-Length: {len(body)}\r\n\r\n".encode("utf-8")
+    header = f"Content-Length: {len(body)}\r\n\r\n".encode()
     return header + body
 
 

@@ -12,7 +12,7 @@ import os
 import random
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from attesta.core.types import (
@@ -21,7 +21,6 @@ from attesta.core.types import (
     ChallengeType,
     RiskAssessment,
 )
-
 
 # ---------------------------------------------------------------------------
 # Question model
@@ -214,7 +213,7 @@ class QuizChallenge:
             random.shuffle(options)
             questions.append(
                 Question(
-                    text=f"What directory will be affected by this action?",
+                    text="What directory will be affected by this action?",
                     correct_answer=dirname,
                     options=options,
                 )
@@ -309,7 +308,7 @@ class QuizChallenge:
         # -- render action summary ----------------------------------------
         separator = "=" * 60
         print(f"\n{separator}")
-        print(f"  QUIZ CHALLENGE  --  HIGH RISK ACTION")
+        print("  QUIZ CHALLENGE  --  HIGH RISK ACTION")
         print(f"{separator}")
         print(f"  Action: {ctx.function_name}")
         print(f"  Risk:   {risk.level.value.upper()} ({risk.score:.2f})")

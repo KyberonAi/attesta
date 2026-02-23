@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import os
-
-import pytest
-
 from attesta.environment import (
-    Environment,
     RISK_MULTIPLIERS,
+    Environment,
     detect_environment,
 )
 

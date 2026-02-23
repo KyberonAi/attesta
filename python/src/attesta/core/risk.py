@@ -23,8 +23,9 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
 from attesta.core.types import (
     ActionContext,

@@ -16,21 +16,19 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import re
 import stat
 import threading
 import time
 from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 import pytest
 
-from attesta.core.audit import AuditEntry, AuditLogger, _GENESIS_HASH
-from attesta.core.gate import Attesta, TRUSTED_RISK_OVERRIDE_METADATA_KEY
+from attesta.core.audit import AuditEntry, AuditLogger
+from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY, Attesta
 from attesta.core.types import (
     ActionContext,
     ApprovalResult,
@@ -47,7 +45,6 @@ from attesta.renderers.web import (
     _esc,
     _teach_back_page,
 )
-
 
 # =========================================================================
 # Shared test helpers
@@ -520,7 +517,7 @@ class TestBodySizeLimit:
         thread = threading.Thread(target=submit_exact_body, daemon=True)
         thread.start()
 
-        verdict = await renderer.render_approval(ctx, risk)
+        await renderer.render_approval(ctx, risk)
         assert len(response_codes) == 1
         # Should be 200 (accepted), not 413
         assert response_codes[0] == 200

@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import re
 import threading
 import time
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-
-import pytest
 
 from attesta.core.types import (
     ActionContext,

@@ -29,7 +29,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -175,7 +175,7 @@ class WebhookDispatcher:
         return {
             "event": event.type.value.upper(),
             "timestamp": datetime.fromtimestamp(
-                event.timestamp, tz=timezone.utc
+                event.timestamp, tz=UTC
             ).isoformat(),
             "data": event.data,
         }

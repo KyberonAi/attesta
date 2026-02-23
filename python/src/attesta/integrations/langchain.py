@@ -23,7 +23,7 @@ import threading
 from typing import TYPE_CHECKING, Any
 
 from attesta.core.gate import TRUSTED_RISK_OVERRIDE_METADATA_KEY
-from attesta.core.types import ActionContext, RiskLevel, Verdict
+from attesta.core.types import ActionContext, Verdict
 
 if TYPE_CHECKING:
     from attesta import Attesta

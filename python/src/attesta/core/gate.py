@@ -12,11 +12,12 @@ import concurrent.futures
 import functools
 import inspect
 import logging
-import threading
 import textwrap
+import threading
 import time
 import uuid
-from typing import Any, Callable, Coroutine, Literal, TypeVar, overload
+from collections.abc import Callable, Coroutine
+from typing import Any, Literal, TypeVar, overload
 
 from attesta.core.types import (
     ActionContext,
@@ -48,7 +49,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 # Exception
 # ---------------------------------------------------------------------------
 
-class AttestaDenied(Exception):
+class AttestaDenied(Exception):  # noqa: N818
     """Raised when a gated function call is denied by the reviewer."""
 
     def __init__(
@@ -427,7 +428,7 @@ class Attesta:
                         ),
                         timeout=self._approval_timeout,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(
                         "Approval timed out after %.0fs for %s",
                         self._approval_timeout,
