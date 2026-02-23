@@ -6,6 +6,10 @@ icon: "file-shield"
 
 Every decision made through Attesta — whether auto-approved, manually approved, or denied — is recorded in a **tamper-proof audit trail**. The log uses a SHA-256 hash chain where each entry's integrity depends on all previous entries, making it impossible to modify or delete records without detection.
 
+<Note>
+Attesta supports **pluggable audit backends**. The default is a built-in SHA-256 hash-chained JSONL logger (described below). You can also use **TrailProof** as an alternative backend for enhanced features like HMAC signing and multi-tenancy. See the [TrailProof Integration Guide](/guides/trailproof-integration) for details.
+</Note>
+
 ## Hash Chain Mechanism
 
 Each audit entry contains a `chain_hash` computed from the previous entry's hash and the current entry's canonical JSON:
@@ -266,10 +270,16 @@ Set up automated monitoring that runs `find_rubber_stamps()` on a schedule. A hi
 ```
 
 <CardGroup cols={2}>
-  <Card title="Challenge System" icon="lock" href="/concepts/challenges">
+  <Card title="Challenge System" icon="lock" color="#16A34A" href="/concepts/challenges">
     How challenges generate the audit data
   </Card>
-  <Card title="CLI Audit Commands" icon="terminal" href="/cli/audit">
+  <Card title="CLI Audit Commands" icon="terminal" color="#15803D" href="/cli/audit">
     Verify and query audit trails from the command line
+  </Card>
+  <Card title="TrailProof Integration" icon="shield-check" color="#16A34A" href="/guides/trailproof-integration">
+    Switch to TrailProof for HMAC signing and multi-tenancy
+  </Card>
+  <Card title="Production Deployment" icon="rocket" color="#15803D" href="/guides/production-deployment">
+    Best practices for audit logs in production
   </Card>
 </CardGroup>

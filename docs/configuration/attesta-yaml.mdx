@@ -89,8 +89,21 @@ trust:
 
 # ─── Audit ─────────────────────────────────────────────────────────
 audit:
-  # Path to the JSONL audit log (SHA-256 hash-chained).
+  # Backend: "legacy" (default, built-in SHA-256 JSONL) or "trailproof"
+  # TrailProof requires: pip install attesta[trailproof]
+  backend: legacy
+
+  # Path to the JSONL audit log.
   path: ".attesta/audit.jsonl"
+
+  # Tenant ID for TrailProof backend (multi-tenancy isolation).
+  # Only used when backend is "trailproof".
+  # tenant_id: "my-org"
+
+  # HMAC signing key for TrailProof backend (optional provenance).
+  # Only used when backend is "trailproof".
+  # Store this in an environment variable, not directly in the config.
+  # hmac_key: "your-secret-key"
 ```
 
 ## Loading the Config
@@ -132,7 +145,7 @@ const deploy = gate(async (service: string, version: string) => {
 | `policy` | Challenge mappings, review times, fail modes | No |
 | `risk` | Risk overrides and score amplifiers | No |
 | `trust` | Trust engine tuning parameters | No |
-| `audit` | Audit log file path | No |
+| `audit` | Audit backend selection and configuration | No |
 
 All sections are optional. When omitted, Attesta uses sensible defaults that enforce safe behavior: actions are denied on timeout, CRITICAL operations require 2-party approval, and trust starts low.
 
@@ -158,19 +171,79 @@ attesta = Attesta.from_config("/etc/attesta/production.yaml")
 `from_config()` requires an explicit path. Supports `.yaml` and `.yml` file extensions. Requires the `pyyaml` package (`pip install attesta[yaml]`).
 </Note>
 
+---
+
+## Audit Section
+
+The `audit` section configures how Attesta persists approval decisions. Attesta supports **pluggable audit backends**:
+
+- **`legacy`** (default) — Built-in SHA-256 hash-chained JSONL logger
+- **`trailproof`** — TrailProof backend with HMAC signing and multi-tenancy
+
+### Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `backend` | string | `legacy` | Audit backend: `legacy` or `trailproof` |
+| `path` | string | `.attesta/audit.jsonl` | File path for the JSONL audit log |
+| `tenant_id` | string | `default` | Tenant ID for TrailProof backend (multi-tenancy) |
+| `hmac_key` | string | None | HMAC signing key for TrailProof backend |
+
+### Example: Legacy Backend (Default)
+
+```yaml
+audit:
+  backend: legacy
+  path: ".attesta/audit.jsonl"
+```
+
+The legacy backend provides SHA-256 hash-chaining with zero dependencies. All entries are written to a JSONL file, and integrity verification walks the chain to detect tampering.
+
+### Example: TrailProof Backend
+
+```yaml
+audit:
+  backend: trailproof
+  path: ".attesta/audit-trailproof.jsonl"
+  tenant_id: "acme-corp"
+  hmac_key: "your-secret-key"  # Store in env var, not in config!
+```
+
+The TrailProof backend adds:
+- **HMAC signatures** for cryptographic provenance
+- **Multi-tenancy isolation** via tenant IDs
+- **Trace correlation** for distributed workflows
+- **Advanced querying** with cursor-based pagination
+
+<Warning>
+Never commit your HMAC key to version control. Store it in an environment variable and read it programmatically at initialization.
+</Warning>
+
+<Tip>
+See the [TrailProof Integration Guide](/guides/trailproof-integration) for detailed setup instructions, field mapping, and migration strategies.
+</Tip>
+
+---
+
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Policy Section" icon="scale-balanced" href="/configuration/policy-section">
+  <Card title="Policy Section" icon="scale-balanced" color="#16A34A" href="/configuration/policy-section">
     Challenge mappings, review times, and fail modes
   </Card>
-  <Card title="Risk Section" icon="gauge-high" href="/configuration/risk-section">
+  <Card title="Risk Section" icon="gauge-high" color="#15803D" href="/configuration/risk-section">
     Risk overrides and amplifiers
   </Card>
-  <Card title="Trust Section" icon="brain" href="/configuration/trust-section">
+  <Card title="Trust Section" icon="brain" color="#16A34A" href="/configuration/trust-section">
     Trust engine parameters
   </Card>
-  <Card title="Domain Activation" icon="hospital" href="/configuration/domain-activation">
+  <Card title="Domain Activation" icon="hospital" color="#15803D" href="/configuration/domain-activation">
     Activate and configure domain-specific risk profiles
+  </Card>
+  <Card title="TrailProof Integration" icon="shield-check" color="#16A34A" href="/guides/trailproof-integration">
+    Switch to TrailProof for enhanced audit features
+  </Card>
+  <Card title="Audit Trail Concepts" icon="file-shield" color="#15803D" href="/concepts/audit-trail">
+    Understand audit trail fundamentals
   </Card>
 </CardGroup>
