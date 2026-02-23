@@ -40,7 +40,7 @@ jobs:
           python -m pip install --upgrade pip build
           python -m build packages/dify-attesta
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dify-dist
           path: packages/dify-attesta/dist/

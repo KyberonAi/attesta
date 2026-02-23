@@ -40,7 +40,7 @@ jobs:
       - name: Build sdist and wheel
         run: python -m build packages/langflow-attesta
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: langflow-dist
           path: packages/langflow-attesta/dist/
