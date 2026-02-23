@@ -38,9 +38,13 @@ jobs:
         run: ./scripts/check_release_boundary.sh
 
   python:
-    name: Python Tests + Build
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     needs: boundary
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     defaults:
       run:
         working-directory: python
@@ -48,7 +52,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: python/pyproject.toml
       - name: Install package + test deps
@@ -56,16 +60,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,yaml]" build
       - name: Lint (ruff, advisory)
+        if: matrix.python-version == '3.12'
         continue-on-error: true
         run: ruff check src tests
       - name: Type check (mypy, advisory)
+        if: matrix.python-version == '3.12'
         continue-on-error: true
         run: mypy src/attesta
       - name: Run tests
         run: pytest -q
       - name: Build package
+        if: matrix.python-version == '3.12'
         run: python -m build
       - name: Check Python artifacts for proprietary leaks
+        if: matrix.python-version == '3.12'
         run: |
           set -euo pipefail
           if tar -tf dist/*.tar.gz | rg -i '(attesta-proprietary|llm_scorer|domains/presets/(healthcare|finance|infrastructure|legal)\.py)'; then
@@ -93,8 +101,8 @@ jobs:
       - name: Test Dify package
         run: PYTHONPATH=python/src pytest -q packages/dify-attesta/tests
 
-  typescript:
-    name: TypeScript Build + Pack
+  no-code-n8n:
+    name: No-Code n8n Package Tests
     runs-on: ubuntu-latest
     needs: boundary
     steps:
@@ -106,6 +114,50 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Build @kyberon/attesta
+        run: npm run --workspace @kyberon/attesta build
+      - name: Build n8n-nodes-attesta
+        run: npm run --workspace n8n-nodes-attesta build
+      - name: Test n8n-nodes-attesta
+        run: npm run --workspace n8n-nodes-attesta test
+
+  no-code-flowise:
+    name: No-Code Flowise Package Tests
+    runs-on: ubuntu-latest
+    needs: boundary
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build @kyberon/attesta
+        run: npm run --workspace @kyberon/attesta build
+      - name: Build flowise-attesta
+        run: npm run --workspace flowise-attesta build
+      - name: Test flowise-attesta
+        run: npm run --workspace flowise-attesta test
+
+  typescript:
+    name: TypeScript (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    needs: boundary
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
       - name: Typecheck
         run: npm run --workspace @kyberon/attesta typecheck
       - name: Build
@@ -113,8 +165,10 @@ jobs:
       - name: Run TypeScript tests
         run: npm run --workspace @kyberon/attesta test
       - name: Pack dry-run
+        if: matrix.node-version == 20
         run: npm --workspace @kyberon/attesta pack --dry-run
       - name: Check npm pack output for proprietary leaks
+        if: matrix.node-version == 20
         run: |
           set -euo pipefail
           PACK_LOG="$(npm --workspace @kyberon/attesta pack --dry-run 2>&1 || true)"
