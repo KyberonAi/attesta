@@ -7,7 +7,7 @@ name = "attesta"
 version = "0.1.0"
 description = "Advanced Human-in-the-Loop for Agentic AI — Stop rubber-stamping. Start understanding."
 readme = "../README.md"
-license = "Apache-2.0"
+license = "MIT"
 requires-python = ">=3.11"
 authors = [
     { name = "Attesta Contributors" },
@@ -16,7 +16,7 @@ keywords = ["ai", "agents", "human-in-the-loop", "safety", "approval", "hitl", "
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

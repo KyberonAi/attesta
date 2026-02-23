@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://pypi.org/project/attesta/"><img alt="PyPI" src="https://img.shields.io/pypi/v/attesta?color=blue"></a>
   <a href="https://pypi.org/project/attesta/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/attesta"></a>
-  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-green"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green"></a>
   <a href="./.github/workflows/ci.yaml"><img alt="CI" src="https://img.shields.io/badge/ci-configured-blue"></a>
   <img alt="Status" src="https://img.shields.io/badge/status-early%20release-orange">
 </p>
@@ -1067,4 +1067,4 @@ cd ..
 
 ## License
 
-Apache 2.0 -- see [LICENSE](LICENSE) for details.
+MIT -- see [LICENSE](LICENSE) for details.
