@@ -71,9 +71,8 @@ trust:
 # Audit trail
 # ─────────────────────────────────────────────────────────
 audit:
+  backend: legacy  # or "trailproof" for enhanced features
   path: /var/log/attesta/audit.jsonl
-  signed: true
-  format: jsonl
 
 # ─────────────────────────────────────────────────────────
 # Domain profile (optional)
@@ -108,7 +107,12 @@ Never use `fail_mode: allow` in production. If the approval system goes down, al
 
 ## Audit Log Persistence
 
-The built-in `AuditLogger` writes SHA-256 hash-chained entries to a JSONL file. For production, you need durable persistence.
+Attesta supports two audit backends:
+
+1. **Legacy backend** (default) -- Built-in SHA-256 hash-chained JSONL logger
+2. **TrailProof backend** -- Enhanced features including HMAC signing and multi-tenancy
+
+Both backends write to JSONL files. For production, you need durable persistence.
 
 ### Option 1: Local JSONL with Rotation
 
@@ -116,6 +120,7 @@ The simplest approach -- write to a local file and rotate with `logrotate` or a 
 
 ```yaml attesta.yaml
 audit:
+  backend: legacy  # or "trailproof"
   path: /var/log/attesta/audit.jsonl
 ```
 
@@ -133,8 +138,12 @@ audit:
 ```
 
 <Note>
-When using `copytruncate`, the hash chain resumes correctly because `AuditLogger` reads the last entry's hash on startup. However, the chain integrity check (`verify_chain()`) should be run on each rotated file individually.
+When using `copytruncate`, the hash chain resumes correctly because the audit logger reads the last entry's hash on startup. However, the chain integrity check (`verify_chain()` or `verify()`) should be run on each rotated file individually.
 </Note>
+
+<Tip>
+For enhanced audit features like HMAC signing and multi-tenancy, consider using the **TrailProof backend**. See the [TrailProof Integration Guide](/guides/trailproof-integration) for details.
+</Tip>
 
 ### Option 2: PostgreSQL Audit Logger
 
@@ -541,10 +550,16 @@ class MetricsAuditLogger:
 </Steps>
 
 <CardGroup cols={2}>
-  <Card title="attesta.yaml Reference" icon="file-code" href="/configuration/attesta-yaml">
+  <Card title="attesta.yaml Reference" icon="file-code" color="#16A34A" href="/configuration/attesta-yaml">
     Full configuration file reference
   </Card>
-  <Card title="Testing Guide" icon="vial" href="/guides/testing">
+  <Card title="Testing Guide" icon="vial" color="#15803D" href="/guides/testing">
     Testing patterns for gated functions
+  </Card>
+  <Card title="TrailProof Integration" icon="shield-check" color="#16A34A" href="/guides/trailproof-integration">
+    Enhanced audit backend with HMAC signing
+  </Card>
+  <Card title="Audit Trail Concepts" icon="file-shield" color="#15803D" href="/concepts/audit-trail">
+    Understand tamper-proof audit logging
   </Card>
 </CardGroup>
