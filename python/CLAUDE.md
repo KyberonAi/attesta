@@ -38,23 +38,27 @@ python/
 ## Commands
 
 ```bash
-# Install (from repo root)
-cd python && pip install -e ".[dev,yaml,terminal]"
+# Install (from python/ dir)
+cd python && uv sync --all-extras
 
-# Run all tests (use the project venv)
-.venv/bin/python -m pytest python/tests/ -q
+# Run all tests
+cd python && uv run pytest tests/ -v
 
 # Run a single test file
-.venv/bin/python -m pytest python/tests/test_gate.py -q
+cd python && uv run pytest tests/test_gate.py -v
 
 # Run a single test function
-.venv/bin/python -m pytest python/tests/test_gate.py::TestGateDecorator::test_basic_gate -q
+cd python && uv run pytest tests/test_gate.py::TestGateDecorator::test_basic_gate -v
 
 # Lint
-cd python && ruff check src tests
+cd python && uv run ruff check src/ tests/
+cd python && uv run ruff format --check src/ tests/
 
 # Type check
-cd python && mypy src/attesta
+cd python && uv run mypy
+
+# All (lint + typecheck + test)
+cd python && make all
 ```
 
 ## Conventions

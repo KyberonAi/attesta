@@ -8,24 +8,25 @@
 all: python typescript
 
 install:
-	cd python && pip install -e ".[dev,yaml,terminal]"
+	cd python && uv sync --all-extras
 	cd typescript && npm install
 
 # ── Python SDK ───────────────────────────────────────────────────────
 
-python: lint-python typecheck-python test-python
+python:
+	$(MAKE) -C python all
 
 build-python:
-	cd python && pip install -e ".[dev,yaml,terminal]"
+	cd python && uv sync --all-extras
 
 test-python:
-	PYTHONPATH=python/src python -m pytest python/tests/ -q
+	$(MAKE) -C python test
 
 lint-python:
-	cd python && ruff check src tests
+	$(MAKE) -C python lint
 
 typecheck-python:
-	cd python && mypy src/attesta
+	$(MAKE) -C python typecheck
 
 # ── TypeScript SDK ───────────────────────────────────────────────────
 
@@ -46,8 +47,8 @@ typecheck-typescript:
 # ── No-code packages ────────────────────────────────────────────────
 
 test-nocode:
-	PYTHONPATH=python/src pytest packages/n8n-nodes-attesta/tests -q 2>/dev/null || true
-	PYTHONPATH=python/src pytest packages/flowise-attesta/tests -q 2>/dev/null || true
+	cd python && uv run pytest ../packages/n8n-nodes-attesta/tests -q 2>/dev/null || true
+	cd python && uv run pytest ../packages/flowise-attesta/tests -q 2>/dev/null || true
 
 # ── Combined ─────────────────────────────────────────────────────────
 
@@ -65,5 +66,5 @@ docs:
 # ── Clean ────────────────────────────────────────────────────────────
 
 clean:
-	cd python && rm -rf dist build *.egg-info src/*.egg-info
+	cd python && rm -rf dist build *.egg-info src/*.egg-info .venv
 	cd typescript && npm run clean
